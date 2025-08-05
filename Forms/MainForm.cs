@@ -264,17 +264,11 @@ namespace LogisticManager.Forms
 
         /// <summary>
         /// 모던한 스타일의 버튼을 생성하는 메서드
-        /// 
-        /// 특징:
-        /// - 둥근 모서리
-        /// - 그라데이션 배경
-        /// - 호버 효과
-        /// - 아이콘 포함
         /// </summary>
         /// <param name="text">버튼 텍스트</param>
         /// <param name="location">위치</param>
         /// <param name="size">크기</param>
-        /// <param name="backgroundColor">배경색 (기본값: 파란색)</param>
+        /// <param name="backgroundColor">배경색</param>
         /// <returns>생성된 버튼</returns>
         private Button CreateModernButton(string text, Point location, Size size, Color? backgroundColor = null)
         {
@@ -287,11 +281,13 @@ namespace LogisticManager.Forms
                 FlatStyle = FlatStyle.Flat,
                 BackColor = backgroundColor ?? Color.FromArgb(52, 152, 219),
                 ForeColor = Color.White,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                FlatAppearance = { BorderSize = 0 }, // 테두리 제거
+                TextAlign = ContentAlignment.MiddleCenter // 텍스트 중앙 정렬
             };
 
-            // 둥근 모서리 설정
-            button.Region = new Region(CreateRoundedRectangle(button.ClientRectangle, 10));
+            // 둥근 모서리 제거 - 일반 사각형 버튼 사용
+            // button.Region = new Region(CreateRoundedRectangle(button.ClientRectangle, 10));
 
             // 호버 효과
             button.MouseEnter += (sender, e) =>
@@ -711,7 +707,7 @@ namespace LogisticManager.Forms
         /// 
         /// 기능:
         /// - 종료 확인 메시지 표시
-        /// - 사용자 확인 시 애플리케이션 완전 종료
+        /// - 사용자 확인 시 프로그램 완전 종료
         /// - 취소 시 폼 유지
         /// </summary>
         /// <param name="sender">이벤트 발생 객체</param>
@@ -722,14 +718,14 @@ namespace LogisticManager.Forms
             {
                 // 종료 확인 메시지 표시
                 var result = MessageBox.Show(
-                    "정말로 애플리케이션을 종료하시겠습니까?",
+                    "프로그램을 종료하시겠습니까?",
                     "종료 확인",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question);
 
                 if (result == DialogResult.Yes)
                 {
-                    LogMessage("👋 애플리케이션을 종료합니다.");
+                    LogMessage("👋 프로그램을 종료합니다.");
                     
                     // 강제 종료를 위한 타이머 설정
                     var exitTimer = new System.Windows.Forms.Timer();
@@ -744,7 +740,7 @@ namespace LogisticManager.Forms
                     // 모든 리소스 정리
                     Dispose();
                     
-                    // 애플리케이션 완전 종료
+                    // 프로그램 완전 종료
                     Application.Exit();
                 }
             }
@@ -775,7 +771,7 @@ namespace LogisticManager.Forms
         {
             try
             {
-                LogMessage("👋 애플리케이션을 종료합니다.");
+                LogMessage("👋 프로그램을 종료합니다.");
                 
                 // 리소스 정리는 GC가 자동으로 처리하므로 별도 작업 불필요
             }
