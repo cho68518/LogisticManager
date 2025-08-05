@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MySQL 데이터베이스 연결 -->
+    <PackageReference Include="MySql.Data" Version="8.3.0" />
+    
+    <!-- Excel 파일 처리 -->
+    <PackageReference Include="EPPlus" Version="7.0.5" />
+    
+    <!-- JSON 처리 -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    
+    <!-- 설정 파일 읽기 -->
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.0" />
+  </ItemGroup>
+
+</Project> 

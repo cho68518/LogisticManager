@@ -1,0 +1,27 @@
+# .NET 빌드 결과물
+bin/
+obj/
+
+# Visual Studio 파일
+.vs/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+
+# 로그 파일
+*.log
+
+# 설정 파일 (보안상 제외)
+settings.json
+settings.backup.json
+
+# 임시 파일
+*.tmp
+*.temp
+
+# OS 생성 파일
+.DS_Store
+Thumbs.db 
