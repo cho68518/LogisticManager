@@ -10,7 +10,6 @@ namespace LogisticManager.Services
     public class ApiService
     {
         private readonly HttpClient _httpClient;
-        private readonly string _dropboxApiKey;
         private readonly string _dropboxFolderPath;
         private readonly string _kakaoWorkApiKey;
         private readonly string _kakaoWorkChatroomId;
@@ -19,13 +18,11 @@ namespace LogisticManager.Services
         {
             _httpClient = new HttpClient();
             
-            // App.config에서 API 키들을 읽어옴
-            _dropboxApiKey = ConfigurationManager.AppSettings["DropboxApiKey"] 
-                ?? throw new InvalidOperationException("Dropbox API 키를 찾을 수 없습니다.");
+            // App.config에서 API 키들을 읽어옴 (Dropbox는 DropboxService에서 처리)
             _dropboxFolderPath = ConfigurationManager.AppSettings["DropboxFolderPath"] ?? "/LogisticManager/";
-            _kakaoWorkApiKey = ConfigurationManager.AppSettings["KakaoWorkApiKey"] 
+            _kakaoWorkApiKey = ConfigurationManager.AppSettings["KakaoWork.AppKey"] 
                 ?? throw new InvalidOperationException("Kakao Work API 키를 찾을 수 없습니다.");
-            _kakaoWorkChatroomId = ConfigurationManager.AppSettings["KakaoWorkChatroomId"] 
+            _kakaoWorkChatroomId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Integrated"] 
                 ?? throw new InvalidOperationException("Kakao Work 채팅방 ID를 찾을 수 없습니다.");
         }
 
@@ -39,51 +36,9 @@ namespace LogisticManager.Services
         {
             try
             {
-                // 파일이 존재하는지 확인
-                if (!File.Exists(filePath))
-                {
-                    throw new FileNotFoundException($"업로드할 파일을 찾을 수 없습니다: {filePath}");
-                }
-
-                // 파일을 바이트 배열로 읽기
-                var fileBytes = await File.ReadAllBytesAsync(filePath);
-                var fileName = Path.GetFileName(filePath);
-                var fullDropboxPath = $"{_dropboxFolderPath.TrimEnd('/')}/{dropboxPath}/{fileName}";
-
-                // Dropbox API 요청 준비
-                var request = new HttpRequestMessage(HttpMethod.Post, "https://content.dropboxapi.com/2/files/upload");
-                request.Headers.Add("Authorization", $"Bearer {_dropboxApiKey}");
-                request.Headers.Add("Dropbox-API-Arg", JsonSerializer.Serialize(new
-                {
-                    path = fullDropboxPath,
-                    mode = "overwrite",
-                    autorename = true,
-                    mute = false
-                }));
-
-                request.Content = new ByteArrayContent(fileBytes);
-                request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
-
-                // 파일 업로드
-                var response = await _httpClient.SendAsync(request);
-                response.EnsureSuccessStatusCode();
-
-                // 공유 링크 생성
-                var shareRequest = new HttpRequestMessage(HttpMethod.Post, "https://api.dropboxapi.com/2/sharing/create_shared_link_with_settings");
-                shareRequest.Headers.Add("Authorization", $"Bearer {_dropboxApiKey}");
-                shareRequest.Content = new StringContent(
-                    JsonSerializer.Serialize(new { path = fullDropboxPath }),
-                    Encoding.UTF8,
-                    "application/json"
-                );
-
-                var shareResponse = await _httpClient.SendAsync(shareRequest);
-                shareResponse.EnsureSuccessStatusCode();
-
-                var shareResult = await shareResponse.Content.ReadAsStringAsync();
-                var shareData = JsonSerializer.Deserialize<JsonElement>(shareResult);
-                
-                return shareData.GetProperty("url").GetString() ?? string.Empty;
+                // DropboxService Singleton 인스턴스 사용
+                var dropboxService = DropboxService.Instance;
+                return await dropboxService.UploadFileAsync(filePath, dropboxPath);
             }
             catch (Exception ex)
             {

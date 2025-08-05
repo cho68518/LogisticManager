@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <!-- MySQL 데이터베이스 연결 (MySqlConnector - 더 안정적) -->
+    <PackageReference Include="Dropbox.Api" Version="7.0.0" />
     <PackageReference Include="MySqlConnector" Version="2.3.5" />
     
     <!-- Excel 파일 처리 -->

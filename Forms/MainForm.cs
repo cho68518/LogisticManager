@@ -118,6 +118,12 @@ namespace LogisticManager.Forms
             
             // 데이터베이스 연결 테스트 및 완료 메시지 표시
             TestDatabaseConnection();
+            
+            // Dropbox 연결 테스트
+            TestDropboxConnection();
+            
+            // KakaoWork 연결 테스트
+            TestKakaoWorkConnection();
         }
 
         #endregion
@@ -695,6 +701,104 @@ namespace LogisticManager.Forms
                 LogMessage($"❌ 데이터베이스 연결 테스트 중 오류 발생: {ex.Message}");
                 lblStatus.Text = "연결 오류";
                 lblStatus.ForeColor = Color.FromArgb(231, 76, 60);
+            }
+        }
+
+        /// <summary>
+        /// Dropbox 연결 상태를 테스트하고 결과를 로그에 표시
+        /// 
+        /// 기능:
+        /// - DropboxService Singleton 인스턴스 사용
+        /// - 비동기 연결 테스트 실행
+        /// - 연결 성공/실패 결과를 로그에 표시
+        /// - UI 상태 업데이트
+        /// </summary>
+        private async void TestDropboxConnection()
+        {
+            try
+            {
+                LogMessage("☁️ Dropbox 연결을 확인하고 있습니다...");
+                Console.WriteLine("🔄 MainForm: Dropbox 연결 테스트 시작");
+                
+                // DropboxService Singleton 인스턴스 사용
+                var dropboxService = DropboxService.Instance;
+                
+                // 비동기 연결 테스트 실행
+                var isConnected = await dropboxService.TestConnectionAsync();
+                
+                Console.WriteLine($"📊 MainForm: Dropbox 연결 테스트 결과 = {isConnected}");
+                
+                if (isConnected)
+                {
+                    LogMessage("✅ Dropbox 연결이 완료되었습니다!");
+                    LogMessage("☁️ 파일 업로드 기능을 사용할 수 있습니다.");
+                    Console.WriteLine("✅ MainForm: Dropbox 연결 성공 처리 완료");
+                }
+                else
+                {
+                    LogMessage("⚠️ Dropbox 연결에 실패했습니다.");
+                    LogMessage("💡 설정 화면에서 Dropbox 인증 정보를 확인해주세요.");
+                    LogMessage("💡 App.config에서 Dropbox.AppKey, Dropbox.AppSecret, Dropbox.RefreshToken을 확인해주세요.");
+                    Console.WriteLine("❌ MainForm: Dropbox 연결 실패 처리 완료");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ MainForm: Dropbox 연결 테스트 중 예외 발생: {ex.Message}");
+                Console.WriteLine($"🔍 MainForm: Dropbox 예외 상세: {ex}");
+                
+                LogMessage($"❌ Dropbox 연결 중 오류가 발생했습니다: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    LogMessage($"🔍 상세 오류: {ex.InnerException.Message}");
+                    Console.WriteLine($"🔍 MainForm: Dropbox 내부 예외: {ex.InnerException.Message}");
+                }
+                LogMessage("💡 설정 화면에서 Dropbox 인증 정보를 확인해주세요.");
+            }
+        }
+
+        /// <summary>
+        /// KakaoWork 연결 상태를 테스트하는 메서드
+        /// </summary>
+        private async void TestKakaoWorkConnection()
+        {
+            try
+            {
+                LogMessage("💬 KakaoWork 연결을 확인하고 있습니다...");
+                Console.WriteLine("🔄 MainForm: KakaoWork 연결 테스트 시작");
+                
+                // KakaoWorkService 인스턴스 생성 시도
+                var kakaoWorkService = KakaoWorkService.Instance;
+                Console.WriteLine("✅ KakaoWorkService 인스턴스 생성 성공");
+                
+                // 연결 테스트
+                var isConnected = await kakaoWorkService.TestConnectionAsync();
+                
+                Console.WriteLine($"📊 MainForm: KakaoWork 연결 테스트 결과 = {isConnected}");
+                
+                if (isConnected)
+                {
+                    LogMessage("✅ KakaoWork 연결이 정상입니다.");
+                    Console.WriteLine("✅ MainForm: KakaoWork 연결 성공");
+                }
+                else
+                {
+                    LogMessage("❌ KakaoWork 연결에 실패했습니다.");
+                    Console.WriteLine("❌ MainForm: KakaoWork 연결 실패");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ MainForm: KakaoWork 연결 테스트 중 예외 발생: {ex.Message}");
+                Console.WriteLine($"🔍 MainForm: KakaoWork 예외 상세: {ex}");
+                
+                LogMessage($"❌ KakaoWork 연결 중 오류가 발생했습니다: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    LogMessage($"🔍 상세 오류: {ex.InnerException.Message}");
+                    Console.WriteLine($"🔍 MainForm: KakaoWork 내부 예외: {ex.InnerException.Message}");
+                }
+                LogMessage("💡 App.config에서 KakaoWork 인증 정보를 확인해주세요.");
             }
         }
 

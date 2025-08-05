@@ -131,10 +131,10 @@ namespace LogisticManager.Forms
             dbTab.Controls.Add(CreateDatabaseSettingsPanel());
             tabControl.TabPages.Add(dbTab);
 
-            // API 설정 탭
-            var apiTab = new TabPage("🔗 API 설정");
-            apiTab.Controls.Add(CreateApiSettingsPanel());
-            tabControl.TabPages.Add(apiTab);
+            // API 설정 탭 (숨김 처리)
+            // var apiTab = new TabPage("🔗 API 설정");
+            // apiTab.Controls.Add(CreateApiSettingsPanel());
+            // tabControl.TabPages.Add(apiTab);
 
             // 파일 경로 설정 탭
             var pathTab = new TabPage("📁 파일 경로 설정");
@@ -1119,17 +1119,9 @@ namespace LogisticManager.Forms
         {
             try
             {
-                // Dropbox API 연결 테스트 로직
-                // 실제 구현에서는 Dropbox SDK를 사용하여 연결 테스트
-                await Task.Delay(1000); // 시뮬레이션용 지연
-                
-                // 간단한 유효성 검사 (실제로는 API 호출)
-                if (apiKey.Length > 10 && apiKey.StartsWith("sl."))
-                {
-                    return true; // Dropbox API 키 형식이 맞는 경우
-                }
-                
-                return false;
+                // DropboxService Singleton 인스턴스를 사용하여 연결 테스트
+                var dropboxService = DropboxService.Instance;
+                return await dropboxService.TestConnectionAsync();
             }
             catch
             {
