@@ -181,6 +181,53 @@ namespace LogisticManager.Services
         }
         
         /// <summary>
+        /// 데이터베이스 연결 정보를 반환하는 메서드
+        /// </summary>
+        /// <returns>DB 연결 정보</returns>
+        public (string Server, string Database, string User, string Port, string ConnectionString) GetConnectionInfo()
+        {
+            var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+            var settings = new Dictionary<string, string>();
+            
+            try
+            {
+                if (File.Exists(settingsPath))
+                {
+                    var jsonContent = File.ReadAllText(settingsPath);
+                    
+                    if (!string.IsNullOrEmpty(jsonContent))
+                    {
+                        try
+                        {
+                            // Newtonsoft.Json을 사용하여 더 안전하게 역직렬화
+                            settings = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonContent) ?? new Dictionary<string, string>();
+                        }
+                        catch (Exception jsonEx)
+                        {
+                            Console.WriteLine($"❌ DatabaseService: JSON 역직렬화 실패: {jsonEx.Message}");
+                            settings = new Dictionary<string, string>();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ DatabaseService: JSON 파일 읽기 실패: {ex.Message}");
+            }
+            
+            // JSON에서 설정을 읽어오거나 기본값 사용
+            var server = settings.GetValueOrDefault("DB_SERVER", "gramwonlogis.mycafe24.com");
+            var database = settings.GetValueOrDefault("DB_NAME", "gramwonlogis");
+            var user = settings.GetValueOrDefault("DB_USER", "gramwonlogis");
+            var password = settings.GetValueOrDefault("DB_PASSWORD", "jung5516!");
+            var port = settings.GetValueOrDefault("DB_PORT", "3306");
+            
+            var connectionString = $"Server={server};Database={database};Uid={user};Pwd={password};CharSet=utf8mb4;Port={port};SslMode=none;AllowPublicKeyRetrieval=true;ConnectionTimeout=30;";
+            
+            return (server, database, user, port, connectionString);
+        }
+
+        /// <summary>
         /// 연결 상태를 확인하는 메서드
         /// </summary>
         /// <returns>연결 가능 여부</returns>

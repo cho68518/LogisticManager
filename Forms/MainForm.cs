@@ -633,6 +633,13 @@ namespace LogisticManager.Forms
                 LogMessage("🔗 데이터베이스 연결을 확인하고 있습니다...");
                 Console.WriteLine("🔄 MainForm: 데이터베이스 연결 테스트 시작");
                 
+                // DB 연결 정보 가져오기
+                var dbInfo = _databaseService.GetConnectionInfo();
+                LogMessage($"📊 DB 서버: {dbInfo.Server}");
+                LogMessage($"📊 DB 이름: {dbInfo.Database}");
+                LogMessage($"📊 DB 사용자: {dbInfo.User}");
+                LogMessage($"📊 DB 포트: {dbInfo.Port}");
+                
                 // 동기적으로 연결 테스트 실행 (UI 스레드에서 직접 실행)
                 try
                 {
