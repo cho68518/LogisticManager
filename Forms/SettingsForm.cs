@@ -2,7 +2,7 @@ using System;
 using System.Windows.Forms;
 using LogisticManager.Services;
 using System.Linq; // Added for FirstOrDefault
-using MySql.Data.MySqlClient; // Added for MySql.Data.MySqlClient
+using MySqlConnector; // Added for MySqlConnector
 using System.Drawing.Drawing2D;
 using System.Collections.Generic; // Added for List
 using System.Drawing; // Added for Color, Point, Size, Font
@@ -145,16 +145,21 @@ namespace LogisticManager.Forms
             buttonPanel.Size = new Size(660, 50);
             buttonPanel.BackColor = Color.Transparent;
 
+            // 버튼들의 총 너비 계산 (80 + 80 + 110 = 270px)
+            // 버튼 간격: 20px
+            // 총 너비: 270 + (20 * 2) = 310px
+            // 시작 위치: (660 - 310) / 2 = 175px
+            
             // 저장 버튼
-            var saveButton = CreateModernButton("💾 저장", new Point(400, 10), new Size(80, 35), Color.FromArgb(46, 204, 113));
+            var saveButton = CreateModernButton("💾 저장", new Point(175, 10), new Size(80, 35), Color.FromArgb(46, 204, 113));
             saveButton.Click += SaveButton_Click;
 
             // 취소 버튼
-            var cancelButton = CreateModernButton("❌ 취소", new Point(490, 10), new Size(80, 35), Color.FromArgb(231, 76, 60));
+            var cancelButton = CreateModernButton("❌ 취소", new Point(275, 10), new Size(80, 35), Color.FromArgb(231, 76, 60));
             cancelButton.Click += (sender, e) => this.Close();
 
             // 연결 테스트 버튼
-            var testButton = CreateModernButton("🔍 연결 테스트", new Point(580, 10), new Size(80, 35), Color.FromArgb(52, 152, 219));
+            var testButton = CreateModernButton("🔍 연결 테스트", new Point(375, 10), new Size(110, 35), Color.FromArgb(52, 152, 219));
             testButton.Click += TestConnectionButton_Click;
 
             // 버튼들을 패널에 추가
@@ -825,15 +830,15 @@ namespace LogisticManager.Forms
                 // 동기적으로 연결 테스트 실행
                 try
                 {
-                    using var connection = new MySqlConnection(connectionString);
+                    using var connection = new MySqlConnector.MySqlConnection(connectionString);
                     connection.Open();
 
                     // 서버 버전 확인
-                    using var command = new MySqlCommand("SELECT VERSION() as version", connection);
+                    using var command = new MySqlConnector.MySqlCommand("SELECT VERSION() as version", connection);
                     var version = command.ExecuteScalar();
 
                     // 데이터베이스 이름 확인
-                    using var dbCommand = new MySqlCommand("SELECT DATABASE() as database_name", connection);
+                    using var dbCommand = new MySqlConnector.MySqlCommand("SELECT DATABASE() as database_name", connection);
                     var databaseName = dbCommand.ExecuteScalar();
 
                     MessageBox.Show($"✅ 데이터베이스 연결이 성공했습니다!\n\n서버 버전: {version}\n현재 데이터베이스: {databaseName}", "연결 테스트", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -896,11 +901,11 @@ namespace LogisticManager.Forms
                 // 동기적으로 연결 테스트 실행
                 try
                 {
-                    using var connection = new MySqlConnection(connectionString);
+                    using var connection = new MySqlConnector.MySqlConnection(connectionString);
                     connection.Open();
 
                     // 서버 버전 확인
-                    using var command = new MySqlCommand("SELECT VERSION() as version", connection);
+                    using var command = new MySqlConnector.MySqlCommand("SELECT VERSION() as version", connection);
                     var version = command.ExecuteScalar();
 
                     MessageBox.Show($"✅ 저장된 설정으로 데이터베이스 연결이 성공했습니다!\n\n서버 버전: {version}\n\n이제 애플리케이션에서 저장된 설정을 사용합니다.", "연결 테스트 성공", MessageBoxButtons.OK, MessageBoxIcon.Information);

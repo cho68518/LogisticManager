@@ -1,4 +1,4 @@
-using MySql.Data.MySqlClient;
+using MySqlConnector;
 using System.Data;
 using System.Configuration;
 
@@ -74,7 +74,7 @@ namespace LogisticManager.Services
             var port = settings.GetValueOrDefault("DB_PORT", "3306");
             
             // 설정값 검증 및 로깅
-            Console.WriteLine($"🔍 DatabaseService: 설정값 검증");
+            Console.WriteLine($"�� DatabaseService: 설정값 검증");
             Console.WriteLine($"   DB_SERVER: '{server}' (길이: {server?.Length ?? 0})");
             Console.WriteLine($"   DB_NAME: '{database}' (길이: {database?.Length ?? 0})");
             Console.WriteLine($"   DB_USER: '{user}' (길이: {user?.Length ?? 0})");
@@ -98,7 +98,7 @@ namespace LogisticManager.Services
             Console.WriteLine($"   사용자: {user}");
             Console.WriteLine($"   포트: {port}");
             
-            _connectionString = $"Server={server};Database={database};Uid={user};Pwd={password};CharSet=utf8mb4;Port={port};SslMode=none;AllowPublicKeyRetrieval=true;ConnectionTimeout=30;";
+            _connectionString = $"Server={server};Database={database};User ID={user};Password={password};Port={port};CharSet=utf8mb4;SslMode=none;AllowPublicKeyRetrieval=true;Convert Zero Datetime=True;ConnectionTimeout=30;";
             
             Console.WriteLine($"🔗 DatabaseService: 연결 문자열 생성 완료");
             Console.WriteLine($"🔗 DatabaseService: 연결 문자열 = {_connectionString}");
@@ -111,9 +111,9 @@ namespace LogisticManager.Services
         /// <returns>쿼리 결과 DataTable</returns>
         public async Task<DataTable> GetDataTableAsync(string query)
         {
-            using var connection = new MySqlConnection(_connectionString);
-            using var command = new MySqlCommand(query, connection);
-            using var adapter = new MySqlDataAdapter(command);
+            using var connection = new MySqlConnector.MySqlConnection(_connectionString);
+            using var command = new MySqlConnector.MySqlCommand(query, connection);
+            using var adapter = new MySqlConnector.MySqlDataAdapter(command);
             
             var dataTable = new DataTable();
             
@@ -136,8 +136,8 @@ namespace LogisticManager.Services
         /// <returns>영향받은 행의 수</returns>
         public async Task<int> ExecuteNonQueryAsync(string query)
         {
-            using var connection = new MySqlConnection(_connectionString);
-            using var command = new MySqlCommand(query, connection);
+            using var connection = new MySqlConnector.MySqlConnection(_connectionString);
+            using var command = new MySqlConnector.MySqlCommand(query, connection);
             
             try
             {
@@ -157,7 +157,7 @@ namespace LogisticManager.Services
         /// <returns>성공 여부</returns>
         public async Task<bool> ExecuteTransactionAsync(IEnumerable<string> queries)
         {
-            using var connection = new MySqlConnection(_connectionString);
+            using var connection = new MySqlConnector.MySqlConnection(_connectionString);
             await connection.OpenAsync();
             
             using var transaction = await connection.BeginTransactionAsync();
@@ -166,7 +166,7 @@ namespace LogisticManager.Services
             {
                 foreach (var query in queries)
                 {
-                    using var command = new MySqlCommand(query, connection, transaction);
+                    using var command = new MySqlConnector.MySqlCommand(query, connection, transaction);
                     await command.ExecuteNonQueryAsync();
                 }
                 
@@ -222,7 +222,7 @@ namespace LogisticManager.Services
             var password = settings.GetValueOrDefault("DB_PASSWORD", "jung5516!");
             var port = settings.GetValueOrDefault("DB_PORT", "3306");
             
-            var connectionString = $"Server={server};Database={database};Uid={user};Pwd={password};CharSet=utf8mb4;Port={port};SslMode=none;AllowPublicKeyRetrieval=true;ConnectionTimeout=30;";
+            var connectionString = $"Server={server};Database={database};User ID={user};Password={password};Port={port};CharSet=utf8mb4;SslMode=none;AllowPublicKeyRetrieval=true;Convert Zero Datetime=True;";
             
             return (server, database, user, port, connectionString);
         }
@@ -237,7 +237,7 @@ namespace LogisticManager.Services
             {
                 Console.WriteLine($"🔍 연결 테스트 시작: {_connectionString}");
                 
-                using var connection = new MySqlConnection(_connectionString);
+                using var connection = new MySqlConnector.MySqlConnection(_connectionString);
                 Console.WriteLine("📡 연결 객체 생성 완료");
                 
                 await connection.OpenAsync();
@@ -260,7 +260,7 @@ namespace LogisticManager.Services
                 }
                 
                 // 오류 타입별 상세 정보
-                if (ex is MySqlException mySqlEx)
+                if (ex is MySqlConnector.MySqlException mySqlEx)
                 {
                     Console.WriteLine($"🔍 MySQL 오류 코드: {mySqlEx.Number}");
                     Console.WriteLine($"🔍 MySQL 오류 메시지: {mySqlEx.Message}");
@@ -281,7 +281,7 @@ namespace LogisticManager.Services
                 Console.WriteLine($"🔍 TestConnectionWithDetailsAsync: 연결 테스트 시작");
                 Console.WriteLine($"🔍 TestConnectionWithDetailsAsync: 연결 문자열 = {_connectionString}");
                 
-                using var connection = new MySqlConnection(_connectionString);
+                using var connection = new MySqlConnector.MySqlConnection(_connectionString);
                 Console.WriteLine("📡 TestConnectionWithDetailsAsync: MySqlConnection 객체 생성 완료");
                 
                 Console.WriteLine("📡 TestConnectionWithDetailsAsync: 데이터베이스 연결 시도 중...");
@@ -296,7 +296,7 @@ namespace LogisticManager.Services
                 Console.WriteLine($"   연결 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 
                 // 간단한 쿼리 테스트
-                using var command = new MySqlCommand("SELECT 1 as test_result", connection);
+                using var command = new MySqlConnector.MySqlCommand("SELECT 1 as test_result", connection);
                 var result = await command.ExecuteScalarAsync();
                 Console.WriteLine($"📊 TestConnectionWithDetailsAsync: 테스트 쿼리 결과 = {result}");
                 
@@ -319,7 +319,7 @@ namespace LogisticManager.Services
                 }
                 
                 // MySQL 특정 오류 정보
-                if (ex is MySqlException mySqlEx)
+                if (ex is MySqlConnector.MySqlException mySqlEx)
                 {
                     Console.WriteLine($"🔍 TestConnectionWithDetailsAsync: MySQL 오류 코드 = {mySqlEx.Number}");
                     Console.WriteLine($"🔍 TestConnectionWithDetailsAsync: MySQL 오류 메시지 = {mySqlEx.Message}");
