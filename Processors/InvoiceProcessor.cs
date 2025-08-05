@@ -81,6 +81,7 @@ namespace LogisticManager.Processors
         public InvoiceProcessor(FileService fileService, DatabaseService databaseService, ApiService apiService, 
             IProgress<string>? progress = null, IProgress<int>? progressReporter = null)
         {
+            // 각 서비스 인스턴스를 private 필드에 저장
             _fileService = fileService;
             _databaseService = databaseService;
             _apiService = apiService;
@@ -212,6 +213,7 @@ namespace LogisticManager.Processors
         private DataTable ProcessFirstStageData(DataTable data)
         {
             // 원본 데이터 구조를 복제하여 새로운 DataTable 생성
+            // data: 엑셀 에서 읽은 데이터
             var processedData = data.Clone();
 
             // 각 행을 순회하며 가공 처리
@@ -257,6 +259,7 @@ namespace LogisticManager.Processors
         /// <param name="order">정리할 주문 정보</param>
         private void CleanAddress(Order order)
         {
+            // 주소가 비어있으면 처리하지 않음
             if (string.IsNullOrEmpty(order.Address))
                 return;
 
@@ -299,16 +302,17 @@ namespace LogisticManager.Processors
         /// <param name="order">정리할 주문 정보</param>
         private void CleanRecipientName(Order order)
         {
+            // 수취인명이 비어있으면 처리하지 않음
             if (string.IsNullOrEmpty(order.RecipientName))
                 return;
 
             // 특수문자 제거 및 정리
             order.RecipientName = order.RecipientName
-                .Replace("(", "")
-                .Replace(")", "")
-                .Replace("[", "")
-                .Replace("]", "")
-                .Trim();
+                .Replace("(", "") // 괄호 제거
+                .Replace(")", "") // 괄호 제거
+                .Replace("[", "") // 대괄호 제거
+                .Replace("]", "") // 대괄호 제거
+                .Trim(); // 앞뒤 공백 제거
         }
 
         /// <summary>
@@ -327,6 +331,7 @@ namespace LogisticManager.Processors
         /// <param name="order">정리할 주문 정보</param>
         private void CleanPaymentMethod(Order order)
         {
+            // 결제방법이 비어있으면 처리하지 않음
             if (string.IsNullOrEmpty(order.PaymentMethod))
                 return;
 
@@ -378,7 +383,9 @@ namespace LogisticManager.Processors
             // 각 행을 순회하며 출고지별로 분류
             foreach (DataRow row in data.Rows)
             {
+                // DataRow를 Order 객체로 변환
                 var order = Order.FromDataRow(row);
+                // 출고지명이 없으면 "미분류"로 설정
                 var centerName = order.ShippingCenter ?? "미분류";
                 
                 // 해당 출고지의 DataTable이 없으면 생성
@@ -428,7 +435,9 @@ namespace LogisticManager.Processors
             // 특수 출고지 처리
             if (IsSpecialShipmentCenter(centerName))
             {
+                // 특수 출고지 타입 확인
                 var specialType = GetSpecialType(centerName);
+                // ShipmentProcessor를 생성하여 특화 처리 실행
                 var processor = new ShipmentProcessor(centerName, data, shippingCost, _progress);
                 return processor.ProcessSpecialShipment(specialType);
             }
@@ -468,6 +477,7 @@ namespace LogisticManager.Processors
 
             // App.config에서 배송비 설정 읽기
             var configValue = ConfigurationManager.AppSettings[configKey];
+            // 설정값을 decimal로 변환, 실패하면 기본값 5000원 사용
             return decimal.TryParse(configValue, out var cost) ? cost : 5000m;
         }
 
@@ -487,7 +497,9 @@ namespace LogisticManager.Processors
         /// <returns>특수 출고지 여부 (true: 특수, false: 일반)</returns>
         private bool IsSpecialShipmentCenter(string centerName)
         {
+            // 특수 출고지 목록 정의
             var specialCenters = new[] { "감천", "카카오", "부산외부" };
+            // 출고지명에 특수 키워드가 포함되어 있는지 확인
             return specialCenters.Any(center => centerName.Contains(center));
         }
 
@@ -507,6 +519,7 @@ namespace LogisticManager.Processors
         /// <returns>특수 타입 문자열</returns>
         private string GetSpecialType(string centerName)
         {
+            // 출고지명에 따른 특수 타입 반환
             if (centerName.Contains("감천"))
                 return "감천";
             else if (centerName.Contains("카카오"))
@@ -543,6 +556,7 @@ namespace LogisticManager.Processors
         private async Task<List<(string centerName, string filePath, string dropboxUrl)>> GenerateAndUploadFiles(
             List<(string centerName, DataTable data)> processedResults)
         {
+            // 업로드 결과를 저장할 리스트
             var uploadResults = new List<(string centerName, string filePath, string dropboxUrl)>();
 
             // 각 출고지별로 파일 생성 및 업로드
@@ -563,12 +577,15 @@ namespace LogisticManager.Processors
                 // Dropbox 업로드
                 try
                 {
+                    // Dropbox에 파일 업로드
                     var dropboxUrl = await _apiService.UploadFileToDropboxAsync(filePath, centerName);
+                    // 성공한 경우 결과에 추가
                     uploadResults.Add((centerName, filePath, dropboxUrl));
                     _progress?.Report($"{centerName} Dropbox 업로드 완료");
                 }
                 catch (Exception ex)
                 {
+                    // 업로드 실패 시 로그만 출력하고 계속 진행
                     _progress?.Report($"{centerName} Dropbox 업로드 실패: {ex.Message}");
                 }
             }
@@ -603,6 +620,7 @@ namespace LogisticManager.Processors
             // Kakao Work 채팅방 ID 설정 확인
             var chatroomId = ConfigurationManager.AppSettings["KakaoWorkChatroomId"] ?? "";
             
+            // 채팅방 ID가 설정되지 않았으면 알림 전송하지 않음
             if (string.IsNullOrEmpty(chatroomId))
             {
                 _progress?.Report("카카오워크 채팅방 ID가 설정되지 않아 알림을 전송하지 않습니다.");
@@ -623,6 +641,7 @@ namespace LogisticManager.Processors
                 }
                 catch (Exception ex)
                 {
+                    // 알림 전송 실패 시 로그만 출력하고 계속 진행
                     _progress?.Report($"{centerName} 카카오워크 알림 전송 실패: {ex.Message}");
                 }
             }

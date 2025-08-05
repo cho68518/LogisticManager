@@ -45,6 +45,16 @@ namespace LogisticManager.Forms
         /// </summary>
         private readonly Dictionary<string, TextBox> _textBoxes = new Dictionary<string, TextBox>();
 
+        /// <summary>
+        /// 설정이 변경되었는지 추적하는 플래그
+        /// </summary>
+        private bool _settingsChanged = false;
+
+        /// <summary>
+        /// 설정이 변경되었는지 확인하는 속성
+        /// </summary>
+        public bool SettingsChanged => _settingsChanged;
+
         #endregion
 
         #region 생성자 (Constructor)
@@ -152,20 +162,16 @@ namespace LogisticManager.Forms
             // 총 너비: 80px
             // 시작 위치: (660 - 80) / 2 = 290px
             
-            // 저장 버튼 (주석처리)
-            // var saveButton = CreateModernButton("💾 저장", new Point(170, 10), new Size(80, 35), Color.FromArgb(46, 204, 113));
-            // saveButton.Click += SaveButton_Click;
+            // 저장 버튼
+            var saveButton = CreateModernButton("💾 저장", new Point(250, 10), new Size(80, 35), Color.FromArgb(46, 204, 113));
+            saveButton.Click += SaveButton_Click;
 
             // 취소 버튼
-            var cancelButton = CreateModernButton("❌ 취소", new Point(290, 10), new Size(80, 35), Color.FromArgb(231, 76, 60));
+            var cancelButton = CreateModernButton("❌ 취소", new Point(370, 10), new Size(80, 35), Color.FromArgb(231, 76, 60));
             cancelButton.Click += (sender, e) => this.Close();
 
-            // 연결 테스트 버튼 (주석처리)
-            // var testButton = CreateModernButton("🔍 연결 테스트", new Point(370, 10), new Size(120, 35), Color.FromArgb(52, 152, 219));
-            // testButton.Click += TestConnectionButton_Click;
-
-            // 버튼들을 패널에 추가 (취소 버튼만)
-            buttonPanel.Controls.AddRange(new Control[] { cancelButton });
+            // 버튼들을 패널에 추가
+            buttonPanel.Controls.AddRange(new Control[] { saveButton, cancelButton });
 
             // 모든 컨트롤을 폼에 추가
             this.Controls.AddRange(new Control[]
@@ -481,24 +487,39 @@ namespace LogisticManager.Forms
 
             // 입력 폴더 설정
             controls.Add(CreateLabel("📥 입력 폴더 경로:", new Point(20, 20)));
-            var txtInputPath = CreateTextBox("C:\\Work\\Input\\", new Point(20, 45), new Size(400, 25));
+            var txtInputPath = CreateTextBox("C:\\Work\\Input\\", new Point(20, 45), new Size(350, 25));
             txtInputPath.Name = "txtInputPath";
             _textBoxes["txtInputPath"] = txtInputPath; // 컨트롤 참조 저장
             controls.Add(txtInputPath);
 
+            // 입력 폴더 선택 버튼
+            var btnInputBrowse = CreateModernButton("📁", new Point(380, 45), new Size(30, 25), Color.FromArgb(52, 152, 219));
+            btnInputBrowse.Click += (sender, e) => BrowseFolder("txtInputPath");
+            controls.Add(btnInputBrowse);
+
             // 출력 폴더 설정
             controls.Add(CreateLabel("📤 출력 폴더 경로:", new Point(20, 80)));
-            var txtOutputPath = CreateTextBox("C:\\Work\\Output\\", new Point(20, 105), new Size(400, 25));
+            var txtOutputPath = CreateTextBox("C:\\Work\\Output\\", new Point(20, 105), new Size(350, 25));
             txtOutputPath.Name = "txtOutputPath";
             _textBoxes["txtOutputPath"] = txtOutputPath; // 컨트롤 참조 저장
             controls.Add(txtOutputPath);
 
+            // 출력 폴더 선택 버튼
+            var btnOutputBrowse = CreateModernButton("📁", new Point(380, 105), new Size(30, 25), Color.FromArgb(52, 152, 219));
+            btnOutputBrowse.Click += (sender, e) => BrowseFolder("txtOutputPath");
+            controls.Add(btnOutputBrowse);
+
             // 임시 폴더 설정
             controls.Add(CreateLabel("📁 임시 폴더 경로:", new Point(20, 140)));
-            var txtTempPath = CreateTextBox("C:\\Work\\Temp\\", new Point(20, 165), new Size(400, 25));
+            var txtTempPath = CreateTextBox("C:\\Work\\Temp\\", new Point(20, 165), new Size(350, 25));
             txtTempPath.Name = "txtTempPath";
             _textBoxes["txtTempPath"] = txtTempPath; // 컨트롤 참조 저장
             controls.Add(txtTempPath);
+
+            // 임시 폴더 선택 버튼
+            var btnTempBrowse = CreateModernButton("📁", new Point(380, 165), new Size(30, 25), Color.FromArgb(52, 152, 219));
+            btnTempBrowse.Click += (sender, e) => BrowseFolder("txtTempPath");
+            controls.Add(btnTempBrowse);
 
             // 설명 라벨
             var infoLabel = CreateLabel("💡 폴더가 존재하지 않으면 자동으로 생성됩니다.", new Point(20, 200));
@@ -548,6 +569,81 @@ namespace LogisticManager.Forms
                 BorderStyle = BorderStyle.FixedSingle,
                 BackColor = Color.White
             };
+        }
+
+        /// <summary>
+        /// 파일 경로 설정이 유효한지 검증하는 메서드
+        /// </summary>
+        /// <returns>검증 결과 (true: 유효, false: 유효하지 않음)</returns>
+        private bool ValidateFilePathSettings()
+        {
+            var inputPath = _tempSettings.GetValueOrDefault("INPUT_FOLDER_PATH", "");
+            var outputPath = _tempSettings.GetValueOrDefault("OUTPUT_FOLDER_PATH", "");
+            var tempPath = _tempSettings.GetValueOrDefault("TEMP_FOLDER_PATH", "");
+
+            // 빈 경로 체크
+            if (string.IsNullOrWhiteSpace(inputPath) || string.IsNullOrWhiteSpace(outputPath) || string.IsNullOrWhiteSpace(tempPath))
+            {
+                MessageBox.Show("⚠️ 모든 파일 경로를 입력해주세요.", "입력 확인", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            // 경로 형식 체크 (기본적인 검증)
+            try
+            {
+                Path.GetFullPath(inputPath);
+                Path.GetFullPath(outputPath);
+                Path.GetFullPath(tempPath);
+            }
+            catch
+            {
+                MessageBox.Show("⚠️ 파일 경로 형식이 올바르지 않습니다.", "경로 오류", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 폴더 탐색기를 열어서 폴더를 선택하는 메서드
+        /// </summary>
+        /// <param name="textBoxName">폴더 경로를 저장할 텍스트박스 이름</param>
+        private void BrowseFolder(string textBoxName)
+        {
+            try
+            {
+                using var folderDialog = new FolderBrowserDialog
+                {
+                    Description = "폴더를 선택하세요",
+                    ShowNewFolderButton = true,
+                    UseDescriptionForTitle = true
+                };
+
+                // 현재 텍스트박스에 있는 경로를 초기 경로로 설정
+                if (_textBoxes.TryGetValue(textBoxName, out var textBox) && textBox != null)
+                {
+                    var currentPath = textBox.Text.Trim();
+                    if (!string.IsNullOrEmpty(currentPath) && Directory.Exists(currentPath))
+                    {
+                        folderDialog.InitialDirectory = currentPath;
+                    }
+                }
+
+                if (folderDialog.ShowDialog() == DialogResult.OK)
+                {
+                    // 선택된 폴더 경로를 텍스트박스에 설정
+                    if (_textBoxes.TryGetValue(textBoxName, out var targetTextBox) && targetTextBox != null)
+                    {
+                        targetTextBox.Text = folderDialog.SelectedPath;
+                        Console.WriteLine($"📁 폴더 선택 완료: {folderDialog.SelectedPath}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ 폴더 선택 중 오류: {ex.Message}");
+                MessageBox.Show($"폴더 선택 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         #endregion
@@ -745,6 +841,8 @@ namespace LogisticManager.Forms
                 if (!string.IsNullOrEmpty(settingKey))
                 {
                     _tempSettings[settingKey] = textBox.Text;
+                    _settingsChanged = true; // 설정 변경 플래그 설정
+                    Console.WriteLine($"📝 설정 변경: {settingKey} = {textBox.Text}");
                 }
             }
         }
@@ -797,17 +895,32 @@ namespace LogisticManager.Forms
         {
             try
             {
-                // 임시 설정에서 필수 데이터베이스 설정 검증
-                var server = _tempSettings.GetValueOrDefault("DB_SERVER", "");
-                var database = _tempSettings.GetValueOrDefault("DB_NAME", "");
-                var user = _tempSettings.GetValueOrDefault("DB_USER", "");
-                var password = _tempSettings.GetValueOrDefault("DB_PASSWORD", "");
-                var port = _tempSettings.GetValueOrDefault("DB_PORT", "");
+                // 현재 활성 탭 확인
+                var tabControl = this.Controls.OfType<TabControl>().FirstOrDefault();
+                var activeTab = tabControl?.SelectedTab;
 
-                if (string.IsNullOrEmpty(server) || string.IsNullOrEmpty(database) || string.IsNullOrEmpty(user))
+                // 파일 경로 설정 탭인 경우 파일 경로 검증
+                if (activeTab?.Text.Contains("파일 경로") == true)
                 {
-                    MessageBox.Show("⚠️ 데이터베이스 설정에서 서버, 데이터베이스명, 사용자명은 필수입니다.", "입력 확인", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
+                    if (!ValidateFilePathSettings())
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    // 데이터베이스 설정 탭인 경우 데이터베이스 설정 검증
+                    var server = _tempSettings.GetValueOrDefault("DB_SERVER", "");
+                    var database = _tempSettings.GetValueOrDefault("DB_NAME", "");
+                    var user = _tempSettings.GetValueOrDefault("DB_USER", "");
+                    var password = _tempSettings.GetValueOrDefault("DB_PASSWORD", "");
+                    var port = _tempSettings.GetValueOrDefault("DB_PORT", "");
+
+                    if (string.IsNullOrEmpty(server) || string.IsNullOrEmpty(database) || string.IsNullOrEmpty(user))
+                    {
+                        MessageBox.Show("⚠️ 데이터베이스 설정에서 서버, 데이터베이스명, 사용자명은 필수입니다.", "입력 확인", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
                 }
 
                 // JSON 파일에 직접 저장
@@ -833,11 +946,11 @@ namespace LogisticManager.Forms
                 }
 
                 // 새 설정으로 업데이트
-                settings["DB_SERVER"] = server;
-                settings["DB_NAME"] = database;
-                settings["DB_USER"] = user;
-                settings["DB_PASSWORD"] = password;
-                settings["DB_PORT"] = port;
+                settings["DB_SERVER"] = _tempSettings.GetValueOrDefault("DB_SERVER", "");
+                settings["DB_NAME"] = _tempSettings.GetValueOrDefault("DB_NAME", "");
+                settings["DB_USER"] = _tempSettings.GetValueOrDefault("DB_USER", "");
+                settings["DB_PASSWORD"] = _tempSettings.GetValueOrDefault("DB_PASSWORD", "");
+                settings["DB_PORT"] = _tempSettings.GetValueOrDefault("DB_PORT", "");
                 settings["DROPBOX_API_KEY"] = _tempSettings.GetValueOrDefault("DROPBOX_API_KEY", "");
                 settings["KAKAO_WORK_API_KEY"] = _tempSettings.GetValueOrDefault("KAKAO_WORK_API_KEY", "");
                 settings["KAKAO_CHATROOM_ID"] = _tempSettings.GetValueOrDefault("KAKAO_CHATROOM_ID", "");
@@ -851,21 +964,15 @@ namespace LogisticManager.Forms
 
                 Console.WriteLine($"✅ 설정 저장 완료: {jsonString}");
 
-                // 저장 성공 메시지와 함께 연결 테스트 옵션 제공
-                var result = MessageBox.Show(
-                    "✅ 설정이 성공적으로 저장되었습니다!\n\n저장된 설정으로 연결을 테스트하시겠습니까?",
+                // 저장 성공 메시지 표시
+                MessageBox.Show(
+                    "✅ 설정이 성공적으로 저장되었습니다!\n\n저장된 설정:\n" +
+                    $"📥 입력 폴더: {settings.GetValueOrDefault("INPUT_FOLDER_PATH", "")}\n" +
+                    $"📤 출력 폴더: {settings.GetValueOrDefault("OUTPUT_FOLDER_PATH", "")}\n" +
+                    $"📁 임시 폴더: {settings.GetValueOrDefault("TEMP_FOLDER_PATH", "")}",
                     "설정 저장 완료",
-                    MessageBoxButtons.YesNo,
+                    MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
-
-                if (result == DialogResult.Yes)
-                {
-                    // 저장된 설정으로 즉시 연결 테스트 (비동기로 실행)
-                    _ = Task.Run(() =>
-                    {
-                        this.Invoke(() => TestConnectionWithSavedSettings());
-                    });
-                }
                 
                 // 저장 성공 시 DialogResult 설정
                 this.DialogResult = DialogResult.OK;

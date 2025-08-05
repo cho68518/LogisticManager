@@ -412,32 +412,40 @@ namespace LogisticManager.Forms
                 var result = settingsForm.ShowDialog(this);
                 
                 // 설정이 변경되었는지 확인하고 DatabaseService 재초기화
-                if (result == DialogResult.OK || result == DialogResult.Cancel)
+                if (result == DialogResult.OK)
                 {
-                    try
+                    // 설정이 실제로 변경되었는지 확인
+                    if (settingsForm.SettingsChanged)
                     {
-                        // DatabaseService 재초기화 (새로운 설정 적용)
-                        var newDatabaseService = new DatabaseService();
-                        
-                        // 연결 테스트 (비동기로 실행)
-                        var testResult = await newDatabaseService.TestConnectionAsync();
-                        
-                        if (testResult)
+                        try
                         {
-                            // 성공 시 로그 메시지만 출력 (readonly 필드이므로 재할당 불가)
-                            LogMessage("✅ 데이터베이스 설정이 업데이트되었습니다.");
-                            LogMessage("🔗 새로운 설정으로 데이터베이스 연결이 성공했습니다.");
-                            LogMessage("💡 애플리케이션을 재시작하면 새로운 설정이 적용됩니다.");
+                            // DatabaseService 재초기화 (새로운 설정 적용)
+                            var newDatabaseService = new DatabaseService();
+                            
+                            // 연결 테스트 (비동기로 실행)
+                            var testResult = await newDatabaseService.TestConnectionAsync();
+                            
+                            if (testResult)
+                            {
+                                // 성공 시 로그 메시지만 출력 (readonly 필드이므로 재할당 불가)
+                                LogMessage("✅ 데이터베이스 설정이 업데이트되었습니다.");
+                                LogMessage("🔗 새로운 설정으로 데이터베이스 연결이 성공했습니다.");
+                                LogMessage("💡 애플리케이션을 재시작하면 새로운 설정이 적용됩니다.");
+                            }
+                            else
+                            {
+                                LogMessage("⚠️ 데이터베이스 설정이 업데이트되었지만 연결 테스트에 실패했습니다.");
+                            }
                         }
-                        else
+                        catch (Exception dbEx)
                         {
-                            LogMessage("⚠️ 데이터베이스 설정이 업데이트되었지만 연결 테스트에 실패했습니다.");
+                            LogMessage($"⚠️ 데이터베이스 서비스 재초기화 중 오류: {dbEx.Message}");
+                            LogMessage("💡 설정은 저장되었지만 데이터베이스 연결에 문제가 있을 수 있습니다.");
                         }
                     }
-                    catch (Exception dbEx)
+                    else
                     {
-                        LogMessage($"⚠️ 데이터베이스 서비스 재초기화 중 오류: {dbEx.Message}");
-                        LogMessage("💡 설정은 저장되었지만 데이터베이스 연결에 문제가 있을 수 있습니다.");
+                        LogMessage("ℹ️ 설정이 변경되지 않았습니다.");
                     }
                 }
             }
