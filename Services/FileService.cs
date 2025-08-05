@@ -1,6 +1,7 @@
 using OfficeOpenXml;
 using System.Data;
 using System.Configuration;
+using LogisticManager.Models;
 
 namespace LogisticManager.Services
 {
@@ -8,7 +9,7 @@ namespace LogisticManager.Services
     /// 파일 처리(Excel 읽기/쓰기)를 담당하는 서비스 클래스
     /// 
     /// 주요 기능:
-    /// - Excel 파일을 DataTable로 읽기
+    /// - Excel 파일을 DataTable로 읽기 (ColumnMapping 적용)
     /// - DataTable을 Excel 파일로 저장
     /// - 파일 선택 대화상자 제공
     /// - 출력 파일 경로 생성
@@ -17,14 +18,16 @@ namespace LogisticManager.Services
     /// 사용 라이브러리:
     /// - EPPlus (Excel 파일 처리)
     /// - System.Data (DataTable 사용)
+    /// - MappingService (컬럼 매핑 처리)
     /// 
     /// 설정 파일:
     /// - settings.json에서 InputFolderPath, OutputFolderPath 읽기
+    /// - column_mapping.json에서 매핑 설정 읽기
     /// 
     /// 처리 과정:
     /// 1. 설정 파일에서 폴더 경로 읽기
     /// 2. EPPlus 라이센스 설정
-    /// 3. Excel 파일 읽기/쓰기 작업 수행
+    /// 3. Excel 파일 읽기/쓰기 작업 수행 (매핑 적용)
     /// 4. 오류 처리 및 로깅
     /// </summary>
     public class FileService
@@ -43,6 +46,12 @@ namespace LogisticManager.Services
         /// </summary>
         private readonly string _outputFolderPath;
 
+        /// <summary>
+        /// 컬럼 매핑 설정을 관리하는 서비스
+        /// Excel 컬럼명과 데이터베이스 컬럼명 간의 매핑 처리
+        /// </summary>
+        private readonly MappingService _mappingService;
+
         #endregion
 
         #region 생성자 (Constructor)
@@ -54,6 +63,7 @@ namespace LogisticManager.Services
         /// 1. settings.json에서 폴더 경로 설정 읽기
         /// 2. EPPlus 라이센스 설정 (NonCommercial)
         /// 3. 기본 폴더 경로 설정
+        /// 4. MappingService 인스턴스 생성
         /// 
         /// 설정 파일 구조:
         /// - INPUT_FOLDER_PATH: 입력 파일 폴더 경로
@@ -99,6 +109,9 @@ namespace LogisticManager.Services
             
             // EPPlus 라이센스 설정 (상업용 사용 시 필요)
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+            
+            // MappingService 인스턴스 생성
+            _mappingService = new MappingService();
         }
 
         #endregion
@@ -106,15 +119,21 @@ namespace LogisticManager.Services
         #region Excel 파일 읽기 (Excel File Reading)
 
         /// <summary>
-        /// Excel 파일을 읽어서 DataTable로 변환하는 메서드
+        /// Excel 파일을 읽어서 DataTable로 변환하는 메서드 (ColumnMapping 적용)
         /// 
         /// 처리 과정:
         /// 1. 파일 존재 여부 확인
         /// 2. EPPlus를 사용하여 Excel 파일 열기
         /// 3. 첫 번째 워크시트 선택
-        /// 4. 헤더 행을 읽어서 DataTable 컬럼 생성
-        /// 5. 데이터 행들을 읽어서 DataTable에 추가
-        /// 6. 빈 행은 제외하고 유효한 데이터만 반환
+        /// 4. 헤더 행을 읽어서 매핑 설정 확인
+        /// 5. 매핑된 컬럼명으로 DataTable 컬럼 생성
+        /// 6. 데이터 행들을 읽어서 DataTable에 추가
+        /// 7. 빈 행은 제외하고 유효한 데이터만 반환
+        /// 
+        /// 매핑 처리:
+        /// - Excel 컬럼명을 데이터베이스 컬럼명으로 변환
+        /// - 매핑되지 않은 컬럼은 원본 이름 유지
+        /// - 데이터 타입 변환 적용
         /// 
         /// 예외 처리:
         /// - FileNotFoundException: 파일이 존재하지 않는 경우
@@ -122,15 +141,16 @@ namespace LogisticManager.Services
         /// - InvalidOperationException: Excel 파일 형식 오류
         /// 
         /// 반환 데이터:
-        /// - DataTable: Excel 파일의 모든 데이터
-        /// - 컬럼명: Excel의 첫 번째 행을 헤더로 사용
-        /// - 데이터 타입: 모든 값을 문자열로 처리
+        /// - DataTable: Excel 파일의 모든 데이터 (매핑 적용)
+        /// - 컬럼명: 매핑 설정에 따른 데이터베이스 컬럼명
+        /// - 데이터 타입: 매핑 설정에 따른 타입 변환
         /// </summary>
         /// <param name="filePath">읽을 Excel 파일의 전체 경로</param>
-        /// <returns>Excel 데이터가 담긴 DataTable</returns>
+        /// <param name="tableMappingKey">테이블 매핑 키 (기본값: "order_table")</param>
+        /// <returns>Excel 데이터가 담긴 DataTable (매핑 적용)</returns>
         /// <exception cref="FileNotFoundException">파일이 존재하지 않는 경우</exception>
         /// <exception cref="IOException">파일 읽기 오류</exception>
-        public DataTable ReadExcelToDataTable(string filePath)
+        public DataTable ReadExcelToDataTable(string filePath, string tableMappingKey = "order_table")
         {
             // 파일 존재 여부 확인
             if (!File.Exists(filePath))
@@ -159,11 +179,22 @@ namespace LogisticManager.Services
                         throw new InvalidOperationException("Excel 파일에 데이터가 없습니다.");
                     }
 
-                    // 헤더 행을 읽어서 DataTable 컬럼 생성
+                    // 헤더 행을 읽어서 매핑된 컬럼명으로 DataTable 컬럼 생성
                     for (int col = 1; col <= dimension.End.Column; col++)
                     {
-                        var headerValue = worksheet.Cells[1, col].Value?.ToString() ?? $"Column{col}";
-                        dataTable.Columns.Add(headerValue);
+                        var excelColumnName = worksheet.Cells[1, col].Value?.ToString() ?? $"Column{col}";
+                        
+                        // 매핑 서비스를 통해 데이터베이스 컬럼명 가져오기
+                        var databaseColumnName = _mappingService.GetDatabaseColumn(excelColumnName, tableMappingKey);
+                        
+                        // 매핑된 컬럼명이 있으면 사용, 없으면 원본 이름 사용
+                        var columnName = databaseColumnName ?? excelColumnName;
+                        
+                        // 데이터 타입에 따른 컬럼 생성
+                        var dataType = GetColumnDataType(excelColumnName, tableMappingKey);
+                        dataTable.Columns.Add(columnName, dataType);
+                        
+                        Console.WriteLine($"📋 FileService: 컬럼 매핑 - Excel: {excelColumnName} → DB: {columnName} ({dataType.Name})");
                     }
 
                     // 데이터 행들을 읽어서 DataTable에 추가
@@ -175,8 +206,12 @@ namespace LogisticManager.Services
                         // 각 컬럼의 값을 읽어서 DataRow에 추가
                         for (int col = 1; col <= dimension.End.Column; col++)
                         {
+                            var excelColumnName = worksheet.Cells[1, col].Value?.ToString() ?? $"Column{col}";
                             var cellValue = worksheet.Cells[row, col].Value?.ToString() ?? string.Empty;
-                            dataRow[col - 1] = cellValue;
+                            
+                            // 데이터 타입에 따른 변환 적용
+                            var convertedValue = ConvertCellValue(cellValue, excelColumnName, tableMappingKey);
+                            dataRow[col - 1] = convertedValue;
                             
                             // 빈 셀이 아닌 경우 데이터가 있다고 표시
                             if (!string.IsNullOrEmpty(cellValue))
@@ -193,13 +228,89 @@ namespace LogisticManager.Services
                     }
                 }
 
-                Console.WriteLine($"✅ FileService: Excel 파일 읽기 완료 - {dataTable.Rows.Count}행, {dataTable.Columns.Count}열");
+                Console.WriteLine($"✅ FileService: Excel 파일 읽기 완료 (매핑 적용) - {dataTable.Rows.Count}행, {dataTable.Columns.Count}열");
                 return dataTable;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"❌ FileService: Excel 파일 읽기 실패: {ex.Message}");
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// 컬럼의 데이터 타입을 가져오는 메서드
+        /// </summary>
+        /// <param name="excelColumnName">Excel 컬럼명</param>
+        /// <param name="tableMappingKey">테이블 매핑 키</param>
+        /// <returns>데이터 타입</returns>
+        private Type GetColumnDataType(string excelColumnName, string tableMappingKey)
+        {
+            // 매핑 설정에서 데이터 타입 확인
+            var configuration = _mappingService.GetConfiguration();
+            if (configuration?.Mappings.TryGetValue(tableMappingKey, out var tableMapping) == true)
+            {
+                if (tableMapping.Columns.TryGetValue(excelColumnName, out var columnMapping))
+                {
+                    return columnMapping.DataType.ToLower() switch
+                    {
+                        "int" => typeof(int),
+                        "decimal" => typeof(decimal),
+                        "double" => typeof(double),
+                        "date" => typeof(DateTime),
+                        "datetime" => typeof(DateTime),
+                        "bool" => typeof(bool),
+                        _ => typeof(string)
+                    };
+                }
+            }
+            
+            // 기본값은 문자열
+            return typeof(string);
+        }
+
+        /// <summary>
+        /// 셀 값을 데이터 타입에 맞게 변환하는 메서드
+        /// </summary>
+        /// <param name="cellValue">원본 셀 값</param>
+        /// <param name="excelColumnName">Excel 컬럼명</param>
+        /// <param name="tableMappingKey">테이블 매핑 키</param>
+        /// <returns>변환된 값</returns>
+        private object ConvertCellValue(string cellValue, string excelColumnName, string tableMappingKey)
+        {
+            if (string.IsNullOrEmpty(cellValue))
+            {
+                // 기본값 확인
+                var configuration = _mappingService.GetConfiguration();
+                if (configuration?.Mappings.TryGetValue(tableMappingKey, out var tableMapping) == true)
+                {
+                    if (tableMapping.Columns.TryGetValue(excelColumnName, out var columnMapping))
+                    {
+                        return columnMapping.DefaultValue ?? DBNull.Value;
+                    }
+                }
+                return DBNull.Value;
+            }
+
+            // 매핑 설정에서 데이터 타입 확인
+            var dataType = GetColumnDataType(excelColumnName, tableMappingKey);
+            
+            try
+            {
+                return dataType.Name switch
+                {
+                    "Int32" => int.TryParse(cellValue, out var intValue) ? intValue : 0,
+                    "Decimal" => decimal.TryParse(cellValue, out var decimalValue) ? decimalValue : 0m,
+                    "Double" => double.TryParse(cellValue, out var doubleValue) ? doubleValue : 0.0,
+                    "DateTime" => DateTime.TryParse(cellValue, out var dateValue) ? dateValue : DateTime.MinValue,
+                    "Boolean" => bool.TryParse(cellValue, out var boolValue) ? boolValue : false,
+                    _ => cellValue
+                };
+            }
+            catch
+            {
+                // 변환 실패 시 원본 값 반환
+                return cellValue;
             }
         }
 

@@ -347,6 +347,78 @@ namespace LogisticManager.Services
             }
         }
 
+        /// <summary>
+        /// 매개변수화된 쿼리로 트랜잭션을 실행하는 비동기 메서드 (새로운 최적화 버전)
+        /// 
+        /// 개선사항:
+        /// - SQL 인젝션 방지를 위한 매개변수화된 쿼리
+        /// - 성능 향상을 위한 배치 처리
+        /// - 메모리 효율성 개선
+        /// - 상세한 오류 처리
+        /// 
+        /// 사용 예시:
+        /// var queries = new List<(string sql, Dictionary<string, object> parameters)>
+        /// {
+        ///     ("INSERT INTO table (col1, col2) VALUES (@val1, @val2)", 
+        ///      new Dictionary<string, object> { ["@val1"] = "value1", ["@val2"] = "value2" })
+        /// };
+        /// </summary>
+        /// <param name="queriesWithParameters">SQL 쿼리와 매개변수의 튜플 목록</param>
+        /// <returns>모든 쿼리가 성공하면 true, 아니면 false</returns>
+        public async Task<bool> ExecuteParameterizedTransactionAsync(IEnumerable<(string sql, Dictionary<string, object> parameters)> queriesWithParameters)
+        {
+            // MySQL 연결 생성
+            using var connection = new MySqlConnection(_connectionString);
+            
+            try
+            {
+                // 데이터베이스 연결
+                await connection.OpenAsync();
+                Console.WriteLine("✅ DatabaseService: 매개변수화된 트랜잭션 시작");
+                
+                // 트랜잭션 시작
+                using var transaction = await connection.BeginTransactionAsync();
+                
+                try
+                {
+                    var totalAffectedRows = 0;
+                    
+                    // 각 쿼리를 순차적으로 실행
+                    foreach (var (sql, parameters) in queriesWithParameters)
+                    {
+                        using var command = new MySqlCommand(sql, connection, transaction);
+                        
+                        // 매개변수 추가
+                        foreach (var param in parameters)
+                        {
+                            command.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                        }
+                        
+                        var affectedRows = await command.ExecuteNonQueryAsync();
+                        totalAffectedRows += affectedRows;
+                        Console.WriteLine($"✅ DatabaseService: 매개변수화 쿼리 실행 완료 - {affectedRows}행 영향받음");
+                    }
+                    
+                    // 모든 쿼리가 성공하면 커밋
+                    await transaction.CommitAsync();
+                    Console.WriteLine($"✅ DatabaseService: 매개변수화 트랜잭션 커밋 완료 - 총 {totalAffectedRows}행 처리됨");
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    // 오류 발생 시 롤백
+                    await transaction.RollbackAsync();
+                    Console.WriteLine($"❌ DatabaseService: 매개변수화 트랜잭션 롤백 - {ex.Message}");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ DatabaseService: 매개변수화 트랜잭션 실행 실패: {ex.Message}");
+                return false;
+            }
+        }
+
         #endregion
 
         #region Excel 데이터 삽입 (Excel Data Insertion)
