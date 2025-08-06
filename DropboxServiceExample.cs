@@ -29,7 +29,8 @@ namespace LogisticManager.Examples
                     if (openFileDialog.ShowDialog() == DialogResult.OK)
                     {
                         var localFilePath = openFileDialog.FileName;
-                        var dropboxFolderPath = "/LogisticManager/";
+                        // App.config에서 Dropbox 폴더 경로 읽기
+                        var dropboxFolderPath = System.Configuration.ConfigurationManager.AppSettings["DropboxFolderPath"] ?? "/LogisticManager/";
 
                         // 진행 상황 표시
                         var progressForm = new Form
@@ -174,8 +175,12 @@ namespace LogisticManager.Examples
                 // DropboxService Singleton 인스턴스 사용
                 var dropboxService = DropboxService.Instance;
                 
+                // App.config에서 Dropbox 폴더 경로 읽기
+                var dropboxFolderPath = System.Configuration.ConfigurationManager.AppSettings["DropboxFolderPath"] ?? "/LogisticManager/";
+                var uploadPath = $"{dropboxFolderPath.TrimEnd('/')}/Invoices/";
+                
                 // 파일 업로드 및 공유 링크 생성
-                var sharedUrl = await dropboxService.UploadFileAsync(filePath, "/LogisticManager/Invoices/");
+                var sharedUrl = await dropboxService.UploadFileAsync(filePath, uploadPath);
 
                 progress?.Report($"파일 업로드 완료: {sharedUrl}");
 

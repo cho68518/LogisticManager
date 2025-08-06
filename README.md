@@ -1,6 +1,31 @@
-# 📦 송장 처리 자동화 시스템
+# 📦 송장 처리 자동화 시스템 (LogisticManager)
 
 사방넷 주문 엑셀 파일을 입력받아 데이터를 가공/분류하고, 출고지별 최종 송장 엑셀 파일을 생성한 후, Dropbox 업로드 및 카카오워크 알림을 보내는 데스크톱 애플리케이션입니다.
+
+## 🎯 주요 기능
+
+### 📊 데이터 처리
+- **Excel 파일 읽기/쓰기**: EPPlus 라이브러리를 사용한 안정적인 Excel 처리
+- **데이터 가공**: 주소 정리, 수취인명 정리, 결제방법 표준화
+- **출고지별 분류**: 서울냉동, 경기공산, 부산 등 출고지별 자동 분류
+- **특수 처리**: 별표, 제주, 박스, 합포장, 카카오 이벤트 등 맞춤 처리
+
+### 🏢 출고지별 처리
+- **낱개/박스 분류**: 박스크기 여부에 따른 상품 분류
+- **합포장 계산**: 같은 수취인에게 여러 상품이 있는 경우 합포장 송장 생성
+- **특수 출고지**: 감천, 카카오 등 특수 출고지별 맞춤 처리
+- **가격 계산**: 지역별, 이벤트별 가격 조정 로직
+
+### ☁️ 클라우드 연동
+- **Dropbox 업로드**: 처리된 송장 파일을 Dropbox에 자동 업로드
+- **카카오워크 알림**: 처리 완료 시 카카오워크로 실시간 알림 전송
+- **파일 관리**: 출고지별 폴더 구조로 체계적인 파일 관리
+
+### 🛠️ 시스템 관리
+- **설정 관리**: 데이터베이스 및 파일 경로 설정을 위한 직관적인 설정 화면
+- **데이터베이스 연동**: MySQL 데이터베이스와 연동하여 데이터 저장 및 관리
+- **로깅 시스템**: 모든 처리 과정을 한글로 상세하게 기록
+- **오류 처리**: 안전한 null 체크와 예외 처리로 안정성 향상
 
 ## 🎨 UI 특징
 
@@ -10,18 +35,6 @@
 - **진행률 표시**: 실시간 진행률 바와 상태 표시로 작업 진행 상황 파악
 - **다크 테마 로그**: 터미널 스타일의 로그 창으로 가독성 향상
 - **반응형 레이아웃**: 창 크기 조절에 따라 UI 요소들이 자동으로 조정
-
-## 🚀 주요 기능
-
-- **📁 Excel 파일 처리**: 사방넷 주문 엑셀 파일 읽기 및 가공
-- **🏢 출고지별 분류**: 서울냉동, 경기공산, 부산 등 출고지별 자동 분류
-- **📦 합포장 처리**: 같은 수취인에게 여러 상품이 있는 경우 합포장 송장 생성
-- **⭐ 특수 출고지 처리**: 감천, 카카오 등 특수 출고지별 맞춤 처리
-- **☁️ Dropbox 업로드**: 처리된 송장 파일을 Dropbox에 자동 업로드
-- **💬 카카오워크 알림**: 처리 완료 시 카카오워크로 알림 전송
-- **🔧 설정 관리**: 데이터베이스 및 파일 경로 설정을 위한 직관적인 설정 화면
-- **📝 상세한 로깅**: 모든 처리 과정을 한글로 상세하게 기록
-- **🛡️ 오류 처리**: 안전한 null 체크와 예외 처리로 안정성 향상
 
 ## 📋 시스템 요구사항
 
@@ -80,6 +93,18 @@ dotnet run
   <!-- Kakao Work API 설정 -->
   <add key="KakaoWork.AppKey" value="b36ed46e.0b55706350e94ef8b49e8647a97ae1b7" />
   <add key="KakaoWork.ChatroomId.Integrated" value="10545642" />
+  
+  <!-- ==================== 다중 테이블 설정 ==================== -->
+  <!-- 송장 데이터 테이블 설정 -->
+  <add key="Tables.Invoice.Main" value="송장출력_사방넷원본변환" />           <!-- 운영 환경 메인 테이블 -->
+  <add key="Tables.Invoice.Test" value="송장출력_사방넷원본변환_Test" />     <!-- 테스트 환경 테이블 -->
+  <add key="Tables.Invoice.Dev" value="송장출력_사방넷원본변환_Dev" />       <!-- 개발 환경 테이블 -->
+  <add key="Tables.Invoice.Backup" value="송장출력_사방넷원본변환_Backup" /> <!-- 백업용 테이블 -->
+  <add key="Tables.Invoice.Temp" value="송장출력_사방넷원본변환_Temp" />     <!-- 임시 처리용 테이블 -->
+  <add key="Tables.Invoice.Archive" value="송장출력_사방넷원본변환_Archive" /> <!-- 아카이브용 테이블 -->
+  
+  <!-- 기본 테이블 설정 (하위 호환성 유지) -->
+  <add key="InvoiceTable.Name" value="송장출력_사방넷원본변환_Test" />        <!-- 기본 테이블 (하위 호환성) -->
   
   <!-- 출고지별 배송비 설정 -->
   <add key="SeoulColdShippingCost" value="5000" />
@@ -141,31 +166,31 @@ dotnet run
 
 ```
 LogisticManager/
-├── Forms/
-│   ├── MainForm.cs          # 메인 UI 폼 (모던한 디자인)
-│   └── SettingsForm.cs      # 설정 UI 폼 (탭 기반 인터페이스)
-├── Models/
-│   ├── Order.cs             # 주문 데이터 모델 (상세한 한글 주석)
-│   ├── ColumnMapping.cs     # 컬럼 매핑 모델
-│   ├── KakaoWorkBlocks.cs   # 카카오워크 블록 모델
-│   └── NotificationType.cs  # 알림 타입 열거형
-├── Services/
-│   ├── DatabaseService.cs   # 데이터베이스 서비스 (MySQL 연결 관리)
-│   ├── FileService.cs       # 파일 처리 서비스 (Excel 읽기/쓰기)
-│   ├── MappingService.cs    # 컬럼 매핑 서비스 (Excel-DB 변환)
-│   ├── ApiService.cs        # 외부 API 서비스
-│   ├── DropboxService.cs    # Dropbox 서비스
-│   ├── KakaoWorkService.cs  # 카카오워크 서비스
-│   └── SecurityService.cs   # 보안 서비스
-├── Processors/
-│   ├── InvoiceProcessor.cs  # 전체 송장 처리 로직 (메인 프로세서)
-│   └── ShipmentProcessor.cs # 출고지별 처리 로직 (특수 출고지 처리)
-├── App.config               # 설정 파일
-├── settings.json            # 데이터베이스 설정 파일
-├── column_mapping.json      # 컬럼 매핑 설정 파일
-├── Program.cs               # 애플리케이션 진입점 (상세한 오류 처리)
-├── DatabaseTest.cs          # 데이터베이스 연결 테스트
-└── README.md               # 프로젝트 설명서
+├── Forms/                          # UI 폼 클래스들
+│   ├── MainForm.cs                 # 메인 UI 폼 (모던한 디자인)
+│   └── SettingsForm.cs             # 설정 UI 폼 (탭 기반 인터페이스)
+├── Models/                         # 데이터 모델 클래스들
+│   ├── Order.cs                    # 주문 데이터 모델 (상세한 한글 주석)
+│   ├── ColumnMapping.cs            # 컬럼 매핑 모델
+│   ├── KakaoWorkBlocks.cs          # 카카오워크 블록 모델
+│   └── NotificationType.cs         # 알림 타입 열거형
+├── Services/                       # 비즈니스 로직 서비스들
+│   ├── DatabaseService.cs          # 데이터베이스 서비스 (MySQL 연결 관리)
+│   ├── FileService.cs              # 파일 처리 서비스 (Excel 읽기/쓰기)
+│   ├── MappingService.cs           # 컬럼 매핑 서비스 (Excel-DB 변환)
+│   ├── ApiService.cs               # 외부 API 서비스
+│   ├── DropboxService.cs           # Dropbox 서비스
+│   ├── KakaoWorkService.cs         # 카카오워크 서비스
+│   └── SecurityService.cs          # 보안 서비스
+├── Processors/                     # 데이터 처리 프로세서들
+│   ├── InvoiceProcessor.cs         # 전체 송장 처리 로직 (메인 프로세서)
+│   └── ShipmentProcessor.cs        # 출고지별 처리 로직 (특수 출고지 처리)
+├── App.config                      # 설정 파일
+├── settings.json                   # 데이터베이스 설정 파일
+├── column_mapping.json             # 컬럼 매핑 설정 파일
+├── Program.cs                      # 애플리케이션 진입점 (상세한 오류 처리)
+├── DatabaseTest.cs                 # 데이터베이스 연결 테스트
+└── README.md                       # 프로젝트 설명서
 ```
 
 ## 🔧 주요 클래스 설명
@@ -206,6 +231,18 @@ LogisticManager/
 - **트랜잭션 처리**: 여러 쿼리를 트랜잭션으로 안전하게 실행
 - **Excel 데이터 삽입**: Excel 데이터를 데이터베이스에 삽입
 - **연결 테스트**: 데이터베이스 연결 상태를 상세하게 테스트
+
+### 🚀 BatchProcessorService (배치 처리 서비스) - 🆕 다중 테이블 지원
+- **대용량 데이터 처리**: 10만 건 이상의 데이터도 안정적 처리
+- **적응형 배치 크기**: 메모리 사용량에 따른 동적 배치 크기 조정 (50~2000건)
+- **🆕 다중 테이블 지원**: App.config에서 정의된 다양한 테이블 중 선택 가능
+  - **환경별 테이블 분리**: Test, Dev, Prod, Backup, Temp, Archive 테이블 지원
+  - **동적 테이블 처리**: 런타임에 테이블명 지정 가능
+  - **하위 호환성**: 기존 코드는 자동으로 기본 테이블 사용
+  - **보안 검증**: 테이블명 유효성 검사로 SQL 인젝션 방지
+- **메모리 최적화**: 가비지 컬렉션 최적화 및 메모리 압박 감지
+- **재시도 로직**: 3단계 지수 백오프 재시도 (1초, 2초, 4초)
+- **실시간 모니터링**: 처리 진행률 및 성능 지표 실시간 보고
 
 ### 📁 FileService (파일 처리 서비스)
 - **Excel 파일 읽기/쓰기**: EPPlus 라이브러리를 사용한 Excel 처리
@@ -279,6 +316,133 @@ LogisticManager/
 - **모든 I/O 작업**: 파일 읽기/쓰기, 데이터베이스 쿼리, API 호출을 비동기로 처리
 - **UI 응답성**: 백그라운드 작업으로 UI 블로킹 방지
 - **진행률 표시**: 실시간 진행률 업데이트로 사용자 경험 향상
+
+## 🆕 다중 테이블 지원 기능
+
+### 🎯 개요
+BatchProcessorService는 이제 다중 테이블을 지원하여 다양한 환경과 용도에 맞는 테이블을 선택할 수 있습니다.
+
+### 📋 지원 테이블 유형
+- **Main**: 운영 환경 메인 테이블
+- **Test**: 테스트 환경 테이블
+- **Dev**: 개발 환경 테이블
+- **Backup**: 백업용 테이블
+- **Temp**: 임시 처리용 테이블
+- **Archive**: 아카이브용 테이블
+
+### 💡 사용 예제
+
+#### 1. 기본 사용법 (하위 호환성)
+```csharp
+// 기존 코드와 동일하게 작동 (기본 테이블 사용)
+var (successCount, failureCount) = await _batchProcessor.ProcessLargeDatasetAsync(orders, progress);
+```
+
+#### 2. 특정 테이블 지정
+```csharp
+// 직접 테이블명 지정
+var (successCount, failureCount) = await _batchProcessor.ProcessLargeDatasetAsync(
+    orders, 
+    progress, 
+    false, 
+    "송장출력_사방넷원본변환_Test");
+```
+
+#### 3. 환경별 테이블 사용
+```csharp
+// App.config에서 정의된 테스트 환경 테이블 사용
+var (successCount, failureCount) = await _batchProcessor.ProcessLargeDatasetAsync(
+    orders, 
+    progress, 
+    false, 
+    "Tables.Invoice.Test");
+
+// 개발 환경 테이블 사용
+var (successCount, failureCount) = await _batchProcessor.ProcessLargeDatasetAsync(
+    orders, 
+    progress, 
+    false, 
+    "Tables.Invoice.Dev");
+```
+
+#### 4. 병렬 처리 + 특정 테이블
+```csharp
+// 임시 테이블에 병렬 처리로 고속 처리
+var (successCount, failureCount) = await _batchProcessor.ProcessLargeDatasetAsync(
+    orders, 
+    progress, 
+    true, 
+    "Tables.Invoice.Temp");
+```
+
+### 🛡️ 보안 기능
+- **테이블명 검증**: SQL 인젝션 방지를 위한 테이블명 유효성 검사
+- **허용된 문자만**: 영문자, 숫자, 언더스코어(_)만 허용
+- **SQL 예약어 차단**: SELECT, INSERT, DROP 등 SQL 키워드 차단
+- **길이 제한**: 1-64자 길이 제한
+
+### 🔧 설정 방법
+App.config 파일에서 테이블을 정의합니다:
+
+```xml
+<!-- 송장 데이터 테이블 설정 -->
+<add key="Tables.Invoice.Main" value="송장출력_사방넷원본변환" />
+<add key="Tables.Invoice.Test" value="송장출력_사방넷원본변환_Test" />
+<add key="Tables.Invoice.Dev" value="송장출력_사방넷원본변환_Dev" />
+<add key="Tables.Invoice.Backup" value="송장출력_사방넷원본변환_Backup" />
+<add key="Tables.Invoice.Temp" value="송장출력_사방넷원본변환_Temp" />
+<add key="Tables.Invoice.Archive" value="송장출력_사방넷원본변환_Archive" />
+
+<!-- 소분단가품목 테이블 설정 -->
+<add key="Tables.SplitPrice.Main" value="소분단가품목" />
+<add key="Tables.SplitPrice.Test" value="소분단가품목_Test" />
+<add key="Tables.SplitPrice.Dev" value="소분단가품목_Dev" />
+<add key="Tables.SplitPrice.Backup" value="소분단가품목_Backup" />
+<add key="Tables.SplitPrice.Temp" value="소분단가품목_Temp" />
+<add key="Tables.SplitPrice.Archive" value="소분단가품목_Archive" />
+```
+
+### 📊 소분단가품목 테이블 사용법
+
+#### 1. 기본 사용법 (테스트 환경)
+```csharp
+// 소분단가품목 테이블에 데이터 처리
+var (successCount, failureCount) = await _batchProcessor.ProcessLargeDatasetAsync(
+    orders, 
+    progress, 
+    false, 
+    "Tables.SplitPrice.Test");
+```
+
+#### 2. 운영 환경 사용
+```csharp
+// 운영 환경 소분단가품목 테이블 사용
+var (successCount, failureCount) = await _batchProcessor.ProcessLargeDatasetAsync(
+    orders, 
+    progress, 
+    false, 
+    "Tables.SplitPrice.Main");
+```
+
+#### 3. 임시 처리용 테이블
+```csharp
+// 임시 테이블에 소분단가품목 데이터 처리
+var (successCount, failureCount) = await _batchProcessor.ProcessLargeDatasetAsync(
+    orders, 
+    progress, 
+    false, 
+    "Tables.SplitPrice.Temp");
+```
+
+#### 4. 직접 테이블명 지정
+```csharp
+// 직접 소분단가품목 테이블명 지정
+var (successCount, failureCount) = await _batchProcessor.ProcessLargeDatasetAsync(
+    orders, 
+    progress, 
+    false, 
+    "소분단가품목_Test");
+```
 
 ### 💾 메모리 효율성
 - **대용량 파일 처리**: 메모리 사용량을 최적화하여 대용량 Excel 파일 처리

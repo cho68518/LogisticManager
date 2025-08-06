@@ -522,7 +522,7 @@ namespace LogisticManager.Forms
             controls.Add(btnTempBrowse);
 
             // 설명 라벨
-            var infoLabel = CreateLabel("💡 폴더가 존재하지 않으면 자동으로 생성됩니다.", new Point(20, 200));
+            var infoLabel = CreateLabel("💡 폴더가 존재하지 않으면 자동으로 생성됩니다. Dropbox 폴더 경로는 App.config에서 관리됩니다.", new Point(20, 200));
             infoLabel.ForeColor = Color.FromArgb(127, 140, 141);
             infoLabel.Font = new Font("맑은 고딕", 8F);
             controls.Add(infoLabel);
@@ -969,7 +969,8 @@ namespace LogisticManager.Forms
                     "✅ 설정이 성공적으로 저장되었습니다!\n\n저장된 설정:\n" +
                     $"📥 입력 폴더: {settings.GetValueOrDefault("INPUT_FOLDER_PATH", "")}\n" +
                     $"📤 출력 폴더: {settings.GetValueOrDefault("OUTPUT_FOLDER_PATH", "")}\n" +
-                    $"📁 임시 폴더: {settings.GetValueOrDefault("TEMP_FOLDER_PATH", "")}",
+                    $"📁 임시 폴더: {settings.GetValueOrDefault("TEMP_FOLDER_PATH", "")}\n" +
+                    $"💡 Dropbox 폴더 경로는 App.config에서 관리됩니다.",
                     "설정 저장 완료",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);

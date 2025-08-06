@@ -71,7 +71,7 @@ namespace LogisticManager.Forms
         /// <summary>
         /// 로그 메시지 출력 텍스트박스 (검은 배경, 녹색 글씨)
         /// </summary>
-        private TextBox txtLog = null!;
+        private RichTextBox txtLog = null!;
         
         /// <summary>
         /// 진행률 표시바 - 송장 처리 작업의 진행 상황 표시
@@ -92,6 +92,16 @@ namespace LogisticManager.Forms
         /// 종료 버튼 - 애플리케이션 완전 종료
         /// </summary>
         private Button btnExit = null!;
+
+        /// <summary>
+        /// Dropbox 테스트 버튼 - Dropbox 연결 테스트 및 파일 업로드
+        /// </summary>
+        private Button btnDropboxTest = null!;
+
+        /// <summary>
+        /// KakaoWork 테스트 버튼
+        /// </summary>
+        private Button btnKakaoWorkTest = null!;
 
         #endregion
 
@@ -180,34 +190,43 @@ namespace LogisticManager.Forms
             btnSelectFile = CreateModernButton("📁 파일 선택", new Point(20, 80), new Size(120, 40));
             btnSelectFile.Click += BtnSelectFile_Click;
 
-            // 선택된 파일 경로 라벨 생성 및 설정
+            // 파일 경로 라벨 생성 및 설정 (파일 선택 버튼 밑에 위치)
             lblFilePath = new Label
             {
                 Text = "선택된 파일: 없음",
-                Location = new Point(160, 90),
-                Size = new Size(500, 20),
+                Location = new Point(20, 130), // 파일 선택 버튼 밑으로 이동
+                Size = new Size(400, 20), // 크기를 늘려서 긴 파일명도 표시 가능하도록
                 Font = new Font("맑은 고딕", 9F),
                 ForeColor = Color.FromArgb(127, 140, 141),
-                BackColor = Color.Transparent
+                BackColor = Color.Transparent,
+                TextAlign = ContentAlignment.MiddleLeft
             };
 
-            // 설정 버튼 생성 및 설정
-            btnSettings = CreateModernButton("⚙️ 설정", new Point(680, 80), new Size(80, 40), Color.FromArgb(52, 152, 219));
+            // 설정 버튼 생성 및 설정 (우상단 고정)
+            btnSettings = CreateModernButton("⚙️ 설정", new Point(690, 80), new Size(80, 40), Color.FromArgb(52, 152, 219));
             btnSettings.Click += BtnSettings_Click;
 
-            // 종료 버튼 생성 및 설정
-            btnExit = CreateModernButton("❌ 종료", new Point(780, 80), new Size(80, 40), Color.FromArgb(231, 76, 60));
+            // Dropbox 테스트 버튼 생성 및 설정 (우상단 고정)
+            btnDropboxTest = CreateModernButton("☁️ Dropbox 테스트", new Point(550, 80), new Size(130, 40), Color.FromArgb(155, 89, 182));
+            btnDropboxTest.Click += BtnDropboxTest_Click;
+
+            // KakaoWork 테스트 버튼 생성 및 설정 (우상단 고정)
+            btnKakaoWorkTest = CreateModernButton("💬 KakaoWork 테스트", new Point(410, 80), new Size(130, 40), Color.FromArgb(46, 204, 113));
+            btnKakaoWorkTest.Click += BtnKakaoWorkTest_Click;
+
+            // 종료 버튼 생성 및 설정 (우상단 고정)
+            btnExit = CreateModernButton("❌ 종료", new Point(790, 80), new Size(80, 40), Color.FromArgb(231, 76, 60));
             btnExit.Click += BtnExit_Click;
 
             // 송장 처리 시작 버튼 생성 및 설정
-            btnStartProcess = CreateModernButton("🚀 송장 처리 시작", new Point(20, 140), new Size(150, 45), Color.FromArgb(46, 204, 113));
+            btnStartProcess = CreateModernButton("🚀 송장 처리 시작", new Point(20, 160), new Size(150, 45), Color.FromArgb(46, 204, 113));
             btnStartProcess.Enabled = false;  // 파일이 선택되기 전까지 비활성화
             btnStartProcess.Click += BtnStartProcess_Click;
 
             // 진행률 표시바 생성 및 설정
             progressBar = new ProgressBar
             {
-                Location = new Point(190, 145),
+                Location = new Point(190, 165),
                 Size = new Size(500, 35),
                 Style = ProgressBarStyle.Continuous,
                 Minimum = 0,
@@ -223,7 +242,7 @@ namespace LogisticManager.Forms
             lblStatus = new Label
             {
                 Text = "대기 중...",
-                Location = new Point(190, 185),
+                Location = new Point(190, 205),
                 Size = new Size(500, 20),
                 Font = new Font("맑은 고딕", 9F),
                 ForeColor = Color.FromArgb(127, 140, 141),
@@ -232,18 +251,16 @@ namespace LogisticManager.Forms
             };
 
             // 로그 표시 텍스트박스 생성 및 설정
-            txtLog = new TextBox
+            txtLog = new RichTextBox
             {
-                Location = new Point(20, 220),
-                Size = new Size(840, 420),
-                Multiline = true,
-                ScrollBars = ScrollBars.Vertical,
+                Location = new Point(20, 240),
+                Size = new Size(840, 400),
                 ReadOnly = true,  // 사용자 입력 방지
                 Font = new Font("맑은 고딕", 9F),
                 BackColor = Color.FromArgb(44, 62, 80),
                 ForeColor = Color.FromArgb(46, 204, 113),  // 밝은 녹색
-                WordWrap = true,
-                BorderStyle = BorderStyle.None
+                BorderStyle = BorderStyle.None,
+                ScrollBars = RichTextBoxScrollBars.Vertical
             };
 
             // 모든 컨트롤을 폼에 추가
@@ -253,6 +270,8 @@ namespace LogisticManager.Forms
                 btnSelectFile,
                 lblFilePath,
                 btnSettings,
+                btnDropboxTest,
+                btnKakaoWorkTest,
                 btnExit,
                 btnStartProcess,
                 progressBar,
@@ -283,13 +302,14 @@ namespace LogisticManager.Forms
                 Text = text,
                 Location = location,
                 Size = size,
-                Font = new Font("맑은 고딕", 10F, FontStyle.Bold),
+                Font = new Font("맑은 고딕", 8F, FontStyle.Bold), // 폰트 크기를 8로 더 작게 조정
                 FlatStyle = FlatStyle.Flat,
                 BackColor = backgroundColor ?? Color.FromArgb(52, 152, 219),
                 ForeColor = Color.White,
                 Cursor = Cursors.Hand,
                 FlatAppearance = { BorderSize = 0 }, // 테두리 제거
-                TextAlign = ContentAlignment.MiddleCenter // 텍스트 중앙 정렬
+                TextAlign = ContentAlignment.MiddleCenter, // 텍스트 중앙 정렬
+                UseMnemonic = false // 앰퍼샌드(&) 문자를 특수 문자로 처리하지 않음
             };
 
             // 둥근 모서리 제거 - 일반 사각형 버튼 사용
@@ -352,26 +372,32 @@ namespace LogisticManager.Forms
 
             // 폼 패딩 설정
             const int padding = 20;
-            const int buttonHeight = 40;
             const int titleHeight = 40;
 
             // 타이틀 라벨 조정
             lblTitle.Size = new Size(this.ClientSize.Width - (padding * 2), titleHeight);
             lblTitle.Location = new Point(padding, padding);
 
-            // 파일 선택 버튼 위치 조정 (좌상단 고정)
+            // 파일 선택 버튼 위치 고정 (좌상단)
             btnSelectFile.Location = new Point(padding, padding + titleHeight + 20);
 
-            // 설정 버튼 위치 조정 (우상단 고정)
-            btnSettings.Location = new Point(this.ClientSize.Width - btnSettings.Width - padding, padding + titleHeight + 20);
+            // 파일 경로 라벨 조정 (파일 선택 버튼 밑에 위치)
+            lblFilePath.Location = new Point(btnSelectFile.Location.X, btnSelectFile.Location.Y + btnSelectFile.Height + 10);
+            lblFilePath.Size = new Size(400, 20); // 고정 크기로 설정
 
-            // 파일 경로 라벨 조정 (파일 선택 버튼과 설정 버튼 사이)
-            int fileLabelWidth = btnSettings.Location.X - btnSelectFile.Location.X - btnSelectFile.Width - 20;
-            lblFilePath.Size = new Size(fileLabelWidth, 20);
-            lblFilePath.Location = new Point(btnSelectFile.Location.X + btnSelectFile.Width + 20, btnSelectFile.Location.Y + 10);
+            // 우상단 버튼들 위치 동적 조정 (창 크기에 따라 항상 오른쪽에 정렬)
+            int buttonSpacing = 10; // 버튼 간 간격
+            int rightMargin = padding; // 오른쪽 여백
+            
+            // 오른쪽부터 역순으로 배치 (Exit → Settings → Dropbox → KakaoWork)
+            // 각 버튼의 실제 Width 속성을 사용하여 정확한 위치 계산
+            btnExit.Location = new Point(this.ClientSize.Width - rightMargin - btnExit.Width, padding + titleHeight + 20);
+            btnSettings.Location = new Point(btnExit.Location.X - btnSettings.Width - buttonSpacing, padding + titleHeight + 20);
+            btnDropboxTest.Location = new Point(btnSettings.Location.X - btnDropboxTest.Width - buttonSpacing, padding + titleHeight + 20);
+            btnKakaoWorkTest.Location = new Point(btnDropboxTest.Location.X - btnKakaoWorkTest.Width - buttonSpacing, padding + titleHeight + 20);
 
-            // 송장 처리 시작 버튼 위치 조정
-            btnStartProcess.Location = new Point(padding, btnSelectFile.Location.Y + buttonHeight + 20);
+            // 송장 처리 시작 버튼 위치 조정 (파일 경로 라벨 밑에 위치)
+            btnStartProcess.Location = new Point(padding, lblFilePath.Location.Y + lblFilePath.Height + 20);
 
             // 진행률 표시바 조정
             int progressBarWidth = this.ClientSize.Width - btnStartProcess.Width - (padding * 3);
@@ -457,6 +483,64 @@ namespace LogisticManager.Forms
         }
 
         /// <summary>
+        /// Dropbox 테스트 버튼 클릭 이벤트 핸들러
+        /// 
+        /// 기능:
+        /// - DropboxTestForm을 모달로 열기
+        /// - Dropbox 연결 테스트 및 파일 업로드 기능 제공
+        /// - 예외 처리 및 오류 메시지 표시
+        /// </summary>
+        /// <param name="sender">이벤트 발생 객체</param>
+        /// <param name="e">이벤트 인수</param>
+        private void BtnDropboxTest_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                LogMessage("☁️ Dropbox 테스트 화면을 엽니다...");
+                
+                // Dropbox 테스트 폼을 모달로 열기
+                var dropboxTestForm = new DropboxTestForm();
+                dropboxTestForm.ShowDialog(this);
+                
+                LogMessage("✅ Dropbox 테스트 화면이 닫혔습니다.");
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"❌ Dropbox 테스트 화면 열기 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"Dropbox 테스트 화면을 열 수 없습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// KakaoWork 테스트 버튼 클릭 이벤트 핸들러
+        /// 
+        /// 기능:
+        /// - KakaoWorkTestForm을 모달로 열기
+        /// - KakaoWork 연결 테스트 및 파일 업로드 기능 제공
+        /// - 예외 처리 및 오류 메시지 표시
+        /// </summary>
+        /// <param name="sender">이벤트 발생 객체</param>
+        /// <param name="e">이벤트 인수</param>
+        private void BtnKakaoWorkTest_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                LogMessage("💬 KakaoWork 테스트 화면을 엽니다...");
+                
+                // KakaoWork 테스트 폼을 모달로 열기
+                var kakaoWorkTestForm = new KakaoWorkTestForm();
+                kakaoWorkTestForm.ShowDialog(this);
+                
+                LogMessage("✅ KakaoWork 테스트 화면이 닫혔습니다.");
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"❌ KakaoWork 테스트 화면 열기 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"KakaoWork 테스트 화면을 열 수 없습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
         /// 파일 선택 버튼 클릭 이벤트 핸들러
         /// 
         /// 기능:
@@ -485,10 +569,11 @@ namespace LogisticManager.Forms
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
                     _selectedFilePath = openFileDialog.FileName;
-                    lblFilePath.Text = $"선택된 파일: {Path.GetFileName(_selectedFilePath)}";
+                    var fileName = Path.GetFileName(_selectedFilePath);
+                    lblFilePath.Text = $"📄 선택된 파일: {fileName}";
                     btnStartProcess.Enabled = true;
                     
-                    LogMessage($"📁 파일이 선택되었습니다: {Path.GetFileName(_selectedFilePath)}");
+                    LogMessage($"📁 파일이 선택되었습니다: {fileName}");
                     LogMessage($"📊 파일 크기: {new FileInfo(_selectedFilePath).Length / 1024} KB");
                 }
             }
@@ -530,7 +615,7 @@ namespace LogisticManager.Forms
                 lblStatus.Text = "처리 중...";
                 lblStatus.ForeColor = Color.FromArgb(52, 152, 219);
 
-                LogMessage("🚀 송장 처리 작업을 시작합니다...");
+                //LogMessage("🚀 송장 처리 작업을 시작합니다...");
 
                 // InvoiceProcessor 생성 및 처리 실행
                 var processor = new InvoiceProcessor(_fileService, _databaseService, _apiService);
@@ -553,7 +638,7 @@ namespace LogisticManager.Forms
                 await processor.ProcessAsync(_selectedFilePath, logCallback, progressCallback);
 
                 // 작업 완료 처리
-                LogMessage("✅ 송장 처리가 성공적으로 완료되었습니다!");
+                //LogMessage("✅ 송장 처리가 성공적으로 완료되었습니다!");
                 lblStatus.Text = "완료";
                 lblStatus.ForeColor = Color.FromArgb(46, 204, 113);
                 
@@ -585,9 +670,10 @@ namespace LogisticManager.Forms
         /// 로그 메시지를 텍스트박스에 출력하는 메서드
         /// 
         /// 기능:
-        /// - 현재 시간과 함께 메시지 출력
-        /// - 텍스트박스 자동 스크롤
-        /// - 긴 메시지 처리
+        /// - 현재 시간과 함께 메시지 구성
+        /// - UI 스레드에서 안전하게 실행
+        /// - 자동 스크롤 및 UI 업데이트
+        /// - "[처리 중단]" 메시지는 굵은 폰트와 빨간색으로 표시
         /// </summary>
         /// <param name="message">출력할 로그 메시지</param>
         private void LogMessage(string message)
@@ -605,8 +691,32 @@ namespace LogisticManager.Forms
                     return;
                 }
 
-                // 텍스트박스에 메시지 추가
-                txtLog.AppendText(logMessage + Environment.NewLine);
+                // "[처리 중단]" 메시지인지 확인
+                if (message.Contains("[처리 중단]"))
+                {
+                    // 굵은 폰트와 빨간색으로 표시
+                    txtLog.SelectionStart = txtLog.TextLength;
+                    txtLog.SelectionLength = 0;
+                    
+                    // 굵은 폰트 설정
+                    txtLog.SelectionFont = new Font("맑은 고딕", 9F, FontStyle.Bold);
+                    // 빨간색 설정
+                    txtLog.SelectionColor = Color.Red;
+                    
+                    // 메시지 추가
+                    txtLog.AppendText(logMessage + Environment.NewLine);
+                    
+                    // 기본 폰트와 색상으로 복원
+                    txtLog.SelectionStart = txtLog.TextLength;
+                    txtLog.SelectionLength = 0;
+                    txtLog.SelectionFont = new Font("맑은 고딕", 9F);
+                    txtLog.SelectionColor = Color.FromArgb(46, 204, 113);
+                }
+                else
+                {
+                    // 일반 메시지는 기본 스타일로 표시
+                    txtLog.AppendText(logMessage + Environment.NewLine);
+                }
                 
                 // 자동 스크롤
                 txtLog.SelectionStart = txtLog.Text.Length;

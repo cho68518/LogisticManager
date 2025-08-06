@@ -26,7 +26,10 @@ namespace LogisticManager.Examples
 
                 // 1. Dropbox에 파일 업로드
                 var dropboxService = DropboxService.Instance;
-                string seoulFrozenUrl = await dropboxService.UploadFileAsync(seoulFrozenFilePath, "/서울냉동");
+                
+                // App.config에서 Dropbox 경로 읽기
+                var dropboxPath = System.Configuration.ConfigurationManager.AppSettings["KakaoWork.NotificationType.SeoulFrozen.DropboxPath"] ?? "/서울냉동";
+                string seoulFrozenUrl = await dropboxService.UploadFileAsync(seoulFrozenFilePath, dropboxPath);
 
                 // 2. KakaoWork로 알림 전송
                 var kakaoWorkService = KakaoWorkService.Instance;
@@ -59,16 +62,18 @@ namespace LogisticManager.Examples
 
                 // 1. Dropbox에 파일 업로드
                 var dropboxService = DropboxService.Instance;
-                string salesDataUrl = await dropboxService.UploadFileAsync(salesDataFilePath, "/판매입력");
+                
+                // App.config에서 Dropbox 경로 읽기
+                var dropboxPath = System.Configuration.ConfigurationManager.AppSettings["KakaoWork.NotificationType.SalesData.DropboxPath"] ?? "/판매입력";
+                string salesDataUrl = await dropboxService.UploadFileAsync(salesDataFilePath, dropboxPath);
 
-                // 2. KakaoWork로 알림 전송 (제목 접미사 변경)
+                // 2. KakaoWork로 알림 전송 (제목 접미사는 App.config에서 자동으로 읽어옴)
                 var kakaoWorkService = KakaoWorkService.Instance;
                 await kakaoWorkService.SendInvoiceNotificationAsync(
                     NotificationType.SalesData, 
                     batch, 
                     invoiceCount, 
-                    salesDataUrl,
-                    "이카운트자료"); // 메시지 제목 접미사 변경
+                    salesDataUrl);
 
                 Console.WriteLine("✅ 판매입력 알림 전송 완료");
             }
@@ -93,7 +98,10 @@ namespace LogisticManager.Examples
 
                 // 1. Dropbox에 파일 업로드
                 var dropboxService = DropboxService.Instance;
-                string gyeonggiFrozenUrl = await dropboxService.UploadFileAsync(gyeonggiFrozenFilePath, "/경기냉동");
+                
+                // App.config에서 Dropbox 경로 읽기
+                var dropboxPath = System.Configuration.ConfigurationManager.AppSettings["KakaoWork.NotificationType.GyeonggiFrozen.DropboxPath"] ?? "/경기냉동";
+                string gyeonggiFrozenUrl = await dropboxService.UploadFileAsync(gyeonggiFrozenFilePath, dropboxPath);
 
                 // 2. KakaoWork로 알림 전송
                 var kakaoWorkService = KakaoWorkService.Instance;
@@ -126,7 +134,10 @@ namespace LogisticManager.Examples
 
                 // 1. Dropbox에 파일 업로드
                 var dropboxService = DropboxService.Instance;
-                string busanCheonggwaUrl = await dropboxService.UploadFileAsync(busanCheonggwaFilePath, "/부산청과");
+                
+                // App.config에서 Dropbox 경로 읽기
+                var dropboxPath = System.Configuration.ConfigurationManager.AppSettings["KakaoWork.NotificationType.BusanCheonggwa.DropboxPath"] ?? "/부산청과";
+                string busanCheonggwaUrl = await dropboxService.UploadFileAsync(busanCheonggwaFilePath, dropboxPath);
 
                 // 2. KakaoWork로 알림 전송
                 var kakaoWorkService = KakaoWorkService.Instance;
@@ -159,7 +170,10 @@ namespace LogisticManager.Examples
 
                 // 1. Dropbox에 파일 업로드
                 var dropboxService = DropboxService.Instance;
-                string integratedUrl = await dropboxService.UploadFileAsync(integratedFilePath, "/통합송장");
+                
+                // App.config에서 Dropbox 경로 읽기
+                var dropboxPath = System.Configuration.ConfigurationManager.AppSettings["KakaoWork.NotificationType.Integrated.DropboxPath"] ?? "/통합송장";
+                string integratedUrl = await dropboxService.UploadFileAsync(integratedFilePath, dropboxPath);
 
                 // 2. KakaoWork로 알림 전송
                 var kakaoWorkService = KakaoWorkService.Instance;
@@ -207,7 +221,10 @@ namespace LogisticManager.Examples
                         Console.WriteLine($"📤 {notificationType} 알림 전송 중...");
 
                         // 1. Dropbox에 파일 업로드
-                        string fileUrl = await dropboxService.UploadFileAsync(filePath, $"/{notificationType}");
+                        // App.config에서 Dropbox 경로 읽기
+                        var dropboxPathKey = $"KakaoWork.NotificationType.{notificationType}.DropboxPath";
+                        var dropboxPath = System.Configuration.ConfigurationManager.AppSettings[dropboxPathKey] ?? $"/{notificationType}";
+                        string fileUrl = await dropboxService.UploadFileAsync(filePath, dropboxPath);
 
                         // 2. KakaoWork로 알림 전송
                         await kakaoWorkService.SendInvoiceNotificationAsync(

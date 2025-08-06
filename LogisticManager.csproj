@@ -6,6 +6,9 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors />
+    <WarningLevel>5</WarningLevel>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +24,13 @@
     
     <!-- 설정 파일 읽기 -->
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 설정 파일들을 실행 파일에 포함 -->
+    <Content Include="App.config" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="settings.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="column_mapping.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project> 

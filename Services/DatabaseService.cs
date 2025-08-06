@@ -278,6 +278,189 @@ namespace LogisticManager.Services
             }
         }
 
+        /// <summary>
+        /// 매개변수를 지원하는 데이터 변경 쿼리 실행 (INSERT, UPDATE, DELETE)
+        /// 
+        /// 📋 기능:
+        /// - 매개변수화된 쿼리로 SQL 인젝션 방지
+        /// - 트랜잭션 지원 준비
+        /// - 영향받은 행 수 반환
+        /// 
+        /// 💡 사용법:
+        /// await ExecuteNonQueryAsync("UPDATE table SET field = @value WHERE id = @id", new { value = "test", id = 1 });
+        /// </summary>
+        /// <param name="query">실행할 SQL 쿼리</param>
+        /// <param name="parameters">쿼리 매개변수</param>
+        /// <returns>영향받은 행 수</returns>
+        public async Task<int> ExecuteNonQueryAsync(string query, object? parameters = null)
+        {
+            using var connection = new MySqlConnection(_connectionString);
+            
+            try
+            {
+                await connection.OpenAsync();
+                Console.WriteLine("✅ DatabaseService: 데이터베이스 연결 성공 (ExecuteNonQueryAsync with parameters)");
+                
+                using var command = new MySqlCommand(query, connection);
+                
+                // 매개변수가 있는 경우 바인딩
+                if (parameters != null)
+                {
+                    var paramDict = ConvertObjectToDictionary(parameters);
+                    foreach (var param in paramDict)
+                    {
+                        command.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                    }
+                }
+                
+                var affectedRows = await command.ExecuteNonQueryAsync();
+                
+                Console.WriteLine($"✅ DatabaseService: ExecuteNonQueryAsync 완료 - {affectedRows}행 영향받음");
+                return affectedRows;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ DatabaseService: ExecuteNonQueryAsync 실패: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// SELECT 쿼리를 실행하여 DataTable 반환 (매개변수 지원)
+        /// 
+        /// 📋 기능:
+        /// - 복잡한 조회 쿼리 실행
+        /// - 매개변수화된 쿼리 지원
+        /// - DataTable 형태로 결과 반환
+        /// 
+        /// 💡 사용법:
+        /// var result = await ExecuteQueryAsync("SELECT * FROM table WHERE field = @value", new { value = "test" });
+        /// </summary>
+        /// <param name="query">실행할 SQL 쿼리</param>
+        /// <param name="parameters">쿼리 매개변수</param>
+        /// <returns>쿼리 결과 DataTable</returns>
+        public async Task<DataTable> ExecuteQueryAsync(string query, object? parameters = null)
+        {
+            using var connection = new MySqlConnection(_connectionString);
+            
+            try
+            {
+                await connection.OpenAsync();
+                Console.WriteLine("✅ DatabaseService: 데이터베이스 연결 성공 (ExecuteQueryAsync with parameters)");
+                
+                using var command = new MySqlCommand(query, connection);
+                
+                // 매개변수가 있는 경우 바인딩
+                if (parameters != null)
+                {
+                    var paramDict = ConvertObjectToDictionary(parameters);
+                    foreach (var param in paramDict)
+                    {
+                        command.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                    }
+                }
+                
+                using var adapter = new MySqlDataAdapter(command);
+                var dataTable = new DataTable();
+                adapter.Fill(dataTable);
+                
+                Console.WriteLine($"✅ DatabaseService: ExecuteQueryAsync 완료 - {dataTable.Rows.Count}행 조회됨");
+                return dataTable;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ DatabaseService: ExecuteQueryAsync 실패: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 단일 값을 반환하는 SELECT 쿼리를 실행하는 비동기 메서드 (매개변수 지원)
+        /// 
+        /// 📋 주요 기능:
+        /// - COUNT, MAX, MIN, SUM 등의 집계 함수 결과 조회
+        /// - 단일 컬럼 값 조회
+        /// - 매개변수화된 쿼리 지원 (SQL 인젝션 방지)
+        /// - null 안전성 보장
+        /// 
+        /// 🔄 처리 과정:
+        /// 1. MySQL 연결 생성
+        /// 2. 매개변수가 있는 경우 바인딩
+        /// 3. SQL 쿼리 실행
+        /// 4. 단일 값 반환
+        /// 5. 연결 해제 및 리소스 정리
+        /// 
+        /// 💡 사용 목적:
+        /// - 데이터 개수 조회 (COUNT)
+        /// - 최대/최소값 조회 (MAX/MIN)
+        /// - 합계 조회 (SUM)
+        /// - 단일 값 존재 여부 확인
+        /// 
+        /// ⚠️ 예외 처리:
+        /// - MySqlException: 데이터베이스 오류
+        /// - InvalidOperationException: 쿼리 결과가 없는 경우
+        /// - ArgumentNullException: 쿼리가 null인 경우
+        /// 
+        /// 🎯 반환 값:
+        /// - object: 쿼리 결과 값 (null 가능)
+        /// - DBNull.Value인 경우 null 반환
+        /// - 결과가 없는 경우 null 반환
+        /// 
+        /// 💡 사용법:
+        /// var count = await ExecuteScalarAsync("SELECT COUNT(*) FROM table");
+        /// var maxId = await ExecuteScalarAsync("SELECT MAX(id) FROM table WHERE name = @name", new { name = "test" });
+        /// </summary>
+        /// <param name="query">실행할 SQL 쿼리</param>
+        /// <param name="parameters">쿼리 매개변수 (선택적)</param>
+        /// <returns>쿼리 결과 단일 값</returns>
+        /// <exception cref="MySqlException">데이터베이스 오류</exception>
+        /// <exception cref="ArgumentNullException">쿼리가 null인 경우</exception>
+        public async Task<object?> ExecuteScalarAsync(string query, object? parameters = null)
+        {
+            if (string.IsNullOrEmpty(query))
+                throw new ArgumentNullException(nameof(query), "쿼리는 비어있을 수 없습니다.");
+
+            // MySQL 연결 생성
+            using var connection = new MySqlConnection(_connectionString);
+            
+            try
+            {
+                // 데이터베이스 연결
+                await connection.OpenAsync();
+                Console.WriteLine("✅ DatabaseService: 데이터베이스 연결 성공 (ExecuteScalarAsync)");
+                
+                // SQL 명령 생성
+                using var command = new MySqlCommand(query, connection);
+                
+                // 매개변수가 있는 경우 바인딩
+                if (parameters != null)
+                {
+                    var paramDict = ConvertObjectToDictionary(parameters);
+                    foreach (var param in paramDict)
+                    {
+                        var value = param.Value ?? DBNull.Value;
+                        command.Parameters.AddWithValue(param.Key, value);
+                    }
+                    Console.WriteLine($"✅ DatabaseService: 매개변수 바인딩 완료 - {paramDict.Count}개");
+                }
+                
+                // SQL 쿼리 실행
+                var result = await command.ExecuteScalarAsync();
+                
+                // DBNull 처리
+                if (result == DBNull.Value)
+                    result = null;
+                
+                Console.WriteLine($"✅ DatabaseService: ExecuteScalarAsync 완료 - 결과: {result ?? "NULL"}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ DatabaseService: ExecuteScalarAsync 실패: {ex.Message}");
+                throw;
+            }
+        }
+
         #endregion
 
         #region 트랜잭션 처리 (Transaction Processing)
@@ -681,6 +864,88 @@ namespace LogisticManager.Services
                 Console.WriteLine($"❌ DatabaseService: 상세 연결 테스트 실패: {errorMessage}");
                 return (false, errorMessage);
             }
+        }
+
+        #endregion
+
+        #region 유틸리티 메서드 (Utility Methods)
+
+        /// <summary>
+        /// 객체를 Dictionary로 변환하는 유틸리티 메서드 (매개변수 처리용)
+        /// 
+        /// 📋 주요 기능:
+        /// - 익명 객체를 Dictionary&lt;string, object&gt;로 변환
+        /// - 리플렉션을 사용한 프로퍼티 추출
+        /// - null 안전성 보장
+        /// - 매개변수 접두사 자동 추가 (@)
+        /// 
+        /// 🔄 처리 과정:
+        /// 1. 입력 객체의 프로퍼티들을 리플렉션으로 추출
+        /// 2. 각 프로퍼티 이름에 @ 접두사 추가
+        /// 3. null 값을 DBNull.Value로 변환
+        /// 4. Dictionary 형태로 반환
+        /// 
+        /// 💡 사용 목적:
+        /// - 익명 객체를 SQL 매개변수로 변환
+        /// - 매개변수화된 쿼리 지원
+        /// - SQL 인젝션 방지
+        /// - 타입 안전성 보장
+        /// 
+        /// ⚠️ 예외 처리:
+        /// - null 입력 시 빈 Dictionary 반환
+        /// - 리플렉션 오류 시 해당 프로퍼티 스킵
+        /// - 프로퍼티 값이 null인 경우 DBNull.Value로 변환
+        /// 
+        /// 💡 사용법:
+        /// var dict = ConvertObjectToDictionary(new { id = 1, name = "test" });
+        /// // 결과: { "@id": 1, "@name": "test" }
+        /// 
+        /// var dict2 = ConvertObjectToDictionary(new { value = (string?)null });
+        /// // 결과: { "@value": DBNull.Value }
+        /// </summary>
+        /// <param name="obj">변환할 객체 (익명 객체 등)</param>
+        /// <returns>Dictionary 형태의 매개변수 (키: @프로퍼티명, 값: 프로퍼티값)</returns>
+        private Dictionary<string, object> ConvertObjectToDictionary(object obj)
+        {
+            var dictionary = new Dictionary<string, object>();
+            
+            // null 체크
+            if (obj == null)
+                return dictionary;
+            
+            try
+            {
+                // 리플렉션을 사용하여 객체의 프로퍼티들 추출
+                var properties = obj.GetType().GetProperties();
+                
+                foreach (var property in properties)
+                {
+                    try
+                    {
+                        // 프로퍼티 값 추출
+                        var value = property.GetValue(obj);
+                        
+                        // 매개변수 이름 생성 (@ 접두사 추가)
+                        var parameterName = $"@{property.Name}";
+                        
+                        // null 값을 DBNull.Value로 변환
+                        dictionary[parameterName] = value ?? DBNull.Value;
+                    }
+                    catch (Exception ex)
+                    {
+                        // 개별 프로퍼티 처리 실패 시 로그 출력 후 스킵
+                        Console.WriteLine($"⚠️ DatabaseService: 프로퍼티 '{property.Name}' 처리 실패: {ex.Message}");
+                    }
+                }
+                
+                Console.WriteLine($"✅ DatabaseService: 객체를 Dictionary로 변환 완료 - {dictionary.Count}개 매개변수");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ DatabaseService: 객체 변환 실패: {ex.Message}");
+            }
+            
+            return dictionary;
         }
 
         #endregion

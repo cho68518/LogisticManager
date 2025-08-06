@@ -72,7 +72,10 @@ namespace LogisticManager.Models
         public string Value { get; set; } = string.Empty;
 
         [JsonProperty("style")]
-        public string Style { get; set; } = "primary";
+        public string Style { get; set; } = "default";
+
+        [JsonProperty("action_type")]
+        public string ActionType { get; set; } = "open_system_browser";
     }
 
     /// <summary>

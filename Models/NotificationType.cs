@@ -44,6 +44,11 @@ namespace LogisticManager.Models
         /// <summary>
         /// 감천냉동 알림
         /// </summary>
-        GamcheonFrozen
+        GamcheonFrozen,
+        
+        /// <summary>
+        /// 모니터링체크용(봇방) 알림
+        /// </summary>
+        Check
     }
 } 
