@@ -1,4 +1,5 @@
 using LogisticManager.Forms;
+using LogisticManager.Services;
 using System.Text;
 
 namespace LogisticManager
@@ -15,9 +16,10 @@ namespace LogisticManager
     /// 실행 과정:
     /// 1. 애플리케이션 시작 로그 기록
     /// 2. Windows Forms 설정
-    /// 3. 데이터베이스 연결 테스트 (선택사항)
-    /// 4. 메인 폼 생성 및 실행
-    /// 5. 오류 발생 시 사용자에게 알림
+    /// 3. 설정 파일 리소스에서 로드
+    /// 4. 데이터베이스 연결 테스트 (선택사항)
+    /// 5. 메인 폼 생성 및 실행
+    /// 6. 오류 발생 시 사용자에게 알림
     /// 
     /// 오류 처리:
     /// - 데이터베이스 연결 실패: 애플리케이션 계속 실행
@@ -32,9 +34,10 @@ namespace LogisticManager
         /// 실행 순서:
         /// 1. 로그 파일 초기화
         /// 2. Windows Forms 설정
-        /// 3. 데이터베이스 연결 테스트
-        /// 4. 메인 폼 실행
-        /// 5. 오류 처리
+        /// 3. 설정 파일 리소스에서 로드
+        /// 4. 데이터베이스 연결 테스트
+        /// 5. 메인 폼 실행
+        /// 6. 오류 처리
         /// 
         /// 특별한 설정:
         /// - [STAThread]: Windows Forms 애플리케이션에 필요한 스레드 모델 설정

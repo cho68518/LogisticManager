@@ -27,10 +27,15 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- 설정 파일들을 실행 파일에 포함 -->
-    <Content Include="App.config" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="settings.json" CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="column_mapping.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- 설정 파일들을 리소스로 포함 (실행 파일에만 포함) -->
+    <EmbeddedResource Include="App.config" />
+    <EmbeddedResource Include="settings.json" />
+    <EmbeddedResource Include="column_mapping.json" />
   </ItemGroup>
+
+  <PropertyGroup>
+    <!-- 단일 파일 빌드 시 리소스 포함 -->
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+  </PropertyGroup>
 
 </Project> 
