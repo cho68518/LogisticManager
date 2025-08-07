@@ -368,7 +368,7 @@ namespace LogisticManager.Processors
         /// <exception cref="ArgumentException">파일 경로가 비어있는 경우</exception>
         /// <exception cref="FileNotFoundException">파일이 존재하지 않는 경우</exception>
         /// <exception cref="Exception">처리 중 오류 발생 시</exception>
-        public Task<bool> ProcessAsync(string filePath, IProgress<string>? progress = null, IProgress<int>? progressReporter = null)
+        public async Task<bool> ProcessAsync(string filePath, IProgress<string>? progress = null, IProgress<int>? progressReporter = null)
         {
             // 입력 파일 경로 검증
             if (string.IsNullOrEmpty(filePath))
@@ -435,7 +435,7 @@ namespace LogisticManager.Processors
                 {
                     finalProgress?.Report("⚠️ [처리 중단] Excel 파일에 처리 가능한 주문 데이터가 없습니다.");
                     finalProgress?.Report("💡 확인사항: 파일 형식, 헤더 행 존재 여부, 데이터 시트명을 점검해주세요.");
-                    return Task.FromResult(false); // 비즈니스 로직상 정상적인 종료 (오류가 아님)
+                    return false; // 비즈니스 로직상 정상적인 종료 (오류가 아님)
                 }
 
                 // ==================== 2단계: 엔터프라이즈급 데이터베이스 초기화 및 대용량 데이터 적재 (5-10%) ====================
@@ -467,7 +467,7 @@ namespace LogisticManager.Processors
                 // - 병렬 처리 지원으로 멀티코어 CPU 활용
                 // - 메모리 풀링 및 가비지 컬렉션 최적화
                 // - 데이터베이스 연결 풀링으로 연결 오버헤드 최소화
-                //await TruncateAndInsertOriginalDataOptimized(originalData, finalProgress);
+                await TruncateAndInsertOriginalDataOptimized(originalData, finalProgress);
                 
                 // === 2단계 완료 및 성능 통계 보고 ===
                 //finalProgressReporter?.Report(10);
@@ -695,7 +695,7 @@ namespace LogisticManager.Processors
                 // === 성공 반환 및 상위 시스템 연동 ===
                 // true 반환으로 상위 호출자에게 전체 워크플로우 성공 알림
                 // 이를 통해 후속 프로세스 (알림, 로깅, 모니터링 등) 트리거 가능
-                return Task.FromResult(true); // 🎯 비즈니스 프로세스 성공적 완료
+                return true; // 🎯 비즈니스 프로세스 성공적 완료
             }
             catch (Exception ex)
             {
@@ -895,12 +895,50 @@ namespace LogisticManager.Processors
                 // === DataTable에서 Order 객체로 안전한 변환 ===
                 // ConvertDataTableToOrders: 각 DataRow를 Order.FromDataRow()로 변환
                 // 변환 실패 시 해당 행은 스킵하고 로그 출력하여 데이터 손실 최소화
+                // DataTable을 Order 객체 리스트로 변환하는 함수 호출
+                // - 이유: DataTable은 DB/Excel 등에서 읽은 원시 데이터이므로, 
+                //   비즈니스 로직 및 타입 안전성을 위해 도메인 객체(Order)로 변환이 필요함
                 var orders = ConvertDataTableToOrders(data);
                 
                 // === 데이터 유효성 검사 및 필터링 ===
                 // Order.IsValid(): 필수 필드(수취인명, 주소, 주문번호 등) 검증
                 // 유효하지 않은 데이터 제외하여 DB 삽입 오류 사전 방지
-                var validOrders = orders.Where(order => order.IsValid()).ToList();
+                // === 유효성 검사: 모든 데이터가 유효해야만 처리 진행 ===
+                // - 유효하지 않은 데이터가 하나라도 있으면 전체 롤백 및 상세 로그 출력
+                var invalidOrders = orders
+                    .Select((order, idx) => new { Order = order, Index = idx })
+                    .Where(x => !x.Order.IsValid())
+                    .ToList();
+
+                if (invalidOrders.Count > 0)
+                {
+                    // 유효하지 않은 데이터가 존재할 경우 상세 로그 작성
+                    var errorLog = new System.Text.StringBuilder();
+                    errorLog.AppendLine("[처리중지] 유효하지 않은 데이터가 발견되어 처리를 중단합니다.");
+                    foreach (var item in invalidOrders)
+                    {
+                        // 어떤 필드가 잘못됐는지 상세히 표시
+                        var invalidFields = new List<string>();
+                        if (string.IsNullOrEmpty(item.Order.RecipientName))
+                            invalidFields.Add("수취인명");
+                        if (string.IsNullOrEmpty(item.Order.Address))
+                            invalidFields.Add("주소");
+                        if (string.IsNullOrEmpty(item.Order.ProductName))
+                            invalidFields.Add("품목명");
+                        if (item.Order.Quantity <= 0)
+                            invalidFields.Add("수량");
+
+                        errorLog.AppendLine(
+                            $"  - 행 {item.Index + 1}: 유효성 실패 [원인: {string.Join(", ", invalidFields)}], 주문번호: {item.Order.OrderNumber ?? "(없음)"}"
+                        );
+                    }
+                    progress?.Report(errorLog.ToString());
+                    Console.WriteLine(errorLog.ToString());
+                    throw new InvalidOperationException("[처리중지] 유효하지 않은 데이터가 포함되어 있습니다. 상세 내용은 로그를 확인하세요.");
+                }
+
+                // 모든 데이터가 유효한 경우에만 처리 진행
+                var validOrders = orders.ToList();
                 
                 // === 변환 결과 통계 보고 ===
                 progress?.Report($"📊 데이터 변환 완료: 총 {data.Rows.Count}건 → 유효 {validOrders.Count}건");

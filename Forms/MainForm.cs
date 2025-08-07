@@ -755,10 +755,6 @@ namespace LogisticManager.Forms
                 
                 // DB 연결 정보 가져오기
                 var dbInfo = _databaseService.GetConnectionInfo();
-                //LogMessage($"📊 DB 서버: {dbInfo.Server}");
-                //LogMessage($"📊 DB 이름: {dbInfo.Database}");
-                //LogMessage($"📊 DB 사용자: {dbInfo.User}");
-                //LogMessage($"📊 DB 포트: {dbInfo.Port}");
                 
                 // 동기적으로 연결 테스트 실행 (UI 스레드에서 직접 실행)
                 try
@@ -780,7 +776,10 @@ namespace LogisticManager.Forms
                     {
                         LogMessage("✅ 데이터베이스 접속이 완료되었습니다!");
                         LogMessage("📊 송장 처리 시스템이 준비되었습니다.");
-                        lblStatus.Text = "데이터베이스 연결됨";
+                        
+                        // 연결된 DB 서버 정보만 포함한 상태 메시지 생성
+                        var dbInfoText = $"데이터베이스 연결됨 ({dbInfo.Server})";
+                        lblStatus.Text = dbInfoText;
                         lblStatus.ForeColor = Color.FromArgb(46, 204, 113);
                         Console.WriteLine("✅ MainForm: 연결 성공 처리 완료");
                     }

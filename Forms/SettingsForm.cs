@@ -340,8 +340,20 @@ namespace LogisticManager.Forms
             _textBoxes["txtPort"] = txtPort; // 컨트롤 참조 저장
             controls.Add(txtPort);
 
+            // 연결테스트 버튼
+            var btnTestConnection = CreateModernButton("🔍 연결테스트", new Point(240, 285), new Size(100, 25), Color.FromArgb(52, 152, 219));
+            btnTestConnection.Click += TestConnectionButton_Click;
+            controls.Add(btnTestConnection);
+
+            // 연결테스트 결과 라벨
+            var lblConnectionResult = CreateLabel("", new Point(20, 320));
+            lblConnectionResult.Name = "lblConnectionResult";
+            lblConnectionResult.Size = new Size(400, 20);
+            lblConnectionResult.Font = new Font("맑은 고딕", 8F);
+            controls.Add(lblConnectionResult);
+
             // 설명 라벨
-            var infoLabel = CreateLabel("💡 환경 변수를 통해 안전하게 설정값을 관리합니다.", new Point(20, 320));
+            var infoLabel = CreateLabel("💡 환경 변수를 통해 안전하게 설정값을 관리합니다.", new Point(20, 350));
             infoLabel.ForeColor = Color.FromArgb(127, 140, 141);
             infoLabel.Font = new Font("맑은 고딕", 8F);
             controls.Add(infoLabel);
@@ -899,28 +911,10 @@ namespace LogisticManager.Forms
                 var tabControl = this.Controls.OfType<TabControl>().FirstOrDefault();
                 var activeTab = tabControl?.SelectedTab;
 
-                // 파일 경로 설정 탭인 경우 파일 경로 검증
-                if (activeTab?.Text.Contains("파일 경로") == true)
+                if (activeTab == null)
                 {
-                    if (!ValidateFilePathSettings())
-                    {
-                        return;
-                    }
-                }
-                else
-                {
-                    // 데이터베이스 설정 탭인 경우 데이터베이스 설정 검증
-                    var server = _tempSettings.GetValueOrDefault("DB_SERVER", "");
-                    var database = _tempSettings.GetValueOrDefault("DB_NAME", "");
-                    var user = _tempSettings.GetValueOrDefault("DB_USER", "");
-                    var password = _tempSettings.GetValueOrDefault("DB_PASSWORD", "");
-                    var port = _tempSettings.GetValueOrDefault("DB_PORT", "");
-
-                    if (string.IsNullOrEmpty(server) || string.IsNullOrEmpty(database) || string.IsNullOrEmpty(user))
-                    {
-                        MessageBox.Show("⚠️ 데이터베이스 설정에서 서버, 데이터베이스명, 사용자명은 필수입니다.", "입력 확인", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
+                    MessageBox.Show("⚠️ 활성 탭을 찾을 수 없습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
 
                 // JSON 파일에 직접 저장
@@ -945,35 +939,71 @@ namespace LogisticManager.Forms
                     }
                 }
 
-                // 새 설정으로 업데이트
-                settings["DB_SERVER"] = _tempSettings.GetValueOrDefault("DB_SERVER", "");
-                settings["DB_NAME"] = _tempSettings.GetValueOrDefault("DB_NAME", "");
-                settings["DB_USER"] = _tempSettings.GetValueOrDefault("DB_USER", "");
-                settings["DB_PASSWORD"] = _tempSettings.GetValueOrDefault("DB_PASSWORD", "");
-                settings["DB_PORT"] = _tempSettings.GetValueOrDefault("DB_PORT", "");
-                settings["DROPBOX_API_KEY"] = _tempSettings.GetValueOrDefault("DROPBOX_API_KEY", "");
-                settings["KAKAO_WORK_API_KEY"] = _tempSettings.GetValueOrDefault("KAKAO_WORK_API_KEY", "");
-                settings["KAKAO_CHATROOM_ID"] = _tempSettings.GetValueOrDefault("KAKAO_CHATROOM_ID", "");
-                settings["INPUT_FOLDER_PATH"] = _tempSettings.GetValueOrDefault("INPUT_FOLDER_PATH", "");
-                settings["OUTPUT_FOLDER_PATH"] = _tempSettings.GetValueOrDefault("OUTPUT_FOLDER_PATH", "");
-                settings["TEMP_FOLDER_PATH"] = _tempSettings.GetValueOrDefault("TEMP_FOLDER_PATH", "");
+                // 탭별로 해당하는 설정만 저장
+                if (activeTab.Text.Contains("데이터베이스"))
+                {
+                    // 데이터베이스 설정 검증
+                    var server = _tempSettings.GetValueOrDefault("DB_SERVER", "");
+                    var database = _tempSettings.GetValueOrDefault("DB_NAME", "");
+                    var user = _tempSettings.GetValueOrDefault("DB_USER", "");
+                    var password = _tempSettings.GetValueOrDefault("DB_PASSWORD", "");
+                    var port = _tempSettings.GetValueOrDefault("DB_PORT", "");
+
+                    if (string.IsNullOrEmpty(server) || string.IsNullOrEmpty(database) || string.IsNullOrEmpty(user))
+                    {
+                        MessageBox.Show("⚠️ 데이터베이스 설정에서 서버, 데이터베이스명, 사용자명은 필수입니다.", "입력 확인", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    // 데이터베이스 설정만 저장
+                    settings["DB_SERVER"] = server;
+                    settings["DB_NAME"] = database;
+                    settings["DB_USER"] = user;
+                    settings["DB_PASSWORD"] = password;
+                    settings["DB_PORT"] = port;
+
+                    Console.WriteLine($"✅ 데이터베이스 설정 저장 완료");
+                    MessageBox.Show("✅ 데이터베이스 설정이 성공적으로 저장되었습니다!", "설정 저장 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else if (activeTab.Text.Contains("파일 경로"))
+                {
+                    // 파일 경로 설정 검증
+                    if (!ValidateFilePathSettings())
+                    {
+                        return;
+                    }
+
+                    // 파일 경로 설정만 저장
+                    settings["INPUT_FOLDER_PATH"] = _tempSettings.GetValueOrDefault("INPUT_FOLDER_PATH", "");
+                    settings["OUTPUT_FOLDER_PATH"] = _tempSettings.GetValueOrDefault("OUTPUT_FOLDER_PATH", "");
+                    settings["TEMP_FOLDER_PATH"] = _tempSettings.GetValueOrDefault("TEMP_FOLDER_PATH", "");
+
+                    Console.WriteLine($"✅ 파일 경로 설정 저장 완료");
+                    MessageBox.Show(
+                        "✅ 파일 경로 설정이 성공적으로 저장되었습니다!\n\n저장된 설정:\n" +
+                        $"📥 입력 폴더: {settings.GetValueOrDefault("INPUT_FOLDER_PATH", "")}\n" +
+                        $"📤 출력 폴더: {settings.GetValueOrDefault("OUTPUT_FOLDER_PATH", "")}\n" +
+                        $"📁 임시 폴더: {settings.GetValueOrDefault("TEMP_FOLDER_PATH", "")}",
+                        "설정 저장 완료",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+                else if (activeTab.Text.Contains("API"))
+                {
+                    // API 설정만 저장
+                    settings["DROPBOX_API_KEY"] = _tempSettings.GetValueOrDefault("DROPBOX_API_KEY", "");
+                    settings["KAKAO_WORK_API_KEY"] = _tempSettings.GetValueOrDefault("KAKAO_WORK_API_KEY", "");
+                    settings["KAKAO_CHATROOM_ID"] = _tempSettings.GetValueOrDefault("KAKAO_CHATROOM_ID", "");
+
+                    Console.WriteLine($"✅ API 설정 저장 완료");
+                    MessageBox.Show("✅ API 설정이 성공적으로 저장되었습니다!", "설정 저장 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
 
                 // JSON 파일에 저장 (Newtonsoft.Json 사용)
-                var jsonString = Newtonsoft.Json.JsonConvert.SerializeObject(settings, Newtonsoft.Json.Formatting.None);
+                var jsonString = Newtonsoft.Json.JsonConvert.SerializeObject(settings, Newtonsoft.Json.Formatting.Indented);
                 File.WriteAllText(settingsPath, jsonString);
 
                 Console.WriteLine($"✅ 설정 저장 완료: {jsonString}");
-
-                // 저장 성공 메시지 표시
-                MessageBox.Show(
-                    "✅ 설정이 성공적으로 저장되었습니다!\n\n저장된 설정:\n" +
-                    $"📥 입력 폴더: {settings.GetValueOrDefault("INPUT_FOLDER_PATH", "")}\n" +
-                    $"📤 출력 폴더: {settings.GetValueOrDefault("OUTPUT_FOLDER_PATH", "")}\n" +
-                    $"📁 임시 폴더: {settings.GetValueOrDefault("TEMP_FOLDER_PATH", "")}\n" +
-                    $"💡 Dropbox 폴더 경로는 App.config에서 관리됩니다.",
-                    "설정 저장 완료",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
                 
                 // 저장 성공 시 DialogResult 설정
                 this.DialogResult = DialogResult.OK;
@@ -987,15 +1017,9 @@ namespace LogisticManager.Forms
         }
 
         /// <summary>
-        /// 연결 테스트 버튼 클릭 이벤트 핸들러
+        /// 데이터베이스 연결 테스트 버튼 클릭 이벤트 핸들러
         /// 
-        /// 기능:
-        /// - 현재 입력된 데이터베이스 설정으로 연결 테스트
-        /// - 임시 연결 문자열 생성
-        /// - MySQL 연결 시도
-        /// - 성공/실패 메시지 표시
-        /// 
-        /// 테스트 과정:
+        /// 동작 순서:
         /// 1. UI에서 현재 입력된 값들을 읽어옴
         /// 2. MySQL 연결 문자열 생성
         /// 3. 연결 시도
@@ -1022,13 +1046,12 @@ namespace LogisticManager.Forms
                 // 필수 값 검증
                 if (string.IsNullOrEmpty(server) || string.IsNullOrEmpty(database) || string.IsNullOrEmpty(user))
                 {
-                    MessageBox.Show("⚠️ 서버, 데이터베이스명, 사용자명을 입력해주세요.", "입력 확인", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ShowConnectionResult("⚠️ 서버, 데이터베이스명, 사용자명을 입력해주세요.", Color.Orange);
                     return;
                 }
 
                 // 연결 정보 표시
-                var connectionInfo = $"서버: {server}\n데이터베이스: {database}\n사용자: {user}\n포트: {port}";
-                MessageBox.Show($"🔍 연결을 시도합니다...\n\n{connectionInfo}", "연결 테스트", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                ShowConnectionResult("🔍 연결을 시도합니다...", Color.Blue);
 
                 // 연결 문자열 생성 (utf8mb4 사용)
                 var connectionString = $"Server={server};Database={database};Uid={user};Pwd={password};CharSet=utf8mb4;Port={port};SslMode=none;AllowPublicKeyRetrieval=true;ConnectionTimeout=30;";
@@ -1047,24 +1070,42 @@ namespace LogisticManager.Forms
                     using var dbCommand = new MySqlConnector.MySqlCommand("SELECT DATABASE() as database_name", connection);
                     var databaseName = dbCommand.ExecuteScalar();
 
-                    MessageBox.Show($"✅ 데이터베이스 연결이 성공했습니다!\n\n서버 버전: {version}\n현재 데이터베이스: {databaseName}", "연결 테스트", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    var successMessage = $"✅ 연결 성공! 서버 버전: {version}, 데이터베이스: {databaseName}";
+                    ShowConnectionResult(successMessage, Color.Green);
                 }
                 catch (Exception ex)
                 {
-                    var errorMessage = $"❌ 데이터베이스 연결에 실패했습니다:\n\n오류: {ex.Message}";
-                    
-                    if (ex.InnerException != null)
-                    {
-                        errorMessage += $"\n\n상세 오류: {ex.InnerException.Message}";
-                    }
-                    
-                    MessageBox.Show(errorMessage, "연결 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    var errorMessage = $"❌ 연결 실패: {ex.Message}";
+                    ShowConnectionResult(errorMessage, Color.Red);
                 }
             }
             catch (Exception ex)
             {
-                var errorMessage = $"❌ 연결 테스트 중 오류가 발생했습니다:\n\n오류: {ex.Message}";
-                MessageBox.Show(errorMessage, "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                var errorMessage = $"❌ 테스트 중 오류: {ex.Message}";
+                ShowConnectionResult(errorMessage, Color.Red);
+            }
+        }
+
+        /// <summary>
+        /// 연결테스트 결과를 라벨에 표시하는 메서드
+        /// </summary>
+        /// <param name="message">표시할 메시지</param>
+        /// <param name="color">메시지 색상</param>
+        private void ShowConnectionResult(string message, Color color)
+        {
+            // UI 스레드에서 실행
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(() => ShowConnectionResult(message, color)));
+                return;
+            }
+
+            // 연결테스트 결과 라벨 찾기
+            var resultLabel = this.Controls.Find("lblConnectionResult", true).FirstOrDefault() as Label;
+            if (resultLabel != null)
+            {
+                resultLabel.Text = message;
+                resultLabel.ForeColor = color;
             }
         }
 

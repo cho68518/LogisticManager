@@ -14,6 +14,7 @@ namespace LogisticManager.Repositories
     /// - 매개변수화된 쿼리 (SQL 인젝션 방지)
     /// - 트랜잭션 처리 (데이터 일관성)
     /// - 진행률 실시간 보고
+    /// - 하이브리드 동적 쿼리 생성 (설정 기반 + 리플렉션 폴백)
     /// 
     /// 🎯 성능 최적화:
     /// - 배치 크기 최적화 (500건)
@@ -44,6 +45,9 @@ namespace LogisticManager.Repositories
         /// <summary>데이터베이스 서비스 - MySQL 연결 및 쿼리 실행</summary>
         private readonly DatabaseService _databaseService;
 
+        /// <summary>하이브리드 동적 쿼리 생성기 - 설정 기반 + 리플렉션 폴백</summary>
+        private readonly DynamicQueryBuilder _queryBuilder;
+
         #endregion
 
         #region 생성자
@@ -54,6 +58,7 @@ namespace LogisticManager.Repositories
         /// 📋 기능:
         /// - DatabaseService 의존성 주입
         /// - App.config에서 테이블명 읽기 (기본값 제공)
+        /// - DynamicQueryBuilder 초기화 (하이브리드 방식)
         /// - null 체크 및 예외 처리
         /// - 초기화 완료 로그
         /// 
@@ -70,8 +75,10 @@ namespace LogisticManager.Repositories
         {
             _databaseService = databaseService ?? throw new ArgumentNullException(nameof(databaseService));
             _tableName = GetTableNameFromConfig();
+            _queryBuilder = new DynamicQueryBuilder(useReflectionFallback: true);
             
             Console.WriteLine($"✅ InvoiceRepository 초기화 완료 - 테이블: {_tableName}");
+            Console.WriteLine($"🔧 DynamicQueryBuilder 초기화 완료 - 하이브리드 모드 활성화");
         }
 
         /// <summary>
@@ -80,6 +87,7 @@ namespace LogisticManager.Repositories
         /// 📋 기능:
         /// - DatabaseService 의존성 주입
         /// - 사용자 지정 테이블명 사용
+        /// - DynamicQueryBuilder 초기화 (하이브리드 방식)
         /// - null 체크 및 예외 처리
         /// - 초기화 완료 로그
         /// 
@@ -98,8 +106,10 @@ namespace LogisticManager.Repositories
                 throw new ArgumentException("테이블명은 비어있을 수 없습니다.", nameof(tableName));
                 
             _tableName = tableName;
+            _queryBuilder = new DynamicQueryBuilder(useReflectionFallback: true);
             
-            Console.WriteLine($"✅ InvoiceRepository 초기화 완료 - 커스텀 테이블: {_tableName}");
+            Console.WriteLine($"✅ InvoiceRepository 초기화 완료 - 테이블: {_tableName}");
+            Console.WriteLine($"🔧 DynamicQueryBuilder 초기화 완료 - 하이브리드 모드 활성화");
         }
 
         /// <summary>
@@ -861,105 +871,112 @@ namespace LogisticManager.Repositories
         #region 내부 헬퍼 메서드
 
         /// <summary>
-        /// INSERT 쿼리 및 매개변수 생성 - 기본 테이블
+        /// 하이브리드 INSERT 쿼리 생성 - 기본 테이블명 사용
         /// 
         /// 📋 기능:
-        /// - Repository가 관리하는 기본 테이블 사용
-        /// - InvoiceDto를 INSERT 쿼리로 변환
-        /// - 매개변수화된 쿼리 생성
-        /// - null 안전성 보장
+        /// - DynamicQueryBuilder를 사용한 하이브리드 쿼리 생성
+        /// - 설정 기반 매핑 우선 적용 (table_mappings.json)
+        /// - 리플렉션 기반 폴백 지원 (설정이 없는 경우)
+        /// - 타입 안전성 보장
+        /// - SQL 인젝션 방지
+        /// 
+        /// 🎯 동작 순서:
+        /// 1. 설정 기반 매핑 시도 (table_mappings.json)
+        /// 2. 설정이 없는 경우 리플렉션 기반 폴백
+        /// 3. 둘 다 실패 시 예외 발생
         /// 
         /// 💡 사용법:
         /// var (sql, parameters) = BuildInsertQuery(invoice);
         /// </summary>
         /// <param name="invoice">삽입할 송장 데이터</param>
         /// <returns>SQL 쿼리와 매개변수</returns>
+        /// <exception cref="ArgumentException">테이블명이 비어있거나 매핑 설정이 없는 경우</exception>
+        /// <exception cref="InvalidOperationException">쿼리 생성 실패</exception>
         private (string sql, Dictionary<string, object> parameters) BuildInsertQuery(InvoiceDto invoice)
         {
             return BuildInsertQuery(_tableName, invoice);
         }
 
         /// <summary>
-        /// INSERT 쿼리 및 매개변수 생성 - 커스텀 테이블
+        /// 하이브리드 INSERT 쿼리 생성 - 커스텀 테이블명 사용
         /// 
         /// 📋 기능:
-        /// - 지정된 테이블명 사용
-        /// - InvoiceDto를 INSERT 쿼리로 변환
-        /// - 매개변수화된 쿼리 생성
-        /// - null 안전성 보장
+        /// - DynamicQueryBuilder를 사용한 하이브리드 쿼리 생성
+        /// - 설정 기반 매핑 우선 적용 (table_mappings.json)
+        /// - 리플렉션 기반 폴백 지원 (설정이 없는 경우)
+        /// - 타입 안전성 보장
+        /// - SQL 인젝션 방지
+        /// - 확장 가능한 구조
+        /// 
+        /// 🎯 동작 순서:
+        /// 1. 테이블명 유효성 검사
+        /// 2. 설정 기반 매핑 시도 (table_mappings.json)
+        /// 3. 설정이 없는 경우 리플렉션 기반 폴백
+        /// 4. 둘 다 실패 시 예외 발생
+        /// 
+        /// 🛡️ 보안 기능:
+        /// - SQL 인젝션 방지 (매개변수화된 쿼리)
+        /// - 테이블명 검증
+        /// - 타입 안전성 보장
+        /// 
+        /// ⚠️ 예외 처리:
+        /// - ArgumentException: 테이블명이 비어있거나 매핑 설정이 없는 경우
+        /// - InvalidOperationException: 쿼리 생성 실패
         /// 
         /// 💡 사용법:
         /// var (sql, parameters) = BuildInsertQuery("custom_table", invoice);
+        /// 
+        /// 🔧 설정 파일 구조 (table_mappings.json):
+        /// ```json
+        /// {
+        ///   "invoice_table": {
+        ///     "tableName": "invoice_table",
+        ///     "columns": [
+        ///       {
+        ///         "propertyName": "RecipientName",
+        ///         "databaseColumn": "수취인명",
+        ///         "dataType": "VARCHAR",
+        ///         "isRequired": true
+        ///       }
+        ///     ]
+        ///   }
+        /// }
+        /// ```
         /// </summary>
         /// <param name="tableName">대상 테이블명</param>
         /// <param name="invoice">삽입할 송장 데이터</param>
         /// <returns>SQL 쿼리와 매개변수</returns>
+        /// <exception cref="ArgumentException">테이블명이 비어있거나 매핑 설정이 없는 경우</exception>
+        /// <exception cref="InvalidOperationException">쿼리 생성 실패</exception>
         private (string sql, Dictionary<string, object> parameters) BuildInsertQuery(string tableName, InvoiceDto invoice)
         {
-            // === 1단계: 매개변수화된 INSERT 쿼리 구성 ===
-            var sql = $@"
-                INSERT INTO {tableName} (
-                    수취인명, 전화번호1, 전화번호2, 우편번호, 주소, 옵션명, 수량, 배송메세지, 주문번호,
-                    쇼핑몰, 수집시간, 송장명, 품목코드, `주문번호(쇼핑몰)`, 결제금액, 주문금액, 결제수단, 면과세구분, 주문상태, 배송송
-                ) 
-                VALUES (
-                    @RecipientName, @Phone1, @Phone2, @ZipCode, @Address, @OptionName, @Quantity, @SpecialNote, @OrderNumber,
-                    @StoreName, @CollectedAt, @ProductName, @ProductCode, @OrderNumberMall, @PaymentAmount, @OrderAmount, @PaymentMethod, @TaxType, @OrderStatus, @ShippingType
-                )";
-
-            // 쿼리 구조 설명:
-            // 1. INSERT INTO {_tableName}: 동적 테이블명 사용 (App.config 기반)
-            // 2. 컬럼 목록: 송장 데이터의 모든 필수 필드 명시적 지정
-            //    - 명시적 컬럼 지정으로 테이블 구조 변경 시에도 안정성 보장
-            //    - `주문번호(쇼핑몰)`: 백틱 사용으로 특수문자 포함 컬럼명 처리
-            // 3. VALUES 절: 모든 값을 매개변수(@name)로 처리
-            //    - SQL 인젝션 공격 완전 차단
-            //    - 타입 안전성 보장 및 자동 이스케이프 처리
-
-            // === 2단계: 매개변수 딕셔너리 구성 (타입 안전 데이터 매핑) ===
-            var parameters = new Dictionary<string, object>
+            try
             {
-                // === 고객 정보 관련 필드 ===
-                ["@RecipientName"] = invoice.RecipientName,   // 수취인명 (필수)
-                ["@Phone1"] = invoice.Phone1,                 // 주 전화번호
-                ["@Phone2"] = invoice.Phone2,                 // 보조 전화번호 (선택)
-                ["@ZipCode"] = invoice.ZipCode,               // 우편번호
-                ["@Address"] = invoice.Address,               // 배송 주소 (필수)
+                Console.WriteLine($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 INSERT 쿼리 생성 시작");
                 
-                // === 주문 상품 정보 관련 필드 ===
-                ["@OptionName"] = invoice.OptionName,         // 상품 옵션명 (색상, 사이즈 등)
-                ["@Quantity"] = invoice.Quantity,             // 주문 수량 (정수형)
-                ["@SpecialNote"] = invoice.SpecialNote,       // 배송 메시지/요청사항
+                // === 1단계: DynamicQueryBuilder를 사용한 하이브리드 쿼리 생성 ===
+                var (sql, parameters) = _queryBuilder.BuildInsertQuery(tableName, invoice);
                 
-                // === 주문 식별 정보 관련 필드 ===
-                ["@OrderNumber"] = invoice.OrderNumber,       // 내부 주문번호 (고유 식별자)
-                ["@StoreName"] = invoice.StoreName,           // 쇼핑몰명 (주문 출처)
+                Console.WriteLine($"✅ 하이브리드 쿼리 생성 완료 - 테이블: {tableName}");
+                Console.WriteLine($"📊 생성된 컬럼 수: {parameters.Count}개");
                 
-                // === 시간 정보 관련 필드 ===
-                // DateTime을 MySQL DATETIME 형식으로 변환 (yyyy-MM-dd HH:mm:ss)
-                // MySQL의 표준 날짜 시간 형식으로 저장하여 호환성 보장
-                ["@CollectedAt"] = invoice.CollectedAt.ToString("yyyy-MM-dd HH:mm:ss"),
-                
-                // === 상품 정보 관련 필드 ===
-                ["@ProductName"] = invoice.ProductName,       // 송장명/상품명
-                ["@ProductCode"] = invoice.ProductCode,       // 품목코드 (상품 식별용)
-                ["@OrderNumberMall"] = invoice.OrderNumberMall, // 쇼핑몰 원본 주문번호
-                
-                // === 금액 정보 관련 필드 ===
-                ["@PaymentAmount"] = invoice.PaymentAmount,   // 실제 결제금액 (decimal)
-                ["@OrderAmount"] = invoice.OrderAmount,       // 주문금액 (decimal)
-                
-                // === 결제 및 처리 정보 관련 필드 ===
-                // TruncateString: 긴 결제수단명을 255자로 제한하여 DB 오류 방지
-                ["@PaymentMethod"] = TruncateString(invoice.PaymentMethod, 255),
-                ["@TaxType"] = invoice.TaxType,               // 면세/과세 구분
-                ["@OrderStatus"] = invoice.OrderStatus,       // 주문 상태
-                ["@ShippingType"] = invoice.ShippingType      // 배송 구분 (일반/냉동/냉장 등)
-            };
-
-            // === 3단계: SQL과 매개변수 튜플 반환 ===
-            // 튜플 반환으로 쿼리와 매개변수를 하나의 단위로 관리
-            return (sql, parameters);
+                return (sql, parameters);
+            }
+            catch (ArgumentException ex)
+            {
+                Console.WriteLine($"❌ 테이블 매핑 오류: {ex.Message}");
+                throw;
+            }
+            catch (InvalidOperationException ex)
+            {
+                Console.WriteLine($"❌ 쿼리 생성 실패: {ex.Message}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ 예상치 못한 오류: {ex.Message}");
+                throw new InvalidOperationException($"테이블 '{tableName}'에 대한 INSERT 쿼리 생성 중 오류가 발생했습니다: {ex.Message}", ex);
+            }
         }
 
         /// <summary>

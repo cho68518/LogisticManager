@@ -1,0 +1,126 @@
+{
+  "invoice_table": {
+    "tableName": "invoice_table",
+    "columns": [
+      {
+        "propertyName": "RecipientName",
+        "databaseColumn": "수취인명",
+        "dataType": "VARCHAR",
+        "isRequired": true
+      },
+      {
+        "propertyName": "RecipientPhone",
+        "databaseColumn": "수취인연락처",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "RecipientAddress",
+        "databaseColumn": "수취인주소",
+        "dataType": "VARCHAR",
+        "isRequired": true
+      },
+      {
+        "propertyName": "OrderNumber",
+        "databaseColumn": "주문번호",
+        "dataType": "VARCHAR",
+        "isRequired": true
+      },
+      {
+        "propertyName": "ProductCode",
+        "databaseColumn": "품목코드",
+        "dataType": "VARCHAR",
+        "isRequired": true
+      },
+      {
+        "propertyName": "ProductName",
+        "databaseColumn": "품목명",
+        "dataType": "VARCHAR",
+        "isRequired": true
+      },
+      {
+        "propertyName": "Quantity",
+        "databaseColumn": "수량",
+        "dataType": "INT",
+        "isRequired": true
+      },
+      {
+        "propertyName": "UnitPrice",
+        "databaseColumn": "단가",
+        "dataType": "DECIMAL",
+        "isRequired": false
+      },
+      {
+        "propertyName": "TotalAmount",
+        "databaseColumn": "총금액",
+        "dataType": "DECIMAL",
+        "isRequired": false
+      },
+      {
+        "propertyName": "OrderDate",
+        "databaseColumn": "주문일자",
+        "dataType": "DATE",
+        "isRequired": false
+      },
+      {
+        "propertyName": "DeliveryDate",
+        "databaseColumn": "배송일자",
+        "dataType": "DATE",
+        "isRequired": false
+      },
+      {
+        "propertyName": "Status",
+        "databaseColumn": "상태",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "Notes",
+        "databaseColumn": "비고",
+        "dataType": "TEXT",
+        "isRequired": false
+      }
+    ]
+  },
+  "shipment_table": {
+    "tableName": "shipment_table",
+    "columns": [
+      {
+        "propertyName": "ShipmentId",
+        "databaseColumn": "배송번호",
+        "dataType": "VARCHAR",
+        "isRequired": true
+      },
+      {
+        "propertyName": "OrderNumber",
+        "databaseColumn": "주문번호",
+        "dataType": "VARCHAR",
+        "isRequired": true
+      },
+      {
+        "propertyName": "RecipientName",
+        "databaseColumn": "수취인명",
+        "dataType": "VARCHAR",
+        "isRequired": true
+      },
+      {
+        "propertyName": "RecipientAddress",
+        "databaseColumn": "수취인주소",
+        "dataType": "VARCHAR",
+        "isRequired": true
+      },
+      {
+        "propertyName": "ShipmentDate",
+        "databaseColumn": "배송일자",
+        "dataType": "DATE",
+        "isRequired": true
+      },
+      {
+        "propertyName": "Status",
+        "databaseColumn": "배송상태",
+        "dataType": "VARCHAR",
+        "isRequired": true
+      }
+    ]
+  }
+}
