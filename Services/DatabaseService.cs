@@ -51,7 +51,7 @@ namespace LogisticManager.Services
         /// DatabaseService 생성자
         /// 
         /// 초기화 작업:
-        /// 1. settings.json에서 데이터베이스 설정 읽기
+        /// 1. settings.json에서 직접 데이터베이스 설정 읽기 (무조건 JSON 파일 우선)
         /// 2. 연결 문자열 생성
         /// 3. MappingService 인스턴스 생성
         /// 4. 설정값 검증 및 로깅
@@ -70,72 +70,13 @@ namespace LogisticManager.Services
         /// </summary>
         public DatabaseService()
         {
-            // JSON 파일에서 설정을 읽어서 연결 문자열 생성
-            var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-            var settings = new Dictionary<string, string>();
+            Console.WriteLine("🔍 DatabaseService: settings.json에서 직접 데이터베이스 설정을 읽어옵니다.");
             
-            Console.WriteLine($"🔍 DatabaseService: 설정 파일 경로 = {settingsPath}");
-            
-            try
-            {
-                // 설정 파일 존재 여부 확인
-                if (File.Exists(settingsPath))
-                {
-                    // JSON 파일 내용 읽기
-                    var jsonContent = File.ReadAllText(settingsPath);
-                    Console.WriteLine($"📄 DatabaseService: JSON 파일 내용 = {jsonContent}");
-                    
-                    if (!string.IsNullOrEmpty(jsonContent))
-                    {
-                        try
-                        {
-                            // Newtonsoft.Json을 사용하여 더 안전하게 역직렬화
-                            settings = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonContent) ?? new Dictionary<string, string>();
-                            Console.WriteLine($"✅ DatabaseService: JSON에서 {settings.Count}개 설정 로드");
-                            
-                            // 각 설정값 로깅
-                            foreach (var setting in settings)
-                            {
-                                Console.WriteLine($"📋 DatabaseService: {setting.Key} = {setting.Value}");
-                            }
-                        }
-                        catch (Exception jsonEx)
-                        {
-                            // JSON 역직렬화 실패 시 상세한 오류 정보 기록
-                            Console.WriteLine($"❌ DatabaseService: JSON 역직렬화 실패: {jsonEx.Message}");
-                            Console.WriteLine($"🔍 DatabaseService: JSON 예외 상세: {jsonEx}");
-                            
-                            // JSON 역직렬화 실패 시 기본값 사용
-                            Console.WriteLine("⚠️ DatabaseService: 기본값을 사용합니다.");
-                            settings = new Dictionary<string, string>();
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("⚠️ DatabaseService: JSON 파일이 비어있음");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine($"❌ DatabaseService: 설정 파일이 존재하지 않음 = {settingsPath}");
-                }
-            }
-            catch (Exception ex)
-            {
-                // 설정 파일 읽기 실패 시 상세한 오류 정보 기록
-                Console.WriteLine($"❌ DatabaseService: JSON 파일 읽기 실패: {ex.Message}");
-                Console.WriteLine($"🔍 DatabaseService: 예외 상세: {ex}");
-            }
-            
-            // JSON에서 설정을 읽어오거나 기본값 사용 (안전한 기본값)
-            var server = settings.GetValueOrDefault("DB_SERVER", "gramwonlogis.mycafe24.com");
-            var database = settings.GetValueOrDefault("DB_NAME", "gramwonlogis");
-            var user = settings.GetValueOrDefault("DB_USER", "gramwonlogis");
-            var password = settings.GetValueOrDefault("DB_PASSWORD", "jung5516!");
-            var port = settings.GetValueOrDefault("DB_PORT", "3306");
+            // settings.json에서 직접 데이터베이스 설정 읽기 (무조건 JSON 파일 우선)
+            var (server, database, user, password, port) = LoadDatabaseSettingsFromJson();
             
             // 설정값 검증 및 로깅
-            Console.WriteLine($"🔍 DatabaseService: 설정값 검증");
+            Console.WriteLine($"🔍 DatabaseService: settings.json에서 읽어온 설정값");
             Console.WriteLine($"   DB_SERVER: '{server}' (길이: {server?.Length ?? 0})");
             Console.WriteLine($"   DB_NAME: '{database}' (길이: {database?.Length ?? 0})");
             Console.WriteLine($"   DB_USER: '{user}' (길이: {user?.Length ?? 0})");
@@ -146,9 +87,9 @@ namespace LogisticManager.Services
             if (string.IsNullOrEmpty(server) || string.IsNullOrEmpty(database) || string.IsNullOrEmpty(user))
             {
                 Console.WriteLine("⚠️ DatabaseService: 필수 설정값이 누락되어 기본값을 사용합니다.");
-                server = "gramwonlogis.mycafe24.com";
-                database = "gramwonlogis";
-                user = "gramwonlogis";
+                server = "gramwonlogis2.mycafe24.com";
+                database = "gramwonlogis2";
+                user = "gramwonlogis2";
                 password = "jung5516!";
                 port = "3306";
             }
@@ -160,13 +101,78 @@ namespace LogisticManager.Services
             Console.WriteLine($"   사용자: {user}");
             Console.WriteLine($"   포트: {port}");
             
-            // MySQL 연결 문자열 생성
-            _connectionString = $"Server={server};Database={database};User={user};Password={password};Port={port};CharSet=utf8;";
-            Console.WriteLine($"🔗 DatabaseService: 연결 문자열 생성 완료 (길이: {_connectionString.Length})");
+            // 연결 문자열 생성
+            _connectionString = $"Server={server};Database={database};User Id={user};Password={password};Port={port};CharSet=utf8;Convert Zero Datetime=True;Allow User Variables=True;";
             
             // MappingService 인스턴스 생성
             _mappingService = new MappingService();
-            Console.WriteLine("✅ DatabaseService: MappingService 초기화 완료");
+            
+            Console.WriteLine("✅ DatabaseService 초기화 완료");
+        }
+
+        #endregion
+
+        #region 설정 로드 메서드 (Settings Loading Methods)
+
+        /// <summary>
+        /// settings.json에서 직접 데이터베이스 설정을 읽어오는 메서드
+        /// 
+        /// 읽기 순서:
+        /// 1. settings.json 파일에서 직접 읽기
+        /// 2. 파일이 없거나 읽기 실패 시 기본값 사용
+        /// 
+        /// 반환값:
+        /// - (server, database, user, password, port) 튜플
+        /// </summary>
+        /// <returns>데이터베이스 설정 튜플</returns>
+        private (string server, string database, string user, string password, string port) LoadDatabaseSettingsFromJson()
+        {
+            try
+            {
+                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                
+                if (File.Exists(settingsPath))
+                {
+                    var jsonContent = File.ReadAllText(settingsPath);
+                    if (!string.IsNullOrEmpty(jsonContent))
+                    {
+                        Console.WriteLine($"📄 settings.json 파일 내용: {jsonContent}");
+                        
+                        var settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
+                        if (settings != null)
+                        {
+                            var server = settings.GetValueOrDefault("DB_SERVER", "gramwonlogis2.mycafe24.com");
+                            var database = settings.GetValueOrDefault("DB_NAME", "gramwonlogis2");
+                            var user = settings.GetValueOrDefault("DB_USER", "gramwonlogis2");
+                            var password = settings.GetValueOrDefault("DB_PASSWORD", "jung5516!");
+                            var port = settings.GetValueOrDefault("DB_PORT", "3306");
+                            
+                            Console.WriteLine($"✅ settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.");
+                            return (server, database, user, password, port);
+                        }
+                        else
+                        {
+                            Console.WriteLine("❌ settings.json 파싱 실패");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("⚠️ settings.json 파일이 비어있음");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"⚠️ settings.json 파일이 존재하지 않음: {settingsPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ settings.json 읽기 실패: {ex.Message}");
+            }
+            
+            // 기본값 반환
+            Console.WriteLine("🔄 기본값을 사용합니다.");
+            return ("gramwonlogis2.mycafe24.com", "gramwonlogis2", "gramwonlogis2", "jung5516!", "3306");
         }
 
         #endregion
@@ -557,7 +563,9 @@ namespace LogisticManager.Services
             {
                 // 데이터베이스 연결
                 await connection.OpenAsync();
-                Console.WriteLine("✅ DatabaseService: 매개변수화된 트랜잭션 시작");
+                var startLog = "✅ DatabaseService: 매개변수화된 트랜잭션 시작";
+                Console.WriteLine(startLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {startLog}\n");
                 
                 // 트랜잭션 시작
                 using var transaction = await connection.BeginTransactionAsync();
@@ -565,39 +573,96 @@ namespace LogisticManager.Services
                 try
                 {
                     var totalAffectedRows = 0;
+                    var queryCount = 0;
                     
-                    // 각 쿼리를 순차적으로 실행
                     foreach (var (sql, parameters) in queriesWithParameters)
                     {
-                        using var command = new MySqlCommand(sql, connection, transaction);
+                        queryCount++;
+                        var queryLog = $"[DatabaseService] 쿼리 {queryCount} 실행 시작";
+                        var sqlLog = $"[DatabaseService] SQL: {sql}";
+                        var paramLog = $"[DatabaseService] 매개변수: {string.Join(", ", parameters.Select(p => $"{p.Key}={p.Value}"))}";
                         
-                        // 매개변수 추가
-                        foreach (var param in parameters)
+                        Console.WriteLine(queryLog);
+                        Console.WriteLine(sqlLog);
+                        Console.WriteLine(paramLog);
+                        File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {queryLog}\n");
+                        File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {sqlLog}\n");
+                        File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paramLog}\n");
+                        
+                        try
                         {
-                            command.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                            using var command = new MySqlCommand(sql, connection, transaction);
+                            
+                            // 매개변수 추가
+                            foreach (var param in parameters)
+                            {
+                                command.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                            }
+                            
+                            // 쿼리 실행
+                            var affectedRows = await command.ExecuteNonQueryAsync();
+                            totalAffectedRows += affectedRows;
+                            
+                            var successLog = $"[DatabaseService] 쿼리 {queryCount} 성공 - 영향받은 행: {affectedRows}";
+                            Console.WriteLine(successLog);
+                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {successLog}\n");
                         }
-                        
-                        var affectedRows = await command.ExecuteNonQueryAsync();
-                        totalAffectedRows += affectedRows;
-                        Console.WriteLine($"✅ DatabaseService: 매개변수화 쿼리 실행 완료 - {affectedRows}행 영향받음");
+                        catch (Exception ex)
+                        {
+                            var errorLog = $"[DatabaseService] 쿼리 {queryCount} 실패: {ex.Message}";
+                            var detailLog = $"[DatabaseService] 상세 오류: {ex}";
+                            
+                            Console.WriteLine(errorLog);
+                            Console.WriteLine(detailLog);
+                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorLog}\n");
+                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {detailLog}\n");
+                            
+                            // 트랜잭션 롤백
+                            await transaction.RollbackAsync();
+                            
+                            var rollbackLog = $"[DatabaseService] 트랜잭션 롤백 완료 - 총 {queryCount}개 쿼리 중 {queryCount}번째 쿼리에서 실패";
+                            Console.WriteLine(rollbackLog);
+                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {rollbackLog}\n");
+                            
+                            return false;
+                        }
                     }
                     
-                    // 모든 쿼리가 성공하면 커밋
+                    // 모든 쿼리 성공 시 커밋
                     await transaction.CommitAsync();
-                    Console.WriteLine($"✅ DatabaseService: 매개변수화 트랜잭션 커밋 완료 - 총 {totalAffectedRows}행 처리됨");
+                    
+                    var commitLog = $"[DatabaseService] 트랜잭션 커밋 완료 - 총 {queryCount}개 쿼리, {totalAffectedRows}개 행 영향받음";
+                    Console.WriteLine(commitLog);
+                    File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {commitLog}\n");
+                    
                     return true;
                 }
                 catch (Exception ex)
                 {
-                    // 오류 발생 시 롤백
+                    // 트랜잭션 롤백
                     await transaction.RollbackAsync();
-                    Console.WriteLine($"❌ DatabaseService: 매개변수화 트랜잭션 롤백 - {ex.Message}");
+                    
+                    var transactionErrorLog = $"[DatabaseService] 트랜잭션 실행 중 예외 발생: {ex.Message}";
+                    var transactionDetailLog = $"[DatabaseService] 트랜잭션 상세 오류: {ex}";
+                    
+                    Console.WriteLine(transactionErrorLog);
+                    Console.WriteLine(transactionDetailLog);
+                    File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {transactionErrorLog}\n");
+                    File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {transactionDetailLog}\n");
+                    
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ DatabaseService: 매개변수화 트랜잭션 실행 실패: {ex.Message}");
+                var connectionErrorLog = $"[DatabaseService] 데이터베이스 연결 실패: {ex.Message}";
+                var connectionDetailLog = $"[DatabaseService] 연결 상세 오류: {ex}";
+                
+                Console.WriteLine(connectionErrorLog);
+                Console.WriteLine(connectionDetailLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {connectionErrorLog}\n");
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {connectionDetailLog}\n");
+                
                 return false;
             }
         }
@@ -734,7 +799,7 @@ namespace LogisticManager.Services
             // 간단한 파싱을 통해 정보 추출
             var server = ExtractValue(connectionString, "Server=", ";");
             var database = ExtractValue(connectionString, "Database=", ";");
-            var user = ExtractValue(connectionString, "User=", ";");
+            var user = ExtractValue(connectionString, "User Id=", ";");
             var port = ExtractValue(connectionString, "Port=", ";");
             
             return (server, database, user, port, connectionString);

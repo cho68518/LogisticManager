@@ -134,6 +134,7 @@ namespace LogisticManager.Forms
             
             // KakaoWork 연결 테스트
             TestKakaoWorkConnection();
+
         }
 
         #endregion
@@ -568,13 +569,22 @@ namespace LogisticManager.Forms
                 // 파일 선택 대화상자 실행
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
+                    // 새 파일이 선택되었으므로 로그 초기화
+                    //ClearLog();
+                    
+                    // UI 상태 초기화
+                    progressBar.Value = 0;
+                    lblStatus.Text = "파일 선택됨";
+                    lblStatus.ForeColor = Color.FromArgb(52, 152, 219);
+                    
                     _selectedFilePath = openFileDialog.FileName;
                     var fileName = Path.GetFileName(_selectedFilePath);
                     lblFilePath.Text = $"📄 선택된 파일: {fileName}";
                     btnStartProcess.Enabled = true;
                     
-                    LogMessage($"📁 파일이 선택되었습니다: {fileName}");
+                    LogMessage($"📁 새 파일이 선택되었습니다: {fileName}");
                     LogMessage($"📊 파일 크기: {new FileInfo(_selectedFilePath).Length / 1024} KB");
+                    LogMessage($"⏰ 선택 시각: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 }
             }
             catch (Exception ex)
@@ -635,14 +645,27 @@ namespace LogisticManager.Forms
                 });
 
                 // 송장 처리 실행
-                await processor.ProcessAsync(_selectedFilePath, logCallback, progressCallback);
+                var result = await processor.ProcessAsync(_selectedFilePath, logCallback, progressCallback);
 
-                // 작업 완료 처리
-                //LogMessage("✅ 송장 처리가 성공적으로 완료되었습니다!");
-                lblStatus.Text = "완료";
-                lblStatus.ForeColor = Color.FromArgb(46, 204, 113);
+                // 처리 결과에 따른 메시지 표시 (약간의 지연을 두어 로그 순서 보장)
+                await Task.Delay(100); // UI 업데이트를 위한 짧은 지연
                 
-                MessageBox.Show("송장 처리가 성공적으로 완료되었습니다!", "완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                if (result)
+                {
+                    // 성공적인 처리 완료
+                    LogMessage("✅ 송장 처리가 성공적으로 완료되었습니다!");
+                    lblStatus.Text = "완료";
+                    lblStatus.ForeColor = Color.FromArgb(46, 204, 113);
+                    MessageBox.Show("송장 처리가 성공적으로 완료되었습니다!", "완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    // 처리 중단 (데이터가 없는 경우 등)
+                    LogMessage("⚠️ 송장 처리가 중단되었습니다. 처리 가능한 데이터가 없거나 파일 형식에 문제가 있을 수 있습니다.");
+                    lblStatus.Text = "처리 중단";
+                    lblStatus.ForeColor = Color.FromArgb(243, 156, 18);
+                    MessageBox.Show("송장 처리가 중단되었습니다.\n\n확인사항:\n• 파일에 처리 가능한 주문 데이터가 있는지 확인\n• 파일 형식이 올바른지 확인\n• 헤더 행이 존재하는지 확인", "처리 중단", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
             }
             catch (Exception ex)
             {
@@ -729,6 +752,42 @@ namespace LogisticManager.Forms
             {
                 // 로그 출력 중 오류가 발생한 경우 콘솔에 출력
                 Console.WriteLine($"로그 출력 중 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 로그 내용을 초기화하는 메서드
+        /// 
+        /// 기능:
+        /// - RichTextBox의 모든 내용을 지움
+        /// - UI 스레드에서 안전하게 실행
+        /// - 초기화 완료 후 자동 스크롤
+        /// </summary>
+        private void ClearLog()
+        {
+            try
+            {
+                // UI 스레드에서 안전하게 실행
+                if (txtLog.InvokeRequired)
+                {
+                    txtLog.Invoke(new Action(() => ClearLog()));
+                    return;
+                }
+
+                // 로그 내용 초기화
+                txtLog.Clear();
+                
+                // 자동 스크롤
+                txtLog.SelectionStart = txtLog.Text.Length;
+                txtLog.ScrollToCaret();
+                
+                // UI 업데이트
+                Application.DoEvents();
+            }
+            catch (Exception ex)
+            {
+                // 로그 초기화 중 오류가 발생한 경우 콘솔에 출력
+                Console.WriteLine($"로그 초기화 중 오류: {ex.Message}");
             }
         }
 
@@ -977,6 +1036,59 @@ namespace LogisticManager.Forms
                 {
                     Environment.Exit(0);
                 }
+            }
+        }
+
+
+
+        /// <summary>
+        /// UI 상태를 최초 상태로 초기화하는 메서드
+        /// 
+        /// 기능:
+        /// - 진행률바 초기화
+        /// - 상태 라벨 초기화
+        /// - 버튼 상태 초기화
+        /// - 파일 경로 라벨 초기화
+        /// </summary>
+        private void ResetUIState()
+        {
+            try
+            {
+                // UI 스레드에서 안전하게 실행
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(() => ResetUIState());
+                    return;
+                }
+
+                // 진행률바 초기화
+                progressBar.Value = 0;
+                
+                // 상태 라벨 초기화
+                lblStatus.Text = "대기 중...";
+                lblStatus.ForeColor = Color.FromArgb(127, 140, 141);
+                
+                // 파일 경로 라벨 초기화
+                lblFilePath.Text = "선택된 파일: 없음";
+                
+                // 버튼 상태 초기화 (초기화 버튼은 백그라운드 작업 완료 후 활성화)
+                btnStartProcess.Enabled = false;
+                btnSelectFile.Enabled = true;
+                btnSettings.Enabled = true;
+                btnDropboxTest.Enabled = true;
+                btnKakaoWorkTest.Enabled = true;
+                btnExit.Enabled = true;
+                // btnReset.Enabled = true; // 이 부분은 백그라운드 작업 완료 후 설정
+                
+                // UI 업데이트
+                Application.DoEvents();
+                
+                // 추가 UI 업데이트를 위한 짧은 대기
+                Thread.Sleep(10);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"UI 상태 초기화 중 오류: {ex.Message}");
             }
         }
 

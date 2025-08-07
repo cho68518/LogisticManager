@@ -18,82 +18,8 @@ namespace LogisticManager
                 Console.WriteLine("🔍 DatabaseTest: 연결 테스트 시작");
                 File.AppendAllText(logPath, "🔍 DatabaseTest: 연결 테스트 시작\n");
                 
-                // settings.json에서 설정을 읽어서 연결 문자열 생성
-                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-                var settings = new Dictionary<string, string>();
-                
-                Console.WriteLine($"🔍 DatabaseTest: 설정 파일 경로 = {settingsPath}");
-                File.AppendAllText(logPath, $"🔍 DatabaseTest: 설정 파일 경로 = {settingsPath}\n");
-                
-                try
-                {
-                    if (File.Exists(settingsPath))
-                    {
-                        var jsonContent = File.ReadAllText(settingsPath);
-                        Console.WriteLine($"📄 DatabaseTest: JSON 파일 내용 = {jsonContent}");
-                        File.AppendAllText(logPath, $"📄 DatabaseTest: JSON 파일 내용 = {jsonContent}\n");
-                        
-                        if (!string.IsNullOrEmpty(jsonContent))
-                        {
-                            try
-                            {
-                                Console.WriteLine("🔍 DatabaseTest: JSON 역직렬화 시도 중...");
-                                File.AppendAllText(logPath, "🔍 DatabaseTest: JSON 역직렬화 시도 중...\n");
-                                // Newtonsoft.Json을 사용하여 더 안전하게 역직렬화
-                                settings = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonContent) ?? new Dictionary<string, string>();
-                                Console.WriteLine($"✅ DatabaseTest: JSON에서 {settings.Count}개 설정 로드");
-                                File.AppendAllText(logPath, $"✅ DatabaseTest: JSON에서 {settings.Count}개 설정 로드\n");
-                                
-                                // 각 설정값 로깅
-                                foreach (var setting in settings)
-                                {
-                                    Console.WriteLine($"📋 DatabaseTest: {setting.Key} = {setting.Value}");
-                                    File.AppendAllText(logPath, $"📋 DatabaseTest: {setting.Key} = {setting.Value}\n");
-                                }
-                            }
-                            catch (Exception jsonEx)
-                            {
-                                Console.WriteLine($"❌ DatabaseTest: JSON 역직렬화 실패: {jsonEx.Message}");
-                                File.AppendAllText(logPath, $"❌ DatabaseTest: JSON 역직렬화 실패: {jsonEx.Message}\n");
-                                Console.WriteLine($"🔍 DatabaseTest: JSON 예외 타입: {jsonEx.GetType().Name}");
-                                File.AppendAllText(logPath, $"🔍 DatabaseTest: JSON 예외 타입: {jsonEx.GetType().Name}\n");
-                                Console.WriteLine($"🔍 DatabaseTest: JSON 예외 상세: {jsonEx}");
-                                File.AppendAllText(logPath, $"🔍 DatabaseTest: JSON 예외 상세: {jsonEx}\n");
-                                
-                                // JSON 역직렬화 실패 시 기본값 사용
-                                Console.WriteLine("⚠️ DatabaseTest: 기본값을 사용합니다.");
-                                File.AppendAllText(logPath, "⚠️ DatabaseTest: 기본값을 사용합니다.\n");
-                                settings = new Dictionary<string, string>();
-                            }
-                        }
-                        else
-                        {
-                            Console.WriteLine("⚠️ DatabaseTest: JSON 파일이 비어있음");
-                            File.AppendAllText(logPath, "⚠️ DatabaseTest: JSON 파일이 비어있음\n");
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine($"❌ DatabaseTest: 설정 파일이 존재하지 않음 = {settingsPath}");
-                        File.AppendAllText(logPath, $"❌ DatabaseTest: 설정 파일이 존재하지 않음 = {settingsPath}\n");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"❌ DatabaseTest: JSON 파일 읽기 실패: {ex.Message}");
-                    File.AppendAllText(logPath, $"❌ DatabaseTest: JSON 파일 읽기 실패: {ex.Message}\n");
-                    Console.WriteLine($"🔍 DatabaseTest: 예외 타입: {ex.GetType().Name}");
-                    File.AppendAllText(logPath, $"🔍 DatabaseTest: 예외 타입: {ex.GetType().Name}\n");
-                    Console.WriteLine($"🔍 DatabaseTest: 예외 상세: {ex}");
-                    File.AppendAllText(logPath, $"🔍 DatabaseTest: 예외 상세: {ex}\n");
-                }
-                
-                // JSON에서 설정을 읽어오거나 기본값 사용
-                var server = settings.GetValueOrDefault("DB_SERVER", "gramwonlogis.mycafe24.com");
-                var database = settings.GetValueOrDefault("DB_NAME", "gramwonlogis");
-                var user = settings.GetValueOrDefault("DB_USER", "gramwonlogis");
-                var password = settings.GetValueOrDefault("DB_PASSWORD", "jung5516!");
-                var port = settings.GetValueOrDefault("DB_PORT", "3306");
+                // settings.json에서 직접 데이터베이스 설정 읽기
+                var (server, database, user, password, port) = LoadDatabaseSettingsFromJson();
                 
                 Console.WriteLine($"🔍 DatabaseTest: 설정값 검증");
                 File.AppendAllText(logPath, "🔍 DatabaseTest: 설정값 검증\n");
@@ -169,20 +95,67 @@ namespace LogisticManager
                         Console.WriteLine($"🔍 DatabaseTest: 내부 예외 타입: {dbEx.InnerException.GetType().Name}");
                         File.AppendAllText(logPath, $"🔍 DatabaseTest: 내부 예외 타입: {dbEx.InnerException.GetType().Name}\n");
                     }
-                    
-                    throw; // 예외를 다시 던져서 상위에서 처리하도록 함
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ DatabaseTest: 최상위 예외 발생: {ex.Message}");
-                File.AppendAllText(logPath, $"❌ DatabaseTest: 최상위 예외 발생: {ex.Message}\n");
-                Console.WriteLine($"🔍 DatabaseTest: 최상위 예외 타입: {ex.GetType().Name}");
-                File.AppendAllText(logPath, $"🔍 DatabaseTest: 최상위 예외 타입: {ex.GetType().Name}\n");
-                Console.WriteLine($"🔍 DatabaseTest: 최상위 예외 상세: {ex}");
-                File.AppendAllText(logPath, $"🔍 DatabaseTest: 최상위 예외 상세: {ex}\n");
-                throw;
+                Console.WriteLine($"❌ DatabaseTest: 일반 오류: {ex.Message}");
+                File.AppendAllText(logPath, $"❌ DatabaseTest: 일반 오류: {ex.Message}\n");
             }
+        }
+
+        /// <summary>
+        /// settings.json에서 직접 데이터베이스 설정을 읽어오는 메서드
+        /// </summary>
+        /// <returns>데이터베이스 설정 튜플</returns>
+        private static (string server, string database, string user, string password, string port) LoadDatabaseSettingsFromJson()
+        {
+            try
+            {
+                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                
+                if (File.Exists(settingsPath))
+                {
+                    var jsonContent = File.ReadAllText(settingsPath);
+                    if (!string.IsNullOrEmpty(jsonContent))
+                    {
+                        Console.WriteLine($"📄 DatabaseTest: settings.json 파일 내용: {jsonContent}");
+                        
+                        var settings = JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonContent);
+                        if (settings != null)
+                        {
+                            var server = settings.GetValueOrDefault("DB_SERVER", "gramwonlogis2.mycafe24.com");
+                            var database = settings.GetValueOrDefault("DB_NAME", "gramwonlogis2");
+                            var user = settings.GetValueOrDefault("DB_USER", "gramwonlogis2");
+                            var password = settings.GetValueOrDefault("DB_PASSWORD", "jung5516!");
+                            var port = settings.GetValueOrDefault("DB_PORT", "3306");
+                            
+                            Console.WriteLine($"✅ DatabaseTest: settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.");
+                            return (server, database, user, password, port);
+                        }
+                        else
+                        {
+                            Console.WriteLine("❌ DatabaseTest: settings.json 파싱 실패");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("⚠️ DatabaseTest: settings.json 파일이 비어있음");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"⚠️ DatabaseTest: settings.json 파일이 존재하지 않음: {settingsPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ DatabaseTest: settings.json 읽기 실패: {ex.Message}");
+            }
+            
+            // 기본값 반환
+            Console.WriteLine("🔄 DatabaseTest: 기본값을 사용합니다.");
+            return ("gramwonlogis2.mycafe24.com", "gramwonlogis2", "gramwonlogis2", "jung5516!", "3306");
         }
     }
 } 

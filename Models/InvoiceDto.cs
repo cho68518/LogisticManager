@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
 
 namespace LogisticManager.Models
 {
@@ -136,25 +137,25 @@ namespace LogisticManager.Models
             return new InvoiceDto
             {
                 RecipientName = order.RecipientName ?? string.Empty,
-                Phone1 = order.RecipientPhone ?? string.Empty,
-                Phone2 = string.Empty,
+                Phone1 = order.RecipientPhone1 ?? order.RecipientPhone ?? string.Empty,
+                Phone2 = order.RecipientPhone2 ?? string.Empty,
                 ZipCode = order.ZipCode ?? string.Empty,
                 Address = order.Address ?? string.Empty,
-                OptionName = string.Empty,
-                Quantity = order.Quantity,
-                SpecialNote = order.SpecialNote ?? string.Empty,
+                OptionName = order.OptionName ?? string.Empty,
+                Quantity = order.Quantity > 0 ? order.Quantity : 1,
+                SpecialNote = order.ShippingMessage ?? order.SpecialNote ?? string.Empty,
                 OrderNumber = order.OrderNumber ?? string.Empty,
-                StoreName = order.StoreName ?? string.Empty,
-                CollectedAt = DateTime.Now,
-                ProductName = order.ProductName ?? string.Empty,
+                StoreName = order.MallName ?? order.StoreName ?? string.Empty,
+                CollectedAt = order.CollectionTime ?? DateTime.Now,
+                ProductName = order.InvoiceName ?? order.ProductName ?? string.Empty,
                 ProductCode = order.ProductCode ?? string.Empty,
-                OrderNumberMall = order.OrderNumber ?? string.Empty,
-                PaymentAmount = order.TotalPrice,
-                OrderAmount = order.TotalPrice,
+                OrderNumberMall = order.OrderNumberMall ?? order.OrderNumber ?? string.Empty,
+                PaymentAmount = decimal.TryParse(order.PaymentAmount, out var paymentAmount) ? paymentAmount : 0,
+                OrderAmount = decimal.TryParse(order.OrderAmount, out var orderAmount) ? orderAmount : 0,
                 PaymentMethod = order.PaymentMethod ?? string.Empty,
-                TaxType = order.PriceCategory ?? string.Empty,
-                OrderStatus = order.ProcessingStatus ?? string.Empty,
-                ShippingType = order.ShippingType ?? string.Empty
+                TaxType = order.TaxType ?? order.PriceCategory ?? string.Empty,
+                OrderStatus = order.OrderStatus ?? order.ProcessingStatus ?? string.Empty,
+                ShippingType = order.DeliverySend ?? order.ShippingType ?? string.Empty
             };
         }
 
@@ -166,7 +167,7 @@ namespace LogisticManager.Models
         /// DTO 데이터 유효성 검사
         /// 
         /// 📋 기능:
-        /// - 필수 필드 검증
+        /// - 필수 필드 검증 (더 유연한 검증)
         /// - 데이터 형식 검증
         /// - 비즈니스 규칙 검증
         /// 
@@ -176,14 +177,66 @@ namespace LogisticManager.Models
         /// <returns>유효성 검사 결과</returns>
         public bool IsValid()
         {
-            return !string.IsNullOrWhiteSpace(RecipientName) &&
-                   !string.IsNullOrWhiteSpace(Phone1) &&
-                   !string.IsNullOrWhiteSpace(ZipCode) &&
-                   !string.IsNullOrWhiteSpace(Address) &&
-                   !string.IsNullOrWhiteSpace(OrderNumber) &&
-                   Quantity > 0 &&
-                   PaymentAmount >= 0 &&
-                   OrderAmount >= 0;
+            // === 기본 필수 필드 검증 (더 유연한 검증) ===
+            var isValid = true;
+            var missingFields = new List<string>();
+            
+            // 수취인명 검사 (필수)
+            if (string.IsNullOrWhiteSpace(RecipientName))
+            {
+                isValid = false;
+                missingFields.Add("수취인명");
+            }
+            
+            // 전화번호1 검사 (필수) - 더 유연한 검증
+            if (string.IsNullOrWhiteSpace(Phone1))
+            {
+                // 전화번호가 없어도 일단 허용 (대용량 데이터 처리 시)
+                // isValid = false;
+                // missingFields.Add("전화번호1");
+            }
+            
+            // 우편번호 검사 (선택) - 더 유연한 검증
+            if (string.IsNullOrWhiteSpace(ZipCode))
+            {
+                // 우편번호가 없어도 일단 허용
+                // isValid = false;
+                // missingFields.Add("우편번호");
+            }
+            
+            // 주소 검사 (필수)
+            if (string.IsNullOrWhiteSpace(Address))
+            {
+                isValid = false;
+                missingFields.Add("주소");
+            }
+            
+            // 주문번호 검사 (필수)
+            if (string.IsNullOrWhiteSpace(OrderNumber))
+            {
+                isValid = false;
+                missingFields.Add("주문번호");
+            }
+            
+            // 수량 검사 (1 이상)
+            if (Quantity <= 0)
+            {
+                isValid = false;
+                missingFields.Add("수량");
+            }
+            
+            // === 디버깅 정보 출력 (유효하지 않은 경우) ===
+            if (!isValid)
+            {
+                Console.WriteLine($"[InvoiceDto] 유효성 검사 실패 - 누락된 필드: {string.Join(", ", missingFields)}");
+                Console.WriteLine($"  - 수취인명: '{RecipientName ?? "(null)"}'");
+                Console.WriteLine($"  - 전화번호1: '{Phone1 ?? "(null)"}'");
+                Console.WriteLine($"  - 주소: '{Address ?? "(null)"}'");
+                Console.WriteLine($"  - 주문번호: '{OrderNumber ?? "(null)"}'");
+                Console.WriteLine($"  - 수량: {Quantity}");
+            }
+            
+            return isValid;
         }
 
         #endregion

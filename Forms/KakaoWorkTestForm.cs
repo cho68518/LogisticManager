@@ -377,8 +377,8 @@ namespace LogisticManager.Forms
 
                 LogMessage("🔗 KakaoWork 연결 테스트를 시작합니다...");
 
-                // 간단한 연결 테스트 (실제로는 KakaoWorkService에 TestConnectionAsync 메서드가 필요)
-                var result = await TestKakaoWorkConnectionAsync();
+                // KakaoWorkService의 TestConnectionAsync 메서드 사용
+                var result = await _kakaoWorkService.TestConnectionAsync();
 
                 if (result)
                 {
@@ -389,12 +389,17 @@ namespace LogisticManager.Forms
                 else
                 {
                     LogMessage("❌ KakaoWork 연결 테스트 실패!");
+                    LogMessage("💡 App.config에서 KakaoWork 인증 정보를 확인해주세요.");
                     lblStatus.Text = "연결 실패";
                 }
             }
             catch (Exception ex)
             {
                 LogMessage($"❌ 연결 테스트 오류: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    LogMessage($"🔍 상세 오류: {ex.InnerException.Message}");
+                }
                 lblStatus.Text = "연결 오류";
             }
             finally
@@ -534,31 +539,6 @@ namespace LogisticManager.Forms
         #endregion
 
         #region 유틸리티 메서드 (Utility Methods)
-
-        /// <summary>
-        /// KakaoWork 연결 테스트 메서드
-        /// </summary>
-        private Task<bool> TestKakaoWorkConnectionAsync()
-        {
-            try
-            {
-                // 간단한 연결 테스트 (실제 구현은 KakaoWorkService에 따라 달라질 수 있음)
-                var appKey = System.Configuration.ConfigurationManager.AppSettings["KakaoWork.AppKey"];
-                if (string.IsNullOrEmpty(appKey))
-                {
-                    LogMessage("❌ KakaoWork AppKey가 설정되지 않았습니다.");
-                    return Task.FromResult(false);
-                }
-
-                LogMessage("✅ KakaoWork 설정 확인 완료");
-                return Task.FromResult(true);
-            }
-            catch (Exception ex)
-            {
-                LogMessage($"❌ KakaoWork 연결 테스트 실패: {ex.Message}");
-                return Task.FromResult(false);
-            }
-        }
 
         /// <summary>
         /// 로그 메시지를 텍스트박스에 추가하는 메서드

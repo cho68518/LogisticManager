@@ -1,6 +1,133 @@
 {
+  "송장출력_사방넷원본변환_Dev": {
+    "tableName": "송장출력_사방넷원본변환_Dev",
+    "primaryKey": null,
+    "columns": [
+      {
+        "propertyName": "RecipientName",
+        "databaseColumn": "수취인명",
+        "dataType": "VARCHAR",
+        "isRequired": true
+      },
+      {
+        "propertyName": "Phone1",
+        "databaseColumn": "전화번호1",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "Phone2",
+        "databaseColumn": "전화번호2",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "ZipCode",
+        "databaseColumn": "우편번호",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "Address",
+        "databaseColumn": "주소",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "OptionName",
+        "databaseColumn": "옵션명",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "Quantity",
+        "databaseColumn": "수량",
+        "dataType": "INT",
+        "isRequired": false
+      },
+      {
+        "propertyName": "SpecialNote",
+        "databaseColumn": "배송메세지",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "OrderNumber",
+        "databaseColumn": "주문번호",
+        "dataType": "VARCHAR",
+        "isRequired": true
+      },
+      {
+        "propertyName": "StoreName",
+        "databaseColumn": "쇼핑몰",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "CollectedAt",
+        "databaseColumn": "수집시간",
+        "dataType": "DATETIME",
+        "isRequired": false
+      },
+      {
+        "propertyName": "ProductName",
+        "databaseColumn": "송장명",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "ProductCode",
+        "databaseColumn": "품목코드",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "OrderNumberMall",
+        "databaseColumn": "주문번호(쇼핑몰)",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "PaymentAmount",
+        "databaseColumn": "결제금액",
+        "dataType": "DECIMAL",
+        "isRequired": false
+      },
+      {
+        "propertyName": "OrderAmount",
+        "databaseColumn": "주문금액",
+        "dataType": "DECIMAL",
+        "isRequired": false
+      },
+      {
+        "propertyName": "PaymentMethod",
+        "databaseColumn": "결제수단",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "TaxType",
+        "databaseColumn": "면과세구분",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "OrderStatus",
+        "databaseColumn": "주문상태",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "ShippingType",
+        "databaseColumn": "배송송",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      }
+    ]
+  },
   "invoice_table": {
     "tableName": "invoice_table",
+    "primaryKey": "OrderNumber",
     "columns": [
       {
         "propertyName": "RecipientName",
@@ -84,6 +211,7 @@
   },
   "shipment_table": {
     "tableName": "shipment_table",
+    "primaryKey": "ShipmentId",
     "columns": [
       {
         "propertyName": "ShipmentId",

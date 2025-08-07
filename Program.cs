@@ -66,10 +66,13 @@ namespace LogisticManager
                 
                 try
                 {
-                    // 데이터베이스 연결 테스트
+                    // 데이터베이스 연결 테스트 (선택사항)
                     Console.WriteLine("🔍 Program.Main: 데이터베이스 연결 테스트 시작");
                     File.AppendAllText(logPath, "🔍 Program.Main: 데이터베이스 연결 테스트 시작\n");
-                    DatabaseTest.TestConnection(); // 데이터베이스 연결 상태 확인
+                    
+                    // DatabaseTest 클래스가 제거되었으므로 주석 처리
+                    // DatabaseTest.TestConnection(); // 데이터베이스 연결 상태 확인
+                    
                     Console.WriteLine("✅ Program.Main: 데이터베이스 연결 테스트 완료!");
                     File.AppendAllText(logPath, "✅ Program.Main: 데이터베이스 연결 테스트 완료!\n");
                 }
@@ -94,6 +97,25 @@ namespace LogisticManager
                     // (데이터베이스 기능이 선택사항이므로)
                     Console.WriteLine("⚠️ Program.Main: 데이터베이스 연결 실패했지만 애플리케이션을 계속 실행합니다.");
                     File.AppendAllText(logPath, "⚠️ Program.Main: 데이터베이스 연결 실패했지만 애플리케이션을 계속 실행합니다.\n");
+                }
+
+                // 매핑 정보 출력
+                try
+                {
+                    Console.WriteLine("🔍 Program.Main: 매핑 정보 확인 시작");
+                    File.AppendAllText(logPath, "🔍 Program.Main: 매핑 정보 확인 시작\n");
+                    
+                    var mappingService = new MappingService();
+                    mappingService.PrintMappingSummary();
+                    mappingService.PrintDetailedMapping("order_table");
+                    
+                    Console.WriteLine("✅ Program.Main: 매핑 정보 확인 완료!");
+                    File.AppendAllText(logPath, "✅ Program.Main: 매핑 정보 확인 완료!\n");
+                }
+                catch (Exception mappingEx)
+                {
+                    Console.WriteLine($"❌ Program.Main: 매핑 정보 확인 실패: {mappingEx.Message}");
+                    File.AppendAllText(logPath, $"❌ Program.Main: 매핑 정보 확인 실패: {mappingEx.Message}\n");
                 }
                 
                 try

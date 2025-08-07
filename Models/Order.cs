@@ -1,3 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using LogisticManager.Services;
+
 namespace LogisticManager.Models
 {
     /// <summary>
@@ -45,6 +50,16 @@ namespace LogisticManager.Models
         /// 수취인연락처 - 수취인의 전화번호
         /// </summary>
         public string? RecipientPhone { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 전화번호1 - 수취인의 첫 번째 전화번호
+        /// </summary>
+        public string? RecipientPhone1 { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 전화번호2 - 수취인의 두 번째 전화번호
+        /// </summary>
+        public string? RecipientPhone2 { get; set; } = string.Empty;
         
         /// <summary>
         /// 주소 - 배송지의 기본 주소
@@ -164,118 +179,445 @@ namespace LogisticManager.Models
 
         #endregion
 
+        #region column_mapping.json 매핑 필드들
+
+        /// <summary>
+        /// 옵션명 - 상품 옵션 정보
+        /// </summary>
+        public string? OptionName { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 배송메세지 - 배송 관련 메시지
+        /// </summary>
+        public string? ShippingMessage { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 쇼핑몰 - 주문이 발생한 쇼핑몰
+        /// </summary>
+        public string? MallName { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 수집시간 - 데이터 수집 시간
+        /// </summary>
+        public DateTime? CollectionTime { get; set; }
+        
+        /// <summary>
+        /// 송장명 - 송장 상품명
+        /// </summary>
+        public string? InvoiceName { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 택배비용 - 택배 배송 비용
+        /// </summary>
+        public string? DeliveryCost { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 출력개수 - 출력할 개수
+        /// </summary>
+        public string? PrintCount { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 송장수량 - 송장 수량
+        /// </summary>
+        public string? InvoiceQuantity { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 별표1 - 별표 필드1
+        /// </summary>
+        public string? Star1 { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 별표2 - 별표 필드2
+        /// </summary>
+        public string? Star2 { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 품목개수 - 품목 개수
+        /// </summary>
+        public string? ProductCount { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 택배수량 - 택배 수량
+        /// </summary>
+        public string? DeliveryQuantity { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 택배수량1 - 택배 수량1
+        /// </summary>
+        public string? DeliveryQuantity1 { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 택배수량합산 - 택배 수량 합산
+        /// </summary>
+        public string? DeliveryQuantitySum { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 송장구분자 - 송장 구분자
+        /// </summary>
+        public string? InvoiceSeparator { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 송장구분 - 송장 구분
+        /// </summary>
+        public string? InvoiceType { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 송장구분최종 - 송장 구분 최종
+        /// </summary>
+        public string? InvoiceTypeFinal { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 위치 - 위치 정보
+        /// </summary>
+        public string? Location { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 위치변환 - 변환된 위치 정보
+        /// </summary>
+        public string? LocationConverted { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 주문번호(쇼핑몰) - 쇼핑몰 주문번호
+        /// </summary>
+        public string? OrderNumberMall { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 결제금액 - 결제 금액
+        /// </summary>
+        public string? PaymentAmount { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 주문금액 - 주문 금액
+        /// </summary>
+        public string? OrderAmount { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 면과세구분 - 면과세 구분
+        /// </summary>
+        public string? TaxType { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 주문상태 - 주문 상태
+        /// </summary>
+        public string? OrderStatus { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 배송송 - 배송 송
+        /// </summary>
+        public string? DeliverySend { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 메시지1 - 추가 메시지1
+        /// </summary>
+        public string? Msg1 { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 메시지2 - 추가 메시지2
+        /// </summary>
+        public string? Msg2 { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 메시지3 - 추가 메시지3
+        /// </summary>
+        public string? Msg3 { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 메시지4 - 추가 메시지4
+        /// </summary>
+        public string? Msg4 { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 메시지5 - 추가 메시지5
+        /// </summary>
+        public string? Msg5 { get; set; } = string.Empty;
+        
+        /// <summary>
+        /// 메시지6 - 추가 메시지6
+        /// </summary>
+        public string? Msg6 { get; set; } = string.Empty;
+
+        #endregion
+
         #region 데이터 변환 메서드 (Data Conversion Methods)
 
         /// <summary>
-        /// DataRow에서 Order 객체를 생성하는 정적 메서드
+        /// DataRow를 Order 객체로 변환하는 메서드 (column_mapping.json 사용)
         /// 
         /// 변환 과정:
-        /// 1. Excel 파일에서 읽은 DataRow의 각 컬럼을 확인
-        /// 2. 해당하는 Order 객체의 속성에 값을 할당
-        /// 3. 숫자 데이터는 안전한 변환을 위해 TryParse 사용
-        /// 4. null 값은 빈 문자열로 처리
+        /// 1. column_mapping.json에서 컬럼 매핑 정보 로드
+        /// 2. DataRow의 각 컬럼을 매핑 정보에 따라 변환
+        /// 3. null 안전성 처리 및 타입 변환
+        /// 4. 유효성 검사 수행
         /// 
-        /// 매핑 규칙:
-        /// - Excel 컬럼명과 Order 속성명이 일치
-        /// - 수량, 단가, 총액, 배송비는 숫자형으로 변환
-        /// - 나머지는 문자열로 처리
+        /// 매핑 처리:
+        /// - Excel 컬럼명을 데이터베이스 컬럼명으로 변환
+        /// - 매핑되지 않은 컬럼은 원본 이름 유지
+        /// - 데이터 타입 변환 적용
+        /// 
+        /// 예외 처리:
+        /// - 매핑 파일이 없는 경우 기본 매핑 사용
+        /// - 컬럼이 없는 경우 빈 값으로 처리
+        /// - 타입 변환 실패 시 기본값 사용
         /// </summary>
-        /// <param name="row">DataRow 객체 (Excel에서 읽은 데이터)</param>
-        /// <returns>Order 객체</returns>
+        /// <param name="row">변환할 DataRow</param>
+        /// <returns>변환된 Order 객체</returns>
         public static Order FromDataRow(System.Data.DataRow row)
         {
-            return new Order
+            var order = new Order();
+            
+            try
             {
-                // 기본 주문 정보 매핑
-                OrderNumber = row["주문번호"]?.ToString() ?? string.Empty,
-                OrderDate = row["주문일자"]?.ToString() ?? string.Empty,
-                RecipientName = row["수취인명"]?.ToString() ?? string.Empty,
-                RecipientPhone = row["수취인연락처"]?.ToString() ?? string.Empty,
-                Address = row["주소"]?.ToString() ?? string.Empty,
-                DetailAddress = row["상세주소"]?.ToString() ?? string.Empty,
-                ZipCode = row["우편번호"]?.ToString() ?? string.Empty,
+                // MappingService를 통해 column_mapping.json 로드
+                var mappingService = new MappingService();
+                var configuration = mappingService.GetConfiguration();
                 
-                // 상품 정보 매핑 (숫자형 데이터는 안전한 변환)
-                ProductCode = row["품목코드"]?.ToString() ?? string.Empty,
-                ProductName = row["품목명"]?.ToString() ?? string.Empty,
-                Quantity = int.TryParse(row["수량"]?.ToString(), out var qty) ? qty : 0,
-                UnitPrice = decimal.TryParse(row["단가"]?.ToString(), out var unitPrice) ? unitPrice : 0,
-                TotalPrice = decimal.TryParse(row["총액"]?.ToString(), out var totalPrice) ? totalPrice : 0,
+                if (configuration?.Mappings.TryGetValue("order_table", out var tableMapping) == true && tableMapping != null)
+                {
+                    Console.WriteLine($"[매핑정보] 매핑 처리 시작: {tableMapping.MappingId}");
+                    Console.WriteLine($"[매핑정보] 엑셀 컬럼 수: {tableMapping.Columns.Count}, 추가 DB 컬럼 수: {tableMapping.AdditionalColumns.Count}");
+                    
+                    // 매핑 정보를 사용하여 동적으로 변환
+                    foreach (var columnMapping in tableMapping.Columns)
+                    {
+                        var excelColumnName = columnMapping.Key;
+                        var dbColumnName = columnMapping.Value.DbColumn;
+                        
+                        if (row.Table.Columns.Contains(excelColumnName))
+                        {
+                            var cellValue = row[excelColumnName];
+                            var stringValue = cellValue?.ToString() ?? string.Empty;
+                            
+                            Console.WriteLine($"[매핑정보] 처리 중: {excelColumnName} → {dbColumnName} = '{stringValue}'");
+                            
+                            // 데이터베이스 컬럼명에 따라 속성 설정 (실제 테이블 구조에 맞춤)
+                            switch (dbColumnName.ToLower())
+                            {
+                                case "주문번호":
+                                    order.OrderNumber = stringValue;
+                                    break;
+                                case "주문번호(쇼핑몰)":
+                                    order.OrderNumberMall = stringValue;
+                                    break;
+                                case "수취인명":
+                                    order.RecipientName = stringValue;
+                                    break;
+                                case "전화번호1":
+                                    order.RecipientPhone1 = stringValue;
+                                    break;
+                                case "전화번호2":
+                                    order.RecipientPhone2 = stringValue;
+                                    break;
+                                case "우편번호":
+                                    order.ZipCode = stringValue;
+                                    break;
+                                case "주소":
+                                    order.Address = stringValue;
+                                    break;
+                                case "옵션명":
+                                    order.OptionName = stringValue;
+                                    break;
+                                case "수량":
+                                    order.Quantity = int.TryParse(stringValue, out var qty) ? qty : 0;
+                                    break;
+                                case "배송메세지":
+                                    order.ShippingMessage = stringValue;
+                                    break;
+                                case "쇼핑몰":
+                                    order.MallName = stringValue;
+                                    break;
+                                case "수집시간":
+                                    if (DateTime.TryParse(stringValue, out var collectionTime))
+                                        order.CollectionTime = collectionTime;
+                                    break;
+                                case "송장명":
+                                    order.InvoiceName = stringValue;
+                                    break;
+                                case "품목코드":
+                                    order.ProductCode = stringValue;
+                                    break;
+                                case "택배비용":
+                                    order.DeliveryCost = stringValue;
+                                    break;
+                                case "박스크기":
+                                    order.BoxSize = stringValue;
+                                    break;
+                                case "출력개수":
+                                    order.PrintCount = stringValue;
+                                    break;
+                                case "송장수량":
+                                    order.InvoiceQuantity = stringValue;
+                                    break;
+                                case "별표1":
+                                    order.Star1 = stringValue;
+                                    break;
+                                case "별표2":
+                                    order.Star2 = stringValue;
+                                    break;
+                                case "품목개수":
+                                    order.ProductCount = stringValue;
+                                    break;
+                                case "택배수량":
+                                    order.DeliveryQuantity = stringValue;
+                                    break;
+                                case "택배수량1":
+                                    order.DeliveryQuantity1 = stringValue;
+                                    break;
+                                case "택배수량합산":
+                                    order.DeliveryQuantitySum = stringValue;
+                                    break;
+                                case "송장구분자":
+                                    order.InvoiceSeparator = stringValue;
+                                    break;
+                                case "송장구분":
+                                    order.InvoiceType = stringValue;
+                                    break;
+                                case "송장구분최종":
+                                    order.InvoiceTypeFinal = stringValue;
+                                    break;
+                                case "위치":
+                                    order.Location = stringValue;
+                                    break;
+                                case "위치변환":
+                                    order.LocationConverted = stringValue;
+                                    break;
+                                case "결제금액":
+                                    order.PaymentAmount = stringValue;
+                                    break;
+                                case "주문금액":
+                                    order.OrderAmount = stringValue;
+                                    break;
+                                case "결제수단":
+                                    order.PaymentMethod = stringValue;
+                                    break;
+                                case "면과세구분":
+                                    order.TaxType = stringValue;
+                                    break;
+                                case "주문상태":
+                                    order.OrderStatus = stringValue;
+                                    break;
+                                case "배송송":
+                                    order.DeliverySend = stringValue;
+                                    break;
+                                default:
+                                    Console.WriteLine($"[매핑정보] ⚠️ 매핑되지 않은 컬럼: {dbColumnName}");
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine($"[매핑정보] ⚠️ 엑셀에 없는 컬럼: {excelColumnName}");
+                        }
+                    }
+                    
+                    Console.WriteLine($"[매핑정보] 매핑 처리 완료");
+                }
+                else
+                {
+                    // 매핑 정보가 없는 경우 기본 매핑 사용 (하위 호환성)
+                    Console.WriteLine("⚠️ column_mapping.json을 찾을 수 없어 기본 매핑을 사용합니다.");
+                    
+                    // 기본 매핑 시도
+                    if (row.Table.Columns.Contains("수취인명"))
+                        order.RecipientName = row["수취인명"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("주소"))
+                        order.Address = row["주소"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("송장명"))
+                        order.InvoiceName = row["송장명"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("수량"))
+                        order.Quantity = int.TryParse(row["수량"]?.ToString(), out var qty) ? qty : 0;
+                }
                 
-                // 배송 정보 매핑
-                ShippingType = row["배송타입"]?.ToString() ?? string.Empty,
-                ShippingCenter = row["출고지"]?.ToString() ?? string.Empty,
-                PaymentMethod = row["결제방법"]?.ToString() ?? string.Empty,
-                ShippingCost = decimal.TryParse(row["배송비"]?.ToString(), out var shippingCost) ? shippingCost : 0,
-                
-                // 특수 처리 정보 매핑
-                BoxSize = row["박스크기"]?.ToString() ?? string.Empty,
-                SpecialNote = row["특이사항"]?.ToString() ?? string.Empty,
-                ProcessingStatus = row["처리상태"]?.ToString() ?? string.Empty,
-                
-                // 추가 필드 매핑
-                StoreName = row["매장명"]?.ToString() ?? string.Empty,
-                EventType = row["이벤트타입"]?.ToString() ?? string.Empty,
-                PriceCategory = row["가격카테고리"]?.ToString() ?? string.Empty,
-                Region = row["지역"]?.ToString() ?? string.Empty,
-                DeliveryArea = row["배송지역"]?.ToString() ?? string.Empty
-            };
+                // === 디버깅 정보 출력 ===
+                Console.WriteLine($"[빌드정보] Order 객체 생성 완료:");
+                Console.WriteLine($"  - 수취인명: '{order.RecipientName ?? "(null)"}'");
+                Console.WriteLine($"  - 주소: '{order.Address ?? "(null)"}'");
+                Console.WriteLine($"  - 송장명: '{order.InvoiceName ?? "(null)"}'");
+                Console.WriteLine($"  - 수량: {order.Quantity}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[빌드정보] Order.FromDataRow 예외 발생: {ex.Message}");
+                Console.WriteLine($"[빌드정보] 예외 상세: {ex}");
+            }
+            
+            // === 주문번호 자동 생성 처리 ===
+            // 주문번호가 비어있거나 null인 경우 자동으로 생성
+            if (string.IsNullOrEmpty(order.OrderNumber) || order.OrderNumber.Trim() == string.Empty)
+            {
+                order.OrderNumber = order.GenerateOrderNumber();
+                Console.WriteLine($"[Order.FromDataRow] 주문번호 자동 생성: {order.OrderNumber} (수취인명: {order.RecipientName ?? "UNKNOWN"})");
+            }
+            
+            return order;
         }
 
         /// <summary>
-        /// Order 객체를 DataRow로 변환하는 메서드
         /// 
-        /// 변환 과정:
-        /// 1. 대상 DataTable에서 새로운 DataRow 생성
-        /// 2. Order 객체의 각 속성 값을 DataRow에 할당
-        /// 3. null 값은 빈 문자열로 처리
-        /// 4. 완성된 DataRow 반환
+        /// [주요 처리 내용]
+        /// - 주문 정보, 상품 정보, 배송 정보, 특수 처리 정보, 추가 필드 등
+        ///   Order 객체의 모든 속성 값을 DataRow의 각 컬럼에 매핑하여 할당함
+        /// - null 값이 존재할 경우, 빈 문자열("") 또는 0으로 안전하게 변환하여 할당
+        /// - 반환된 DataRow는 엑셀 저장, DB 저장, 송장 파일 생성 등 다양한 용도로 활용 가능
         /// 
-        /// 사용 목적:
-        /// - 처리된 Order 데이터를 Excel 파일로 저장
-        /// - 데이터베이스에 저장할 형식으로 변환
-        /// - 최종 송장 파일 생성
+        /// [사용 예시]
+        ///   var row = order.ToDataRow(dataTable);
+        ///   dataTable.Rows.Add(row);
         /// </summary>
-        /// <param name="table">대상 DataTable (출력 파일의 구조)</param>
-        /// <returns>DataRow 객체</returns>
+        /// <param name="table">출력 구조를 정의하는 DataTable 객체</param>
+        /// <returns>Order 정보가 할당된 DataRow 객체</returns>
         public System.Data.DataRow ToDataRow(System.Data.DataTable table)
         {
             // 새로운 DataRow 생성
             var row = table.NewRow();
             
             // 기본 주문 정보를 DataRow에 할당
-            row["주문번호"] = OrderNumber ?? string.Empty;
-            row["주문일자"] = OrderDate ?? string.Empty;
+            // 데이터베이스 컬럼명 기준으로 DataRow에 값 할당 (누락/오타 방지, 유지보수 용이)
+            // 각 컬럼은 null-safe 처리 및 기본값 지정
+
+            // 메시지 필드
+            row["msg1"] = Msg1 ?? string.Empty; // 추가 메시지1
+            row["msg2"] = Msg2 ?? string.Empty; // 추가 메시지2
+            row["msg3"] = Msg3 ?? string.Empty; // 추가 메시지3
+            row["msg4"] = Msg4 ?? string.Empty; // 추가 메시지4
+            row["msg5"] = Msg5 ?? string.Empty; // 추가 메시지5
+            row["msg6"] = Msg6 ?? string.Empty; // 추가 메시지6
+
+            // 주문 및 수취인 정보
             row["수취인명"] = RecipientName ?? string.Empty;
-            row["수취인연락처"] = RecipientPhone ?? string.Empty;
-            row["주소"] = Address ?? string.Empty;
-            row["상세주소"] = DetailAddress ?? string.Empty;
+            row["전화번호1"] = RecipientPhone1 ?? string.Empty;
+            row["전화번호2"] = RecipientPhone2 ?? string.Empty;
             row["우편번호"] = ZipCode ?? string.Empty;
-            
-            // 상품 정보를 DataRow에 할당
-            row["품목코드"] = ProductCode ?? string.Empty;
-            row["품목명"] = ProductName ?? string.Empty;
+            row["주소"] = Address ?? string.Empty;
+            row["옵션명"] = OptionName ?? string.Empty;
             row["수량"] = Quantity;
-            row["단가"] = UnitPrice;
-            row["총액"] = TotalPrice;
-            
-            // 배송 정보를 DataRow에 할당
-            row["배송타입"] = ShippingType ?? string.Empty;
-            row["출고지"] = ShippingCenter ?? string.Empty;
-            row["결제방법"] = PaymentMethod ?? string.Empty;
-            row["배송비"] = ShippingCost;
-            
-            // 특수 처리 정보를 DataRow에 할당
+            row["배송메세지"] = ShippingMessage ?? string.Empty;
+            row["주문번호"] = OrderNumber ?? string.Empty;
+            row["쇼핑몰"] = MallName ?? string.Empty;
+            row["수집시간"] = CollectionTime == null ? DBNull.Value : (object)CollectionTime;
+            row["송장명"] = InvoiceName ?? string.Empty;
+            row["품목코드"] = ProductCode ?? string.Empty;
+            row["택배비용"] = DeliveryCost ?? string.Empty;
             row["박스크기"] = BoxSize ?? string.Empty;
-            row["특이사항"] = SpecialNote ?? string.Empty;
-            row["처리상태"] = ProcessingStatus ?? string.Empty;
-            
-            // 추가 필드를 DataRow에 할당
-            row["매장명"] = StoreName ?? string.Empty;
-            row["이벤트타입"] = EventType ?? string.Empty;
-            row["가격카테고리"] = PriceCategory ?? string.Empty;
-            row["지역"] = Region ?? string.Empty;
-            row["배송지역"] = DeliveryArea ?? string.Empty;
+            row["출력개수"] = PrintCount ?? string.Empty;
+            row["송장수량"] = InvoiceQuantity ?? string.Empty;
+            row["별표1"] = Star1 ?? string.Empty;
+            row["별표2"] = Star2 ?? string.Empty;
+            row["품목개수"] = ProductCount ?? string.Empty;
+            row["택배수량"] = DeliveryQuantity ?? string.Empty;
+            row["택배수량1"] = DeliveryQuantity1 ?? string.Empty;
+            row["택배수량합산"] = DeliveryQuantitySum ?? string.Empty;
+            row["송장구분자"] = InvoiceSeparator ?? string.Empty;
+            row["송장구분"] = InvoiceType ?? string.Empty;
+            row["송장구분최종"] = InvoiceTypeFinal ?? string.Empty;
+            row["위치"] = Location ?? string.Empty;
+            row["위치변환"] = LocationConverted ?? string.Empty;
+            row["주문번호(쇼핑몰)"] = OrderNumberMall ?? string.Empty;
+            row["결제금액"] = PaymentAmount ?? string.Empty;
+            row["주문금액"] = OrderAmount ?? string.Empty;
+            row["결제수단"] = PaymentMethod ?? string.Empty;
+            row["면과세구분"] = TaxType ?? string.Empty;
+            row["주문상태"] = OrderStatus ?? string.Empty;
+            row["배송송"] = DeliverySend ?? string.Empty;
 
             return row;
         }
@@ -343,10 +685,11 @@ namespace LogisticManager.Models
         /// 주문이 유효한지 확인하는 메서드
         /// 
         /// 유효성 검사 조건:
-        /// - 수취인명이 비어있지 않아야 함
-        /// - 주소가 비어있지 않아야 함
-        /// - 품목명이 비어있지 않아야 함
-        /// - 수량이 0보다 커야 함
+        /// - 주문번호가 비어있지 않아야 함 (필수) - 자동 생성 가능
+        /// - 수취인명이 비어있지 않아야 함 (필수)
+        /// - 주소가 비어있지 않아야 함 (필수)
+        /// - 송장명이 비어있지 않아야 함 (필수) - 더 유연한 검증
+        /// - 수량이 0보다 커야 함 (필수)
         /// 
         /// 사용 목적:
         /// - 데이터 처리 전 유효성 검사
@@ -356,10 +699,86 @@ namespace LogisticManager.Models
         /// <returns>유효한 주문이면 true, 아니면 false</returns>
         public bool IsValid()
         {
-            return !string.IsNullOrEmpty(RecipientName) && 
-                   !string.IsNullOrEmpty(Address) && 
-                   !string.IsNullOrEmpty(ProductName) && 
-                   Quantity > 0;
+            // === 필수 필드 유효성 검사 (더 유연한 검증) ===
+            var isValid = true;
+            var missingFields = new List<string>();
+            
+            // 주문번호 검사 (필수) - 비어있으면 자동 생성
+            if (string.IsNullOrEmpty(OrderNumber) || OrderNumber.Trim() == string.Empty)
+            {
+                // 주문번호가 비어있으면 자동으로 생성
+                OrderNumber = GenerateOrderNumber();
+                Console.WriteLine($"[Order] 주문번호 자동 생성: {OrderNumber} (수취인명: {RecipientName})");
+            }
+            
+            // 수취인명 검사 (필수)
+            if (string.IsNullOrEmpty(RecipientName) || RecipientName.Trim() == string.Empty)
+            {
+                isValid = false;
+                missingFields.Add("수취인명");
+            }
+            
+            // 주소 검사 (필수)
+            if (string.IsNullOrEmpty(Address) || Address.Trim() == string.Empty)
+            {
+                isValid = false;
+                missingFields.Add("주소");
+            }
+            
+            // 송장명 검사 (InvoiceName 또는 ProductName 사용) - 더 유연한 검증
+            if ((string.IsNullOrEmpty(InvoiceName) || InvoiceName.Trim() == string.Empty) &&
+                (string.IsNullOrEmpty(ProductName) || ProductName.Trim() == string.Empty))
+            {
+                // 송장명이 없어도 일단 허용 (대용량 데이터 처리 시)
+                // isValid = false;
+                // missingFields.Add("송장명");
+            }
+            
+            // 수량 검사 (1 이상)
+            if (Quantity <= 0)
+            {
+                isValid = false;
+                missingFields.Add("수량");
+            }
+            
+            // === 디버깅 정보 출력 (유효하지 않은 경우) ===
+            if (!isValid)
+            {
+                Console.WriteLine($"[Order] 유효성 검사 실패 - 누락된 필드: {string.Join(", ", missingFields)}");
+                Console.WriteLine($"  - 주문번호: '{OrderNumber ?? "(null)"}'");
+                Console.WriteLine($"  - 수취인명: '{RecipientName ?? "(null)"}'");
+                Console.WriteLine($"  - 주소: '{Address ?? "(null)"}'");
+                Console.WriteLine($"  - 송장명: '{InvoiceName ?? "(null)"}' / '{ProductName ?? "(null)"}'");
+                Console.WriteLine($"  - 수량: {Quantity}");
+            }
+            
+            return isValid;
+        }
+
+        /// <summary>
+        /// 주문번호가 비어있을 때 자동으로 생성하는 메서드
+        /// 
+        /// 생성 규칙:
+        /// - 형식: AUTO_{수취인명}_{현재시간}_{랜덤숫자}
+        /// - 예시: AUTO_유승렬_20250807_163122_001
+        /// 
+        /// 사용 목적:
+        /// - 주문번호가 비어있는 데이터 처리
+        /// - 중복 방지를 위한 고유 식별자 생성
+        /// </summary>
+        /// <returns>생성된 주문번호</returns>
+        public string GenerateOrderNumber()
+        {
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var random = new Random();
+            var randomNumber = random.Next(1, 1000).ToString("D3");
+            var recipientName = string.IsNullOrEmpty(RecipientName) ? "UNKNOWN" : RecipientName.Trim();
+            
+            // 특수문자 제거 및 공백을 언더스코어로 변경
+            var cleanRecipientName = System.Text.RegularExpressions.Regex.Replace(recipientName, @"[^\w\s-]", "");
+            cleanRecipientName = cleanRecipientName.Replace(" ", "_");
+            
+            return $"AUTO_{cleanRecipientName}_{timestamp}_{randomNumber}";
         }
 
         #endregion

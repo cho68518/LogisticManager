@@ -402,6 +402,9 @@ namespace LogisticManager.Processors
                 
                 finalProgress?.Report("📖 [1단계] Excel 파일 분석 중... ");
                 
+                // UI 업데이트를 위한 짧은 지연
+                await Task.Delay(50);
+                
                 // === FileService를 통한 지능형 Excel 데이터 읽기 시스템 ===
                 // 
                 // 🏪 지원 쇼핑몰 형식:
@@ -435,7 +438,7 @@ namespace LogisticManager.Processors
                 {
                     finalProgress?.Report("⚠️ [처리 중단] Excel 파일에 처리 가능한 주문 데이터가 없습니다.");
                     finalProgress?.Report("💡 확인사항: 파일 형식, 헤더 행 존재 여부, 데이터 시트명을 점검해주세요.");
-                    return false; // 비즈니스 로직상 정상적인 종료 (오류가 아님)
+                    return await Task.FromResult(false); // 비즈니스 로직상 정상적인 종료 (오류가 아님)
                 }
 
                 // ==================== 2단계: 엔터프라이즈급 데이터베이스 초기화 및 대용량 데이터 적재 (5-10%) ====================
@@ -467,6 +470,7 @@ namespace LogisticManager.Processors
                 // - 병렬 처리 지원으로 멀티코어 CPU 활용
                 // - 메모리 풀링 및 가비지 컬렉션 최적화
                 // - 데이터베이스 연결 풀링으로 연결 오버헤드 최소화
+                // - 데이터베이스의 기존 주문 데이터를 초기화(TRUNCATE)하고, 새로 로드한 주문 데이터를 최적화된 방식으로 대량 삽입하는 작업을 수행
                 await TruncateAndInsertOriginalDataOptimized(originalData, finalProgress);
                 
                 // === 2단계 완료 및 성능 통계 보고 ===
@@ -681,7 +685,7 @@ namespace LogisticManager.Processors
                 var processingDuration = endTime.Subtract(DateTime.Now.AddSeconds(-10)); // 임시 계산
                 
                 // 🎉 전사 물류 시스템 워크플로우 성공적 완료 선언
-                finalProgress?.Report("🎉 물류 시스템 송장 처리 성공!");
+                //finalProgress?.Report("🎉 물류 시스템 송장 처리 성공!");
                 finalProgress?.Report($"⏱️ 총 처리 시간: {processingDuration.TotalSeconds:F1}초");
                 finalProgress?.Report($"📊 현재 활성화 단계: 1-2단계 (데이터 수집 및 적재)");
                 finalProgress?.Report($"🚀 향후 확장 예정: 3-7단계 (고급 처리 및 자동화)");
@@ -695,7 +699,7 @@ namespace LogisticManager.Processors
                 // === 성공 반환 및 상위 시스템 연동 ===
                 // true 반환으로 상위 호출자에게 전체 워크플로우 성공 알림
                 // 이를 통해 후속 프로세스 (알림, 로깅, 모니터링 등) 트리거 가능
-                return true; // 🎯 비즈니스 프로세스 성공적 완료
+                return await Task.FromResult(true);
             }
             catch (Exception ex)
             {
@@ -862,35 +866,143 @@ namespace LogisticManager.Processors
         /// <exception cref="Exception">데이터베이스 초기화 실패 시</exception>
         private async Task TruncateAndInsertOriginalDataOptimized(DataTable data, IProgress<string>? progress)
         {
+            // 로그 파일 경로
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            
             try
             {
+                // ==================== 0단계: 데이터베이스 연결 상태 확인 ====================
+                var connectionLog = "🔍 데이터베이스 연결 상태 확인 중...";
+                progress?.Report(connectionLog);
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {connectionLog}\n");
+                
+                var isConnected = await CheckDatabaseConnectionAsync();
+                if (!isConnected)
+                {
+                    var connectionErrorLog = "데이터베이스에 연결할 수 없습니다. 연결 정보와 네트워크 상태를 확인해주세요.";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ❌ {connectionErrorLog}\n");
+                    throw new InvalidOperationException(connectionErrorLog);
+                }
+                
+                var connectionSuccessLog = "✅ 데이터베이스 연결 확인 완료";
+                progress?.Report(connectionSuccessLog);
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {connectionSuccessLog}\n");
+
                 // ==================== 1단계: 데이터베이스 테이블 초기화 (Repository 패턴 적용) ====================
-                progress?.Report("🗄️ 데이터베이스 테이블 초기화 중... ");
+                var truncateLog = "🗄️ 데이터베이스 테이블 초기화 중... ";
+                progress?.Report(truncateLog);
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {truncateLog}\n");
                 
                 // === Repository를 통한 안전한 테이블 초기화 ===
                 // TRUNCATE TABLE 명령 실행: DELETE보다 빠르고 자동 증가 값도 초기화
                 // Repository 패턴으로 SQL 로직이 캡슐화되어 테스트 가능하고 유지보수 용이
                 // 🆕 App.config에서 테이블명을 동적으로 읽어와서 사용
                 var tableName = GetTableName("Tables.Invoice.Dev");
-                var truncateSuccess = await _invoiceRepository.TruncateTableAsync(tableName);
+                var tableLog = $"🔍 대상 테이블: {tableName}";
+                progress?.Report(tableLog);
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {tableLog}\n");
                 
-                // === 초기화 결과 검증 및 로깅 ===
-                if (truncateSuccess)
+                // 테이블 존재 여부 확인
+                var tableExists = await CheckTableExistsAsync(tableName);
+                if (!tableExists)
                 {
-                    // UI에 성공 메시지 전달
-                    progress?.Report($"✅ 테이블 초기화 완료 (테이블: {tableName})");
+                    var tableNotFoundLog = $"⚠️ 테이블 '{tableName}'이 존재하지 않습니다.";
+                    progress?.Report(tableNotFoundLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {tableNotFoundLog}\n");
                     
-                    // 개발자용 빌드 정보 출력 (터미널에 표시)
-                    Console.WriteLine($"[빌드정보] 테이블 초기화 완료: {tableName}");
+                    var tableNotFoundDetailLog = "💡 테이블을 생성하거나 다른 테이블을 사용해주세요.";
+                    progress?.Report(tableNotFoundDetailLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {tableNotFoundDetailLog}\n");
+                    
+                    // 대체 테이블 시도
+                    var fallbackTableName = GetTableName("Tables.Invoice.Test");
+                    var fallbackLog = $"🔄 대체 테이블 확인: {fallbackTableName}";
+                    progress?.Report(fallbackLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {fallbackLog}\n");
+                    
+                    var fallbackTableExists = await CheckTableExistsAsync(fallbackTableName);
+                    if (!fallbackTableExists)
+                    {
+                        var fallbackErrorLog = $"대체 테이블 '{fallbackTableName}'도 존재하지 않습니다. 테이블을 생성해주세요.";
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ❌ {fallbackErrorLog}\n");
+                        throw new InvalidOperationException(fallbackErrorLog);
+                    }
+                    
+                    tableName = fallbackTableName;
+                    var fallbackSuccessLog = $"✅ 대체 테이블 사용: {tableName}";
+                    progress?.Report(fallbackSuccessLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {fallbackSuccessLog}\n");
                 }
-                else
+                
+                // 테이블 초기화 시도
+                try
                 {
-                    // 초기화 실패 시 즉시 예외 발생하여 후속 처리 중단
-                    throw new InvalidOperationException($"테이블 초기화에 실패했습니다. (테이블: {tableName})");
+                    var truncateSuccess = await _invoiceRepository.TruncateTableAsync(tableName);
+                    
+                    var tableInfoLog = $"작업 대상 Table: {tableName}";
+                    Console.WriteLine(tableInfoLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {tableInfoLog}\n");
+
+                    // === 초기화 결과 검증 및 로깅 ===
+                    if (truncateSuccess)
+                    {
+                        // UI에 성공 메시지 전달
+                        var truncateSuccessLog = $"✅ 테이블 초기화 완료 (테이블: {tableName})";
+                        progress?.Report(truncateSuccessLog);
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {truncateSuccessLog}\n");
+                        
+                        // 개발자용 빌드 정보 출력 (터미널에 표시)
+                        var buildInfoLog = $"[빌드정보] 테이블 초기화 완료: {tableName}";
+                        Console.WriteLine(buildInfoLog);
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {buildInfoLog}\n");
+                    }
+                    else
+                    {
+                        // 초기화 실패 시 즉시 예외 발생하여 후속 처리 중단
+                        var truncateErrorLog = $"테이블 초기화에 실패했습니다. (테이블: {tableName})";
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ❌ {truncateErrorLog}\n");
+                        throw new InvalidOperationException(truncateErrorLog);
+                    }
+                }
+                catch (Exception truncateEx)
+                {
+                    // 테이블이 존재하지 않거나 권한 문제일 수 있음
+                    var truncateExceptionLog = $"⚠️ 테이블 초기화 실패: {truncateEx.Message}";
+                    progress?.Report(truncateExceptionLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {truncateExceptionLog}\n");
+                    
+                    var truncateExceptionDetailLog = "💡 테이블이 존재하지 않거나 권한이 부족할 수 있습니다.";
+                    progress?.Report(truncateExceptionDetailLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {truncateExceptionDetailLog}\n");
+                    
+                    var truncateExceptionHelpLog = "💡 데이터베이스 연결 상태와 테이블 존재 여부를 확인해주세요.";
+                    progress?.Report(truncateExceptionHelpLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {truncateExceptionHelpLog}\n");
+                    
+                    // 테이블 생성 시도 또는 다른 테이블 사용
+                    var fallbackTableName = GetTableName("Tables.Invoice.Test");
+                    var fallbackAttemptLog = $"🔄 대체 테이블 사용 시도: {fallbackTableName}";
+                    progress?.Report(fallbackAttemptLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {fallbackAttemptLog}\n");
+                    
+                    var fallbackSuccess = await _invoiceRepository.TruncateTableAsync(fallbackTableName);
+                    if (!fallbackSuccess)
+                    {
+                        var fallbackErrorLog = $"대체 테이블 초기화도 실패했습니다. (테이블: {fallbackTableName})";
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ❌ {fallbackErrorLog}\n");
+                        throw new InvalidOperationException(fallbackErrorLog);
+                    }
+                    
+                    tableName = fallbackTableName;
+                    var fallbackCompleteLog = $"✅ 대체 테이블 초기화 완료: {fallbackTableName}";
+                    progress?.Report(fallbackCompleteLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {fallbackCompleteLog}\n");
                 }
                 
                 // ==================== 2단계: 타입 안전한 데이터 변환 ====================
-                progress?.Report("🔄 데이터 변환 중... (DataTable → Order 객체)");
+                var conversionLog = "🔄 데이터 변환 중... (DataTable → Order 객체)";
+                progress?.Report(conversionLog);
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {conversionLog}\n");
                 
                 // === DataTable에서 Order 객체로 안전한 변환 ===
                 // ConvertDataTableToOrders: 각 DataRow를 Order.FromDataRow()로 변환
@@ -924,7 +1036,7 @@ namespace LogisticManager.Processors
                         if (string.IsNullOrEmpty(item.Order.Address))
                             invalidFields.Add("주소");
                         if (string.IsNullOrEmpty(item.Order.ProductName))
-                            invalidFields.Add("품목명");
+                            invalidFields.Add("송장명");
                         if (item.Order.Quantity <= 0)
                             invalidFields.Add("수량");
 
@@ -934,6 +1046,7 @@ namespace LogisticManager.Processors
                     }
                     progress?.Report(errorLog.ToString());
                     Console.WriteLine(errorLog.ToString());
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorLog.ToString()}\n");
                     throw new InvalidOperationException("[처리중지] 유효하지 않은 데이터가 포함되어 있습니다. 상세 내용은 로그를 확인하세요.");
                 }
 
@@ -941,17 +1054,23 @@ namespace LogisticManager.Processors
                 var validOrders = orders.ToList();
                 
                 // === 변환 결과 통계 보고 ===
-                progress?.Report($"📊 데이터 변환 완료: 총 {data.Rows.Count}건 → 유효 {validOrders.Count}건");
+                var conversionStatsLog = $"📊 데이터 변환 완료: 총 {data.Rows.Count}건 → 유효 {validOrders.Count}건";
+                progress?.Report(conversionStatsLog);
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {conversionStatsLog}\n");
                 
                 // === 유효 데이터 존재 여부 확인 ===
                 if (validOrders.Count == 0)
                 {
-                    progress?.Report("⚠️ 유효한 데이터가 없습니다.");
+                    var noValidDataLog = "⚠️ 유효한 데이터가 없습니다.";
+                    progress?.Report(noValidDataLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {noValidDataLog}\n");
                     return; // 처리할 데이터가 없으므로 메서드 종료
                 }
                 
                 // ==================== 3단계: 적응형 배치 처리로 대용량 데이터 삽입 ====================
-                progress?.Report("🚀 대용량 배치 처리 시작... (적응형 배치 크기 적용)");
+                var batchProcessLog = "🚀 대용량 배치 처리 시작... (적응형 배치 크기 적용)";
+                progress?.Report(batchProcessLog);
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {batchProcessLog}\n");
                 
                 // === BatchProcessorService를 통한 최적화된 배치 처리 (다중 테이블 지원) ===
                 // 주요 기능:
@@ -970,21 +1089,52 @@ namespace LogisticManager.Processors
                 var (successCount, failureCount) = await _batchProcessor.ProcessLargeDatasetAsync(validOrders, progress, false, tableName);
                 
                 // ==================== 4단계: 처리 결과 분석 및 성능 통계 ====================
-                progress?.Report($"✅ 원본 데이터 적재 완료: 성공 {successCount:N0}건, 실패 {failureCount:N0}건 (테이블: {tableName})");
+                var finalResultLog = $"✅ 원본 데이터 적재 완료: 성공 {successCount:N0}건, 실패 {failureCount:N0}건 (테이블: {tableName})";
+                progress?.Report(finalResultLog);
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {finalResultLog}\n");
+                
+                // === 실패 원인 상세 분석 ===
+                if (failureCount > 0)
+                {
+                    var failureAnalysisLog = $"[원본데이터적재] 실패 원인 상세 분석 - 총 실패: {failureCount:N0}건 ({failureCount * 100.0 / validOrders.Count:F1}%)";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {failureAnalysisLog}\n");
+                    
+                    var failureRateLog = $"[원본데이터적재] 실패율 분석 - 유효 데이터: {validOrders.Count:N0}건, 실패: {failureCount:N0}건, 실패율: {failureCount * 100.0 / validOrders.Count:F1}%";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {failureRateLog}\n");
+                    
+                    // 실패율이 높은 경우 경고
+                    if (failureCount * 100.0 / validOrders.Count > 5.0)
+                    {
+                        var highFailureRateLog = $"[원본데이터적재] ⚠️ 높은 실패율 경고 - 실패율이 5%를 초과합니다. ({failureCount * 100.0 / validOrders.Count:F1}%)";
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {highFailureRateLog}\n");
+                    }
+                }
+                else
+                {
+                    var successAnalysisLog = $"[원본데이터적재] 모든 데이터 처리 성공! - 성공률: 100% ({validOrders.Count:N0}건)";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {successAnalysisLog}\n");
+                }
                 
                 // === 배치 처리 성능 통계 수집 및 출력 ===
                 // GetStatus(): 현재 배치 크기, 메모리 사용량, 가용 메모리 정보 제공
                 // 성능 튜닝 및 메모리 최적화 분석을 위한 상세 정보
                 var (currentBatchSize, currentMemoryMB, availableMemoryMB) = _batchProcessor.GetStatus();
-                Console.WriteLine($"[빌드정보] 배치 처리 완료 - 테이블: {tableName}, 최종 배치 크기: {currentBatchSize}, 메모리 사용량: {currentMemoryMB}MB, 가용 메모리: {availableMemoryMB}MB");
-                    }
-                    catch (Exception ex)
-                    {
+                var performanceLog = $"[빌드정보] 배치 처리 완료 - 테이블: {tableName}, 최종 배치 크기: {currentBatchSize}, 메모리 사용량: {currentMemoryMB}MB, 가용 메모리: {availableMemoryMB}MB";
+                Console.WriteLine(performanceLog);
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {performanceLog}\n");
+            }
+            catch (Exception ex)
+            {
                 // 오류 메시지 출력 및 예외 재발생
-                progress?.Report($"❌ 데이터베이스 초기화 및 적재 실패: {ex.Message}");
-                Console.WriteLine($"[빌드정보] 오류 발생: {ex}");
-                        throw;
-                }
+                var errorLog = $"❌ 데이터베이스 초기화 및 적재 실패: {ex.Message}";
+                progress?.Report(errorLog);
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorLog}\n");
+                
+                var errorDetailLog = $"[빌드정보] 오류 발생: {ex}";
+                Console.WriteLine(errorDetailLog);
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorDetailLog}\n");
+                throw;
+            }
         }
 
         /// <summary>
@@ -1021,45 +1171,81 @@ namespace LogisticManager.Processors
             var totalRows = data.Rows.Count;
             var convertedRows = 0;
             var failedRows = 0;
+            var errorDetails = new List<string>();
             
-            // === DataTable의 각 행을 Order 객체로 안전하게 변환 ===
-            foreach (DataRow row in data.Rows)
-        {
-            try
+            // 로그 파일 경로
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            
+            var conversionStartLog = $"[데이터변환] DataTable → Order 변환 시작 - 총 {totalRows:N0}건";
+            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {conversionStartLog}\n");
+            
+            // === 각 행을 Order 객체로 변환 ===
+            for (int i = 0; i < totalRows; i++)
             {
-                    // === Order.FromDataRow를 통한 타입 안전한 변환 ===
-                    // Order 클래스의 정적 메서드를 사용하여 DataRow를 Order 객체로 변환
-                    // 내부적으로 컬럼명 매핑, null 체크, 타입 변환 등을 안전하게 처리
+                try
+                {
+                    var row = data.Rows[i];
                     var order = Order.FromDataRow(row);
                     
-                    // === 변환 성공 여부 확인 및 통계 업데이트 ===
                     if (order != null)
                     {
-                        // 변환 성공: 리스트에 추가하고 성공 카운터 증가
                         orders.Add(order);
                         convertedRows++;
-                }
-                else
-                {
-                        // 변환 실패: Order.FromDataRow가 null 반환한 경우
-                        // 데이터 유효성 검사 실패 등의 이유로 객체 생성 불가
+                        
+                        // 변환 진행률 로깅 (100건마다)
+                        if (convertedRows % 100 == 0)
+                        {
+                            var progressLog = $"[데이터변환] 변환 진행률: {convertedRows:N0}/{totalRows:N0}건 ({convertedRows * 100.0 / totalRows:F1}%)";
+                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {progressLog}\n");
+                        }
+                    }
+                    else
+                    {
                         failedRows++;
+                        var nullOrderLog = $"[데이터변환] 행 {i + 1}: Order.FromDataRow()가 null 반환";
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {nullOrderLog}\n");
+                        errorDetails.Add($"행 {i + 1}: null 반환");
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                    // === 개별 행 변환 예외 처리 ===
-                    // 특정 행의 변환이 실패하더라도 전체 처리를 중단하지 않고 계속 진행
-                    // 실패한 행의 정보를 로그에 기록하여 디버깅 지원
-                    Console.WriteLine($"[빌드정보] 행 변환 실패: {ex.Message}");
+                catch (Exception ex)
+                {
                     failedRows++;
+                    var conversionErrorLog = $"[데이터변환] 행 {i + 1} 변환 실패: {ex.Message}";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {conversionErrorLog}\n");
+                    errorDetails.Add($"행 {i + 1}: {ex.Message}");
+                    
+                    // 처음 10개의 오류만 상세 로그
+                    if (failedRows <= 10)
+                    {
+                        var errorDetailLog = $"[데이터변환]   - 행 {i + 1} 상세 오류: {ex}";
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorDetailLog}\n");
+                    }
                 }
             }
             
-            // === 최종 변환 통계 보고 ===
-            // 개발자가 데이터 품질을 파악할 수 있도록 상세한 통계 정보 제공
-            // 성공률을 통해 데이터 소스의 품질 및 매핑 규칙의 적절성 평가 가능
-            Console.WriteLine($"[빌드정보] 데이터 변환 완료 - 총 {totalRows}건 중 성공 {convertedRows}건, 실패 {failedRows}건");
+            // === 변환 결과 통계 ===
+            var conversionResultLog = $"[데이터변환] 변환 완료 - 성공: {convertedRows:N0}건, 실패: {failedRows:N0}건, 성공률: {convertedRows * 100.0 / totalRows:F1}%";
+            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {conversionResultLog}\n");
+            
+            if (failedRows > 0)
+            {
+                var failureSummaryLog = $"[데이터변환] 실패 요약 - 총 실패: {failedRows:N0}건 ({failedRows * 100.0 / totalRows:F1}%)";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {failureSummaryLog}\n");
+                
+                // 실패율이 높은 경우 경고
+                if (failedRows * 100.0 / totalRows > 10.0)
+                {
+                    var highFailureRateLog = $"[데이터변환] ⚠️ 높은 실패율 경고 - 실패율이 10%를 초과합니다. ({failedRows * 100.0 / totalRows:F1}%)";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {highFailureRateLog}\n");
+                }
+                
+                // 처음 5개의 오류 상세 정보
+                foreach (var errorDetail in errorDetails.Take(5))
+                {
+                    var errorDetailLog = $"[데이터변환]   - {errorDetail}";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorDetailLog}\n");
+                }
+            }
             
             return orders;
         }
@@ -2005,5 +2191,42 @@ namespace LogisticManager.Processors
         }
 
         #endregion
+
+        /// <summary>
+        /// 데이터베이스 연결 상태를 확인하는 메서드
+        /// </summary>
+        private async Task<bool> CheckDatabaseConnectionAsync()
+        {
+            try
+            {
+                // 간단한 연결 테스트 쿼리 실행
+                var testSql = "SELECT 1";
+                var result = await _invoiceRepository.ExecuteQueryAsync(testSql);
+                return result != null && result.Rows.Count > 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ 데이터베이스 연결 확인 실패: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 테이블 존재 여부를 확인하는 메서드
+        /// </summary>
+        private async Task<bool> CheckTableExistsAsync(string tableName)
+        {
+            try
+            {
+                var checkSql = $"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '{tableName}'";
+                var result = await _invoiceRepository.ExecuteQueryAsync(checkSql);
+                return result != null && result.Rows.Count > 0 && Convert.ToInt32(result.Rows[0][0]) > 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ 테이블 존재 여부 확인 실패: {ex.Message}");
+                return false;
+            }
+        }
     }
 } 

@@ -1,183 +1,578 @@
 {
-  "version": "1.0",
-  "description": "엑셀 컬럼과 데이터베이스 컬럼 간의 매핑 설정",
+  "version": "2.0",
+  "description": "엑셀 컬럼과 데이터베이스 컬럼 간의 매핑 설정 - 확장 가능한 구조",
+  "created_date": "2024-12-19",
+  "last_updated": "2024-12-19",
+  
   "mappings": {
     "order_table": {
-      "table_name": "orders",
-      "description": "주문 정보 테이블 매핑",
+      "mapping_id": "order_mapping_001",
+      "table_name": "송장출력_사방넷원본변환_Dev",
+      "description": "주문 정보 테이블 매핑 - 첫 번째 단계",
+      "excel_file_pattern": "*.xlsx",
+      "excel_sheet_name": "Sheet1",
+      "processing_order": 1,
+      "is_active": true,
       "columns": {
-        "주문번호": {
-          "db_column": "order_number",
-          "data_type": "varchar",
-          "required": true,
-          "description": "주문번호"
-        },
-        "주문일자": {
-          "db_column": "order_date",
-          "data_type": "date",
-          "required": true,
-          "description": "주문일자"
-        },
         "수취인명": {
-          "db_column": "recipient_name",
-          "data_type": "varchar",
-          "required": true,
-          "description": "수취인명"
-        },
-        "수취인연락처": {
-          "db_column": "recipient_phone",
+          "db_column": "수취인명",
           "data_type": "varchar",
           "required": false,
-          "description": "수취인연락처"
+          "description": "수취인명",
+          "excel_column_index": 1
         },
-        "주소": {
-          "db_column": "address",
-          "data_type": "varchar",
-          "required": true,
-          "description": "주소"
-        },
-        "상세주소": {
-          "db_column": "detail_address",
+        "전화번호1": {
+          "db_column": "전화번호1",
           "data_type": "varchar",
           "required": false,
-          "description": "상세주소"
+          "description": "전화번호1",
+          "excel_column_index": 2
+        },
+        "전화번호2": {
+          "db_column": "전화번호2",
+          "data_type": "varchar",
+          "required": false,
+          "description": "전화번호2",
+          "excel_column_index": 3
         },
         "우편번호": {
-          "db_column": "zip_code",
+          "db_column": "우편번호",
           "data_type": "varchar",
           "required": false,
-          "description": "우편번호"
+          "description": "우편번호",
+          "excel_column_index": 4
         },
-        "품목코드": {
-          "db_column": "product_code",
+        "주소": {
+          "db_column": "주소",
           "data_type": "varchar",
           "required": false,
-          "description": "품목코드"
+          "description": "주소",
+          "excel_column_index": 5
         },
-        "품목명": {
-          "db_column": "product_name",
+        "옵션명": {
+          "db_column": "옵션명",
           "data_type": "varchar",
-          "required": true,
-          "description": "품목명"
+          "required": false,
+          "description": "옵션명",
+          "excel_column_index": 6
         },
         "수량": {
-          "db_column": "quantity",
+          "db_column": "수량",
           "data_type": "int",
-          "required": true,
-          "description": "수량"
-        },
-        "단가": {
-          "db_column": "unit_price",
-          "data_type": "decimal",
           "required": false,
-          "description": "단가"
+          "description": "수량",
+          "excel_column_index": 7
         },
-        "총액": {
-          "db_column": "total_price",
-          "data_type": "decimal",
-          "required": false,
-          "description": "총액"
-        },
-        "배송타입": {
-          "db_column": "shipping_type",
+        "배송메세지": {
+          "db_column": "배송메세지",
           "data_type": "varchar",
           "required": false,
-          "description": "배송타입"
+          "description": "배송메세지",
+          "excel_column_index": 8
         },
-        "출고지": {
-          "db_column": "shipping_center",
-          "data_type": "varchar",
-          "required": true,
-          "description": "출고지"
-        },
-        "결제방법": {
-          "db_column": "payment_method",
+        "주문번호": {
+          "db_column": "주문번호",
           "data_type": "varchar",
           "required": false,
-          "description": "결제방법"
+          "description": "주문번호",
+          "excel_column_index": 9
         },
-        "배송비": {
-          "db_column": "shipping_cost",
-          "data_type": "decimal",
+        "쇼핑몰": {
+          "db_column": "쇼핑몰",
+          "data_type": "varchar",
           "required": false,
-          "description": "배송비"
+          "description": "쇼핑몰",
+          "excel_column_index": 10
+        },
+        "수집시간": {
+          "db_column": "수집시간",
+          "data_type": "datetime",
+          "required": false,
+          "description": "수집시간",
+          "excel_column_index": 11
+        },
+        "송장명": {
+          "db_column": "송장명",
+          "data_type": "varchar",
+          "required": false,
+          "description": "송장명",
+          "excel_column_index": 12
+        },
+        "품목코드": {
+          "db_column": "품목코드",
+          "data_type": "varchar",
+          "required": false,
+          "description": "품목코드",
+          "excel_column_index": 13
+        },
+        "주문번호(쇼핑몰)": {
+          "db_column": "주문번호(쇼핑몰)",
+          "data_type": "varchar",
+          "required": false,
+          "description": "주문번호(쇼핑몰)",
+          "excel_column_index": 14
+        },
+        "결제금액": {
+          "db_column": "결제금액",
+          "data_type": "varchar",
+          "required": false,
+          "description": "결제금액",
+          "excel_column_index": 15
+        },
+        "주문금액": {
+          "db_column": "주문금액",
+          "data_type": "varchar",
+          "required": false,
+          "description": "주문금액",
+          "excel_column_index": 16
+        },
+        "결제수단": {
+          "db_column": "결제수단",
+          "data_type": "varchar",
+          "required": false,
+          "description": "결제수단",
+          "excel_column_index": 17
+        },
+        "면과세구분": {
+          "db_column": "면과세구분",
+          "data_type": "varchar",
+          "required": false,
+          "description": "면과세구분",
+          "excel_column_index": 18
+        },
+        "주문상태": {
+          "db_column": "주문상태",
+          "data_type": "varchar",
+          "required": false,
+          "description": "주문상태",
+          "excel_column_index": 19
+        },
+        "배송송": {
+          "db_column": "배송송",
+          "data_type": "varchar",
+          "required": false,
+          "description": "배송송",
+          "excel_column_index": 20
+        }
+      },
+      "additional_columns": {
+        "msg1": {
+          "db_column": "msg1",
+          "data_type": "varchar",
+          "required": false,
+          "description": "메시지1",
+          "default_value": null
+        },
+        "msg2": {
+          "db_column": "msg2",
+          "data_type": "varchar",
+          "required": false,
+          "description": "메시지2",
+          "default_value": null
+        },
+        "msg3": {
+          "db_column": "msg3",
+          "data_type": "varchar",
+          "required": false,
+          "description": "메시지3",
+          "default_value": null
+        },
+        "msg4": {
+          "db_column": "msg4",
+          "data_type": "varchar",
+          "required": false,
+          "description": "메시지4",
+          "default_value": null
+        },
+        "msg5": {
+          "db_column": "msg5",
+          "data_type": "varchar",
+          "required": false,
+          "description": "메시지5",
+          "default_value": null
+        },
+        "msg6": {
+          "db_column": "msg6",
+          "data_type": "varchar",
+          "required": false,
+          "description": "메시지6",
+          "default_value": null
+        },
+        "택배비용": {
+          "db_column": "택배비용",
+          "data_type": "varchar",
+          "required": false,
+          "description": "택배비용",
+          "default_value": null
         },
         "박스크기": {
-          "db_column": "box_size",
+          "db_column": "박스크기",
           "data_type": "varchar",
           "required": false,
-          "description": "박스크기"
+          "description": "박스크기",
+          "default_value": null
         },
-        "특이사항": {
-          "db_column": "special_note",
+        "출력개수": {
+          "db_column": "출력개수",
           "data_type": "varchar",
           "required": false,
-          "description": "특이사항"
+          "description": "출력개수",
+          "default_value": null
         },
-        "처리상태": {
-          "db_column": "processing_status",
+        "송장수량": {
+          "db_column": "송장수량",
           "data_type": "varchar",
           "required": false,
-          "description": "처리상태"
+          "description": "송장수량",
+          "default_value": null
         },
-        "매장명": {
-          "db_column": "store_name",
+        "별표1": {
+          "db_column": "별표1",
           "data_type": "varchar",
           "required": false,
-          "description": "매장명"
+          "description": "별표1",
+          "default_value": null
         },
-        "이벤트타입": {
-          "db_column": "event_type",
+        "별표2": {
+          "db_column": "별표2",
           "data_type": "varchar",
           "required": false,
-          "description": "이벤트타입"
+          "description": "별표2",
+          "default_value": null
         },
-        "가격카테고리": {
-          "db_column": "price_category",
+        "품목개수": {
+          "db_column": "품목개수",
           "data_type": "varchar",
           "required": false,
-          "description": "가격카테고리"
+          "description": "품목개수",
+          "default_value": null
         },
-        "지역": {
-          "db_column": "region",
+        "택배수량": {
+          "db_column": "택배수량",
           "data_type": "varchar",
           "required": false,
-          "description": "지역"
+          "description": "택배수량",
+          "default_value": null
         },
-        "배송지역": {
-          "db_column": "delivery_area",
+        "택배수량1": {
+          "db_column": "택배수량1",
           "data_type": "varchar",
           "required": false,
-          "description": "배송지역"
+          "description": "택배수량1",
+          "default_value": null
+        },
+        "택배수량합산": {
+          "db_column": "택배수량합산",
+          "data_type": "varchar",
+          "required": false,
+          "description": "택배수량합산",
+          "default_value": null
+        },
+        "송장구분자": {
+          "db_column": "송장구분자",
+          "data_type": "varchar",
+          "required": false,
+          "description": "송장구분자",
+          "default_value": null
+        },
+        "송장구분": {
+          "db_column": "송장구분",
+          "data_type": "varchar",
+          "required": false,
+          "description": "송장구분",
+          "default_value": null
+        },
+        "송장구분최종": {
+          "db_column": "송장구분최종",
+          "data_type": "varchar",
+          "required": false,
+          "description": "송장구분최종",
+          "default_value": null
+        },
+        "위치": {
+          "db_column": "위치",
+          "data_type": "varchar",
+          "required": false,
+          "description": "위치",
+          "default_value": null
+        },
+        "위치변환": {
+          "db_column": "위치변환",
+          "data_type": "varchar",
+          "required": false,
+          "description": "위치변환",
+          "default_value": null
         }
+      },
+      "validation_rules": {
+        "required_fields": ["주문번호", "수취인명", "주소", "수량"],
+        "numeric_fields": ["수량"],
+        "date_fields": ["수집시간"],
+        "decimal_fields": ["결제금액", "주문금액"]
+      },
+      "data_transformations": {
+        "수량": {
+          "special_handling": "convert_to_int",
+          "description": "수량을 정수로 변환",
+          "data_type_conversion": "string_to_int",
+          "default_value": 0
+        },
+        "결제금액": {
+          "special_handling": "convert_to_string",
+          "description": "결제금액을 문자열로 변환",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "주문금액": {
+          "special_handling": "convert_to_string",
+          "description": "주문금액을 문자열로 변환",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "수집시간": {
+          "special_handling": "convert_to_datetime",
+          "description": "수집시간을 datetime으로 변환",
+          "data_type_conversion": "string_to_datetime",
+          "default_value": null
+        }
+      },
+      "column_mapping_summary": {
+        "excel_columns": 19,
+        "db_columns": 35,
+        "mapped_columns": 19,
+        "additional_db_columns": 16,
+        "mapping_status": "complete"
+      }
+    },
+
+    "invoice_table": {
+      "mapping_id": "invoice_mapping_002",
+      "table_name": "invoices",
+      "description": "송장 정보 테이블 매핑 - 두 번째 단계 (샘플)",
+      "excel_file_pattern": "invoice_*.xlsx",
+      "excel_sheet_name": "송장데이터",
+      "processing_order": 2,
+      "is_active": false,
+      "columns": {
+        "송장번호": {
+          "db_column": "송장번호",
+          "data_type": "varchar",
+          "required": true,
+          "description": "송장번호",
+          "excel_column_index": 1
+        },
+        "택배사": {
+          "db_column": "택배사",
+          "data_type": "varchar",
+          "required": false,
+          "description": "택배사명",
+          "excel_column_index": 2
+        },
+        "발송일": {
+          "db_column": "발송일",
+          "data_type": "datetime",
+          "required": false,
+          "description": "발송일자",
+          "excel_column_index": 3
+        },
+        "배송비": {
+          "db_column": "배송비",
+          "data_type": "decimal",
+          "required": false,
+          "description": "배송비용",
+          "excel_column_index": 4
+        }
+      },
+      "additional_columns": {
+        "처리상태": {
+          "db_column": "처리상태",
+          "data_type": "varchar",
+          "required": false,
+          "description": "처리상태",
+          "default_value": "대기"
+        },
+        "등록일시": {
+          "db_column": "등록일시",
+          "data_type": "datetime",
+          "required": false,
+          "description": "등록일시",
+          "default_value": "CURRENT_TIMESTAMP"
+        }
+      },
+      "validation_rules": {
+        "required_fields": ["송장번호"],
+        "numeric_fields": ["배송비"],
+        "date_fields": ["발송일", "등록일시"]
+      },
+      "data_transformations": {
+        "배송비": {
+          "special_handling": "convert_to_decimal",
+          "description": "배송비를 decimal로 변환",
+          "data_type_conversion": "string_to_decimal",
+          "default_value": 0.00
+        },
+        "발송일": {
+          "special_handling": "convert_to_datetime",
+          "description": "발송일을 datetime으로 변환",
+          "data_type_conversion": "string_to_datetime",
+          "default_value": null
+        }
+      },
+      "column_mapping_summary": {
+        "excel_columns": 4,
+        "db_columns": 6,
+        "mapped_columns": 4,
+        "additional_db_columns": 2,
+        "mapping_status": "sample"
+      }
+    },
+
+    "shipment_table": {
+      "mapping_id": "shipment_mapping_003",
+      "table_name": "shipments",
+      "description": "배송 정보 테이블 매핑 - 세 번째 단계 (샘플)",
+      "excel_file_pattern": "shipment_*.xlsx",
+      "excel_sheet_name": "배송데이터",
+      "processing_order": 3,
+      "is_active": false,
+      "columns": {
+        "배송번호": {
+          "db_column": "배송번호",
+          "data_type": "varchar",
+          "required": true,
+          "description": "배송번호",
+          "excel_column_index": 1
+        },
+        "배송상태": {
+          "db_column": "배송상태",
+          "data_type": "varchar",
+          "required": false,
+          "description": "배송상태",
+          "excel_column_index": 2
+        },
+        "배송완료일": {
+          "db_column": "배송완료일",
+          "data_type": "datetime",
+          "required": false,
+          "description": "배송완료일",
+          "excel_column_index": 3
+        }
+      },
+      "additional_columns": {
+        "배송메모": {
+          "db_column": "배송메모",
+          "data_type": "text",
+          "required": false,
+          "description": "배송메모",
+          "default_value": null
+        },
+        "수정일시": {
+          "db_column": "수정일시",
+          "data_type": "datetime",
+          "required": false,
+          "description": "수정일시",
+          "default_value": "CURRENT_TIMESTAMP"
+        }
+      },
+      "validation_rules": {
+        "required_fields": ["배송번호"],
+        "date_fields": ["배송완료일", "수정일시"]
+      },
+      "data_transformations": {
+        "배송완료일": {
+          "special_handling": "convert_to_datetime",
+          "description": "배송완료일을 datetime으로 변환",
+          "data_type_conversion": "string_to_datetime",
+          "default_value": null
+        }
+      },
+      "column_mapping_summary": {
+        "excel_columns": 3,
+        "db_columns": 5,
+        "mapped_columns": 3,
+        "additional_db_columns": 2,
+        "mapping_status": "sample"
       }
     }
   },
-  "validation_rules": {
-    "required_fields": ["주문번호", "수취인명", "주소", "품목명", "수량", "출고지"],
-    "numeric_fields": ["수량", "단가", "총액", "배송비"],
-    "date_fields": ["주문일자"]
+
+  "global_settings": {
+    "default_data_types": {
+      "varchar": "varchar(255)",
+      "int": "int(11)",
+      "datetime": "datetime",
+      "decimal": "decimal(10,2)",
+      "text": "text"
+    },
+    "supported_file_formats": ["xlsx", "xls", "csv"],
+    "encoding": "UTF-8",
+    "batch_size": 1000,
+    "error_handling": {
+      "continue_on_error": true,
+      "log_errors": true,
+      "skip_invalid_rows": true
+    }
   },
-  "data_transformations": {
-    "주소": {
-      "special_handling": "star_processing",
-      "description": "별표 처리 (감천, 카카오 등 특수 출고지)"
+
+  "mapping_templates": {
+    "order_mapping": {
+      "description": "주문 정보 매핑 템플릿",
+      "template_type": "order_processing",
+      "version": "1.0"
     },
-    "수량": {
-      "data_type_conversion": "int",
-      "default_value": 0
+    "invoice_mapping": {
+      "description": "송장 정보 매핑 템플릿",
+      "template_type": "invoice_processing",
+      "version": "1.0"
     },
-    "단가": {
-      "data_type_conversion": "decimal",
-      "default_value": 0
+    "shipment_mapping": {
+      "description": "배송 정보 매핑 템플릿",
+      "template_type": "shipment_processing",
+      "version": "1.0"
+    }
+  },
+
+  "usage_guide": {
+    "how_to_add_new_mapping": {
+      "step1": "mappings 객체 내에 새로운 매핑 키를 추가합니다 (예: 'new_table')",
+      "step2": "mapping_id를 고유하게 설정합니다 (예: 'new_mapping_004')",
+      "step3": "table_name을 실제 데이터베이스 테이블명으로 설정합니다",
+      "step4": "excel_file_pattern으로 처리할 엑셀 파일 패턴을 지정합니다",
+      "step5": "excel_sheet_name으로 엑셀 시트명을 지정합니다",
+      "step6": "processing_order로 처리 순서를 설정합니다",
+      "step7": "is_active를 true로 설정하여 활성화합니다",
+      "step8": "columns 객체에 엑셀 컬럼과 DB 컬럼 매핑을 정의합니다",
+      "step9": "additional_columns에 DB에만 있는 컬럼들을 정의합니다",
+      "step10": "validation_rules로 데이터 검증 규칙을 설정합니다",
+      "step11": "data_transformations로 데이터 변환 규칙을 설정합니다"
     },
-    "총액": {
-      "data_type_conversion": "decimal",
-      "default_value": 0
+    "field_descriptions": {
+      "mapping_id": "매핑의 고유 식별자 (필수)",
+      "table_name": "데이터베이스 테이블명 (필수)",
+      "description": "매핑에 대한 설명",
+      "excel_file_pattern": "처리할 엑셀 파일 패턴 (예: '*.xlsx', 'invoice_*.xlsx')",
+      "excel_sheet_name": "엑셀 시트명 (기본값: 'Sheet1')",
+      "processing_order": "처리 순서 (숫자가 작을수록 먼저 처리)",
+      "is_active": "매핑 활성화 여부 (true/false)",
+      "excel_column_index": "엑셀에서의 컬럼 위치 (1부터 시작)",
+      "db_column": "데이터베이스 컬럼명",
+      "data_type": "데이터 타입 (varchar, int, datetime, decimal, text)",
+      "required": "필수 여부 (true/false)",
+      "default_value": "기본값 (null, 빈 문자열, 숫자 등)"
     },
-    "배송비": {
-      "data_type_conversion": "decimal",
-      "default_value": 0
+    "data_type_mapping": {
+      "varchar": "문자열 (최대 255자)",
+      "int": "정수",
+      "datetime": "날짜/시간",
+      "decimal": "소수점 숫자",
+      "text": "긴 텍스트"
+    },
+    "special_handling_types": {
+      "convert_to_int": "문자열을 정수로 변환",
+      "convert_to_decimal": "문자열을 소수점 숫자로 변환",
+      "convert_to_datetime": "문자열을 날짜/시간으로 변환",
+      "convert_to_string": "모든 타입을 문자열로 변환",
+      "any_to_string": "모든 타입을 문자열로 변환 (에러 처리 포함)"
     }
   }
 } 

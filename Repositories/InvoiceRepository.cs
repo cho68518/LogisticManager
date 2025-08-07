@@ -272,14 +272,40 @@ namespace LogisticManager.Repositories
                     // 배치에 유효한 쿼리가 하나라도 있는 경우에만 DB 실행
                     if (batchQueries.Count > 0)
                     {
+                        var batchLog = $"[InvoiceRepository] 배치 {i / batchSize + 1} 실행 시작 - 쿼리 수: {batchQueries.Count}";
+                        Console.WriteLine(batchLog);
+                        File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {batchLog}\n");
+                        
+                        // === 첫 번째 쿼리 상세 로깅 ===
+                        if (batchQueries.Count > 0)
+                        {
+                            var firstQuery = batchQueries.First();
+                            var sqlLog = $"[InvoiceRepository] 첫 번째 쿼리 SQL: {firstQuery.sql}";
+                            var paramLog = $"[InvoiceRepository] 첫 번째 쿼리 매개변수: {string.Join(", ", firstQuery.parameters.Select(p => $"{p.Key}={p.Value}"))}";
+                            
+                            Console.WriteLine(sqlLog);
+                            Console.WriteLine(paramLog);
+                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {sqlLog}\n");
+                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paramLog}\n");
+                        }
+                        
                         // === 트랜잭션 단위 배치 실행 ===
                         // ExecuteParameterizedTransactionAsync: 모든 쿼리를 하나의 트랜잭션으로 실행
                         // 하나라도 실패하면 전체 배치 롤백되어 데이터 일관성 보장
                         var success = await _databaseService.ExecuteParameterizedTransactionAsync(batchQueries);
                         
+                        var resultLog = $"[InvoiceRepository] 배치 {i / batchSize + 1} 실행 결과: {(success ? "성공" : "실패")}";
+                        Console.WriteLine(resultLog);
+                        File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {resultLog}\n");
+                        
                         // === 배치 실행 결과 검증 ===
                         if (!success)
+                        {
+                            var failureLog = $"[InvoiceRepository] 배치 {i / batchSize + 1} 삽입 실패 - 상세 정보 로깅 완료";
+                            Console.WriteLine(failureLog);
+                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {failureLog}\n");
                             throw new InvalidOperationException($"배치 삽입 실패 (배치 {i / batchSize + 1})");
+                        }
                         
                         // === 처리 통계 업데이트 ===
                         processedRows += batchQueries.Count;
@@ -303,52 +329,38 @@ namespace LogisticManager.Repositories
         }
 
         /// <summary>
-        /// 테이블 초기화 (TRUNCATE) - 빠른 전체 삭제 (기본 테이블 대상)
+        /// 테이블 초기화 (TRUNCATE) - DynamicQueryBuilder 사용
         /// 
-        /// 📋 기능:
-        /// - Repository가 관리하는 기본 테이블 초기화
-        /// - TRUNCATE TABLE 명령 사용 (DELETE보다 빠름)
-        /// - 자동 증가 값 초기화
-        /// - 트랜잭션 로그 최소화
+        /// 📋 주요 기능:
+        /// - DynamicQueryBuilder를 사용한 하이브리드 TRUNCATE 쿼리 생성
+        /// - 설정 기반 매핑 우선 적용 (table_mappings.json)
+        /// - 리플렉션 기반 폴백 지원 (설정이 없는 경우)
+        /// - 테이블명 유효성 검사
+        /// - SQL 인젝션 방지
         /// 
-        /// ⚠️ 주의사항:
-        /// - 모든 데이터가 영구 삭제됨
-        /// - 롤백 불가능
-        /// - 외래키 제약 조건 확인 필요
+        /// 🎯 동작 순서:
+        /// 1. 테이블명 유효성 검사
+        /// 2. DynamicQueryBuilder를 사용한 TRUNCATE 쿼리 생성
+        /// 3. 매개변수화된 쿼리 실행
+        /// 4. 결과 반환
         /// 
         /// 💡 사용법:
-        /// var success = await repository.TruncateTableAsync();
+        /// ```csharp
+        /// // 기본 사용법 (기본 테이블명 사용)
+        /// var result = await repository.TruncateTableAsync();
+        /// 
+        /// // 커스텀 테이블명 사용
+        /// var result = await repository.TruncateTableAsync("custom_table_name");
+        /// ```
         /// </summary>
         /// <returns>작업 성공 여부</returns>
         public async Task<bool> TruncateTableAsync()
         {
-            // === 기본 테이블명 사용하여 오버로드 메서드 호출 ===
-            // Repository가 관리하는 _tableName(App.config에서 결정)을 사용
             return await TruncateTableAsync(_tableName);
         }
 
         /// <summary>
-        /// 테이블 초기화 (TRUNCATE) - 빠른 전체 삭제 (커스텀 테이블 대상)
-        /// 
-        /// 📋 기능:
-        /// - 지정된 테이블명으로 초기화 실행
-        /// - TRUNCATE TABLE 명령 사용 (DELETE보다 빠름)
-        /// - 자동 증가 값 초기화
-        /// - 트랜잭션 로그 최소화
-        /// 
-        /// ⚠️ 주의사항:
-        /// - 모든 데이터가 영구 삭제됨
-        /// - 롤백 불가능
-        /// - 외래키 제약 조건 확인 필요
-        /// - 테이블명 유효성 검사 필수
-        /// 
-        /// 🔒 보안 고려사항:
-        /// - 테이블명 검증으로 SQL 인젝션 방지
-        /// - 허용된 테이블명만 처리 권장
-        /// 
-        /// 💡 사용법:
-        /// var success = await repository.TruncateTableAsync("custom_table_name");
-        /// var success2 = await repository.TruncateTableAsync("송장출력_사방넷원본변환_Backup");
+        /// 테이블 초기화 (TRUNCATE) - DynamicQueryBuilder 사용 (커스텀 테이블명)
         /// </summary>
         /// <param name="tableName">초기화할 테이블명</param>
         /// <returns>작업 성공 여부</returns>
@@ -356,55 +368,32 @@ namespace LogisticManager.Repositories
         {
             try
             {
-                // === 1단계: 입력 테이블명 유효성 검사 ===
-                if (string.IsNullOrWhiteSpace(tableName))
-                {
-                    Console.WriteLine("❌ TruncateTable 실패: 테이블명이 비어있습니다.");
-                    return false;
-                }
-
-                // === 2단계: 테이블명 보안 검증 (기본적인 SQL 인젝션 방지) ===
-                // 위험한 문자나 SQL 키워드 포함 여부 검사
-                if (tableName.Contains(";") || tableName.Contains("--") || 
-                    tableName.Contains("/*") || tableName.Contains("*/") ||
-                    tableName.ToUpper().Contains("DROP") || tableName.ToUpper().Contains("DELETE"))
-                {
-                    Console.WriteLine($"❌ TruncateTable 실패: 테이블명에 위험한 문자가 포함되어 있습니다: {tableName}");
-                    return false;
-                }
+                Console.WriteLine($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 TRUNCATE 쿼리 생성 시작");
                 
-                // === 3단계: TRUNCATE TABLE 명령 실행 ===
-                // TRUNCATE TABLE의 장점:
-                // 1. DELETE보다 훨씬 빠른 성능 (모든 행을 개별적으로 삭제하지 않음)
-                // 2. AUTO_INCREMENT 값도 자동으로 1로 리셋됨
-                // 3. 트랜잭션 로그를 최소화하여 디스크 I/O 절약
-                // 4. 테이블 구조는 유지하면서 데이터만 완전 삭제
-                var sql = $"TRUNCATE TABLE {tableName}";
+                // === 1단계: DynamicQueryBuilder를 사용한 하이브리드 TRUNCATE 쿼리 생성 ===
+                var (sql, parameters) = _queryBuilder.BuildTruncateQuery(tableName);
                 
-                // === 4단계: 비동기 쿼리 실행 ===
-                // DatabaseService를 통한 안전한 쿼리 실행
-                // 내부적으로 연결 관리, 예외 처리, 타임아웃 관리 등이 처리됨
-                var affectedRows = await _databaseService.ExecuteNonQueryAsync(sql);
+                Console.WriteLine($"✅ 하이브리드 TRUNCATE 쿼리 생성 완료 - 테이블: {tableName}");
                 
-                // === 5단계: 성공 로그 및 반환 ===
-                Console.WriteLine($"✅ 테이블 초기화 성공: {tableName}");
-                // TRUNCATE는 성공하면 영향받은 행 수와 관계없이 항상 성공으로 간주
-                // MySQL에서 TRUNCATE는 실제 삭제된 행 수를 반환하지 않을 수 있음
+                // === 2단계: 매개변수화된 쿼리 실행 ===
+                var affectedRows = await _databaseService.ExecuteNonQueryAsync(sql, parameters);
+                
+                Console.WriteLine($"✅ TRUNCATE 쿼리 실행 완료 - 테이블: {tableName}");
                 return true; // TRUNCATE는 성공하면 항상 true
+            }
+            catch (ArgumentException ex)
+            {
+                Console.WriteLine($"❌ 테이블 매핑 오류: {ex.Message}");
+                return false;
+            }
+            catch (InvalidOperationException ex)
+            {
+                Console.WriteLine($"❌ 쿼리 생성 실패: {ex.Message}");
+                return false;
             }
             catch (Exception ex)
             {
-                // === 실패 처리 및 상세 로그 ===
-                // 예외 발생 시 false 반환하여 호출자가 실패를 인지할 수 있도록 함
-                // 예외를 다시 던지지 않고 단순히 false 반환하여 호출자가 선택할 수 있게 함
-                Console.WriteLine($"❌ 테이블 초기화 실패: {tableName} - {ex.Message}");
-                
-                // 가능한 실패 원인:
-                // - 테이블이 존재하지 않음
-                // - 권한 부족
-                // - 다른 트랜잭션에서 테이블 사용 중
-                // - 외래키 제약 조건 위반
-                // - 잘못된 테이블명 형식
+                Console.WriteLine($"❌ 예상치 못한 오류: {ex.Message}");
                 return false;
             }
         }
@@ -1191,5 +1180,162 @@ namespace LogisticManager.Repositories
         }
 
         #endregion
+
+        /// <summary>
+        /// 단일 송장 데이터 업데이트 (하이브리드 동적 쿼리 사용)
+        /// 
+        /// 📋 주요 기능:
+        /// - DynamicQueryBuilder를 사용한 하이브리드 UPDATE 쿼리 생성
+        /// - 설정 기반 매핑 우선 적용 (table_mappings.json)
+        /// - 리플렉션 기반 폴백 지원 (설정이 없는 경우)
+        /// - WHERE 조건 동적 생성
+        /// - 타입 안전성 보장
+        /// - SQL 인젝션 방지
+        /// 
+        /// 🎯 동작 순서:
+        /// 1. 테이블명 유효성 검사
+        /// 2. DynamicQueryBuilder를 사용한 UPDATE 쿼리 생성
+        /// 3. 매개변수화된 쿼리 실행
+        /// 4. 결과 반환
+        /// 
+        /// 💡 사용법:
+        /// ```csharp
+        /// // 기본 사용법 (기본키 기반 업데이트)
+        /// var result = await repository.UpdateAsync(invoiceDto);
+        /// 
+        /// // WHERE 조건 지정
+        /// var result = await repository.UpdateAsync(invoiceDto, "OrderNumber = @OrderNumber");
+        /// 
+        /// // 커스텀 테이블명 사용
+        /// var result = await repository.UpdateAsync("custom_table", invoiceDto, "RecipientName = @RecipientName");
+        /// ```
+        /// </summary>
+        /// <param name="invoice">업데이트할 송장 데이터</param>
+        /// <param name="whereClause">WHERE 조건 (선택사항, 기본값: 기본키 기반)</param>
+        /// <returns>업데이트된 행 수</returns>
+        public async Task<int> UpdateAsync(InvoiceDto invoice, string? whereClause = null)
+        {
+            return await UpdateAsync(_tableName, invoice, whereClause);
+        }
+
+        /// <summary>
+        /// 단일 송장 데이터 업데이트 (커스텀 테이블명 사용)
+        /// </summary>
+        /// <param name="tableName">대상 테이블명</param>
+        /// <param name="invoice">업데이트할 송장 데이터</param>
+        /// <param name="whereClause">WHERE 조건 (선택사항, 기본값: 기본키 기반)</param>
+        /// <returns>업데이트된 행 수</returns>
+        public async Task<int> UpdateAsync(string tableName, InvoiceDto invoice, string? whereClause = null)
+        {
+            try
+            {
+                Console.WriteLine($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 UPDATE 쿼리 생성 시작");
+                
+                // === 1단계: DynamicQueryBuilder를 사용한 하이브리드 UPDATE 쿼리 생성 ===
+                var (sql, parameters) = _queryBuilder.BuildUpdateQuery(tableName, invoice, whereClause);
+                
+                Console.WriteLine($"✅ 하이브리드 UPDATE 쿼리 생성 완료 - 테이블: {tableName}");
+                Console.WriteLine($"📊 생성된 컬럼 수: {parameters.Count}개");
+                
+                // === 2단계: 매개변수화된 쿼리 실행 ===
+                var affectedRows = await _databaseService.ExecuteNonQueryAsync(sql, parameters);
+                
+                Console.WriteLine($"✅ UPDATE 쿼리 실행 완료 - 영향받은 행 수: {affectedRows}개");
+                return affectedRows;
+            }
+            catch (ArgumentException ex)
+            {
+                Console.WriteLine($"❌ 테이블 매핑 오류: {ex.Message}");
+                throw;
+            }
+            catch (InvalidOperationException ex)
+            {
+                Console.WriteLine($"❌ 쿼리 생성 실패: {ex.Message}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ 예상치 못한 오류: {ex.Message}");
+                throw new InvalidOperationException($"테이블 '{tableName}'에 대한 UPDATE 쿼리 실행 중 오류가 발생했습니다: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 단일 송장 데이터 삭제 (하이브리드 동적 쿼리 사용)
+        /// 
+        /// 📋 주요 기능:
+        /// - DynamicQueryBuilder를 사용한 하이브리드 DELETE 쿼리 생성
+        /// - 설정 기반 매핑 우선 적용 (table_mappings.json)
+        /// - 리플렉션 기반 폴백 지원 (설정이 없는 경우)
+        /// - WHERE 조건 동적 생성
+        /// - 타입 안전성 보장
+        /// - SQL 인젝션 방지
+        /// 
+        /// 🎯 동작 순서:
+        /// 1. 테이블명 유효성 검사
+        /// 2. DynamicQueryBuilder를 사용한 DELETE 쿼리 생성
+        /// 3. 매개변수화된 쿼리 실행
+        /// 4. 결과 반환
+        /// 
+        /// 💡 사용법:
+        /// ```csharp
+        /// // 기본 사용법 (기본키 기반 삭제)
+        /// var result = await repository.DeleteAsync(invoiceDto);
+        /// 
+        /// // WHERE 조건 지정
+        /// var result = await repository.DeleteAsync(invoiceDto, "OrderNumber = @OrderNumber");
+        /// 
+        /// // 커스텀 테이블명 사용
+        /// var result = await repository.DeleteAsync("custom_table", invoiceDto, "RecipientName = @RecipientName");
+        /// ```
+        /// </summary>
+        /// <param name="invoice">삭제할 송장 데이터</param>
+        /// <param name="whereClause">WHERE 조건 (선택사항, 기본값: 기본키 기반)</param>
+        /// <returns>삭제된 행 수</returns>
+        public async Task<int> DeleteAsync(InvoiceDto invoice, string? whereClause = null)
+        {
+            return await DeleteAsync(_tableName, invoice, whereClause);
+        }
+
+        /// <summary>
+        /// 단일 송장 데이터 삭제 (커스텀 테이블명 사용)
+        /// </summary>
+        /// <param name="tableName">대상 테이블명</param>
+        /// <param name="invoice">삭제할 송장 데이터</param>
+        /// <param name="whereClause">WHERE 조건 (선택사항, 기본값: 기본키 기반)</param>
+        /// <returns>삭제된 행 수</returns>
+        public async Task<int> DeleteAsync(string tableName, InvoiceDto invoice, string? whereClause = null)
+        {
+            try
+            {
+                Console.WriteLine($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 DELETE 쿼리 생성 시작");
+                
+                // === 1단계: DynamicQueryBuilder를 사용한 하이브리드 DELETE 쿼리 생성 ===
+                var (sql, parameters) = _queryBuilder.BuildDeleteQuery(tableName, invoice, whereClause);
+                
+                Console.WriteLine($"✅ 하이브리드 DELETE 쿼리 생성 완료 - 테이블: {tableName}");
+                
+                // === 2단계: 매개변수화된 쿼리 실행 ===
+                var affectedRows = await _databaseService.ExecuteNonQueryAsync(sql, parameters);
+                
+                Console.WriteLine($"✅ DELETE 쿼리 실행 완료 - 영향받은 행 수: {affectedRows}개");
+                return affectedRows;
+            }
+            catch (ArgumentException ex)
+            {
+                Console.WriteLine($"❌ 테이블 매핑 오류: {ex.Message}");
+                throw;
+            }
+            catch (InvalidOperationException ex)
+            {
+                Console.WriteLine($"❌ 쿼리 생성 실패: {ex.Message}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ 예상치 못한 오류: {ex.Message}");
+                throw new InvalidOperationException($"테이블 '{tableName}'에 대한 DELETE 쿼리 실행 중 오류가 발생했습니다: {ex.Message}", ex);
+            }
+        }
     }
 }

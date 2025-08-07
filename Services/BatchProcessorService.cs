@@ -470,12 +470,52 @@ namespace LogisticManager.Services
             var successCount = 0;
             var failureCount = 0;
             
-            progress?.Report($"🚀 대용량 데이터 처리 시작: 총 {totalCount:N0}건");
-            progress?.Report($"📊 초기 배치 크기: {_currentBatchSize}건");
+            // 로그 파일 경로
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            
+            // === 상세 로깅 시작 ===
+            var startLog = $"[원본데이터적재] 대용량 데이터 처리 시작 - 총 {totalCount:N0}건, 테이블: {targetTableName}";
+            progress?.Report($"🚀 {startLog}");
+            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {startLog}\n");
+            
+            // === 데이터 유효성 사전 검사 ===
+            var validOrderCount = orderList.Count(o => o.IsValid());
+            var invalidOrderCount = totalCount - validOrderCount;
+            
+            var validationLog = $"[원본데이터적재] 데이터 유효성 사전 검사 - 유효: {validOrderCount:N0}건, 무효: {invalidOrderCount:N0}건";
+            progress?.Report($"🔍 {validationLog}");
+            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {validationLog}\n");
+            
+            if (invalidOrderCount > 0)
+            {
+                var invalidDetailsLog = $"[원본데이터적재] 무효 데이터 상세 분석:";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {invalidDetailsLog}\n");
+                
+                var invalidOrders = orderList.Where(o => !o.IsValid()).Take(10).ToList(); // 처음 10건만 로그
+                foreach (var invalidOrder in invalidOrders)
+                {
+                    var invalidFields = new List<string>();
+                    if (string.IsNullOrEmpty(invalidOrder.RecipientName))
+                        invalidFields.Add("수취인명");
+                    if (string.IsNullOrEmpty(invalidOrder.Address))
+                        invalidFields.Add("주소");
+                    if (string.IsNullOrEmpty(invalidOrder.ProductName))
+                        invalidFields.Add("송장명");
+                    if (invalidOrder.Quantity <= 0)
+                        invalidFields.Add("수량");
+
+                    var detailLog = $"[원본데이터적재]   - 주문번호: {invalidOrder.OrderNumber ?? "(없음)"}, 무효필드: {string.Join(", ", invalidFields)}";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {detailLog}\n");
+                }
+            }
 
             try
             {
                 // 메모리 사용량 확인 및 배치 크기 최적화
+                var memoryLog = $"[원본데이터적재] 메모리 상태 확인 - 초기 배치 크기: {_currentBatchSize}건";
+                progress?.Report($"💾 {memoryLog}");
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {memoryLog}\n");
+                
                 OptimizeBatchSize();
                 
                 var processedCount = 0;
@@ -487,29 +527,45 @@ namespace LogisticManager.Services
                     var endIndex = Math.Min(i + _currentBatchSize, totalCount);
                     var batchOrders = orderList.Skip(i).Take(endIndex - i).ToList();
                     
-                    progress?.Report($"📦 배치 {batchNumber} 처리 중... ({batchOrders.Count}건)");
+                    var batchStartLog = $"[원본데이터적재] 배치 {batchNumber} 시작 - 범위: {i+1}~{endIndex} ({batchOrders.Count}건)";
+                    progress?.Report($"📦 {batchStartLog}");
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {batchStartLog}\n");
                     
                     try
                     {
                         // 배치 처리 실행
-                        // 지정된 테이블(targetTableName)에 배치 데이터를 삽입하는 처리입니다.
-                        // 테이블명은 ValidateAndGetTableName() 메서드를 통해 검증되고 결정됩니다.
                         var batchResult = await ProcessBatchWithRetry(batchOrders, progress, batchNumber, targetTableName);
                         
                         successCount += batchResult.successCount;
                         failureCount += batchResult.failureCount;
                         processedCount += batchOrders.Count;
                         
+                        var batchResultLog = $"[원본데이터적재] 배치 {batchNumber} 완료 - 성공: {batchResult.successCount}건, 실패: {batchResult.failureCount}건";
+                        progress?.Report($"✅ {batchResultLog}");
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {batchResultLog}\n");
+                        
                         // 진행률 계산 및 보고
                         var progressPercentage = (int)((double)processedCount / totalCount * 100);
-                        progress?.Report($"📈 전체 진행률: {progressPercentage}% ({processedCount:N0}/{totalCount:N0}건)");
+                        var progressLog = $"[원본데이터적재] 전체 진행률: {progressPercentage}% ({processedCount:N0}/{totalCount:N0}건)";
+                        progress?.Report($"📈 {progressLog}");
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {progressLog}\n");
                         
                         // 메모리 사용량 모니터링 및 배치 크기 조정
+                        var beforeMemory = GetAvailableMemoryMB();
                         MonitorMemoryAndAdjustBatchSize(progress);
+                        var afterMemory = GetAvailableMemoryMB();
+                        
+                        if (beforeMemory != afterMemory)
+                        {
+                            var memoryAdjustLog = $"[원본데이터적재] 메모리 조정 - 이전: {beforeMemory}MB, 현재: {afterMemory}MB, 배치크기: {_currentBatchSize}건";
+                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {memoryAdjustLog}\n");
+                        }
                         
                         // 가비지 컬렉션 최적화 (큰 배치 처리 후)
                         if (batchNumber % 10 == 0)
                         {
+                            var gcLog = $"[원본데이터적재] 가비지 컬렉션 실행 (배치 {batchNumber})";
+                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {gcLog}\n");
                             GC.Collect();
                             GC.WaitForPendingFinalizers();
                         }
@@ -517,29 +573,66 @@ namespace LogisticManager.Services
                     catch (OutOfMemoryException)
                     {
                         // 메모리 부족 시 배치 크기 감소 후 재시도
-                        progress?.Report("⚠️ 메모리 부족 감지, 배치 크기를 줄여서 재시도합니다...");
+                        var oomLog = $"[원본데이터적재] 메모리 부족 감지 - 배치 {batchNumber}, 현재 배치크기: {_currentBatchSize}건";
+                        progress?.Report($"⚠️ {oomLog}");
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {oomLog}\n");
+                        
+                        var oldBatchSize = _currentBatchSize;
                         _currentBatchSize = Math.Max(_currentBatchSize / 2, MIN_BATCH_SIZE);
+                        
+                        var batchSizeAdjustLog = $"[원본데이터적재] 배치 크기 조정 - {oldBatchSize}건 → {_currentBatchSize}건";
+                        progress?.Report($"🔄 {batchSizeAdjustLog}");
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {batchSizeAdjustLog}\n");
+                        
                         i -= _currentBatchSize; // 현재 배치 재처리
                         continue;
                     }
                     catch (Exception ex)
                     {
-                        progress?.Report($"❌ 배치 {batchNumber} 처리 실패: {ex.Message}");
+                        var batchErrorLog = $"[원본데이터적재] 배치 {batchNumber} 처리 실패: {ex.Message}";
+                        progress?.Report($"❌ {batchErrorLog}");
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {batchErrorLog}\n");
+                        
+                        var exceptionDetailLog = $"[원본데이터적재] 예외 상세: {ex}";
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {exceptionDetailLog}\n");
+                        
                         failureCount += batchOrders.Count;
                     }
                     
                     batchNumber++;
                 }
                 
-                // 최종 결과 보고
-                progress?.Report($"✅ 대용량 데이터 처리 완료!");
-                progress?.Report($"📊 처리 결과: 성공 {successCount:N0}건, 실패 {failureCount:N0}건");
+                // === 최종 결과 상세 분석 ===
+                var finalResultLog = $"[원본데이터적재] 처리 완료 - 성공: {successCount:N0}건, 실패: {failureCount:N0}건, 테이블: {targetTableName}";
+                progress?.Report($"✅ {finalResultLog}");
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {finalResultLog}\n");
+                
+                // === 실패 원인 분석 ===
+                if (failureCount > 0)
+                {
+                    var failureAnalysisLog = $"[원본데이터적재] 실패 원인 분석 - 총 실패: {failureCount:N0}건 ({failureCount * 100.0 / totalCount:F1}%)";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {failureAnalysisLog}\n");
+                    
+                    var failureRateLog = $"[원본데이터적재] 실패율: {failureCount * 100.0 / totalCount:F1}% (임계값: 5% 이상 시 주의 필요)";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {failureRateLog}\n");
+                }
+                else
+                {
+                    var successLog = $"[원본데이터적재] 모든 데이터 처리 성공! (성공률: 100%)";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {successLog}\n");
+                }
                 
                 return (successCount, failureCount);
             }
             catch (Exception ex)
             {
-                progress?.Report($"❌ 대용량 데이터 처리 실패: {ex.Message}");
+                var criticalErrorLog = $"[원본데이터적재] 치명적 오류 발생: {ex.Message}";
+                progress?.Report($"❌ {criticalErrorLog}");
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {criticalErrorLog}\n");
+                
+                var exceptionStackLog = $"[원본데이터적재] 예외 스택 트레이스: {ex}";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {exceptionStackLog}\n");
+                
                 throw;
             }
         }
@@ -580,52 +673,181 @@ namespace LogisticManager.Services
             const int maxRetries = 3;
             var retryDelays = new[] { 1000, 2000, 4000 }; // 지수 백오프 (밀리초)
             
+            // 로그 파일 경로
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            
             for (int retry = 0; retry <= maxRetries; retry++)
             {
                 try
                 {
-                    // Order를 InvoiceDto로 변환
-                    var invoiceDtos = batchOrders
-                        .Where(order => order.IsValid())
-                        .Select(InvoiceDto.FromOrder)
-                        .Where(dto => dto.IsValid())
-                        .ToList();
+                    // === 1단계: Order를 InvoiceDto로 변환 ===
+                    var logMessage = $"[배치 {batchNumber}] 1단계: Order → InvoiceDto 변환 시작 ({batchOrders.Count}건)";
+                    progress?.Report($"🔧 {logMessage}");
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
                     
-                    if (invoiceDtos.Count == 0)
+                    var validOrders = new List<Order>();
+                    var invalidOrders = new List<Order>();
+                    
+                    // 각 Order의 유효성 검사
+                    foreach (var order in batchOrders)
                     {
-                        progress?.Report($"⚠️ 배치 {batchNumber}: 유효한 데이터가 없습니다.");
+                        if (order.IsValid())
+                        {
+                            validOrders.Add(order);
+                        }
+                        else
+                        {
+                            invalidOrders.Add(order);
+                            var invalidLog = $"[배치 {batchNumber}] 유효하지 않은 Order 발견 - 주문번호: {order.OrderNumber}, 수취인명: {order.RecipientName}, 주소: {order.Address}";
+                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {invalidLog}\n");
+                        }
+                    }
+                    
+                    if (invalidOrders.Count > 0)
+                    {
+                        var invalidLog = $"[배치 {batchNumber}] 유효하지 않은 주문 {invalidOrders.Count}건 발견";
+                        progress?.Report($"⚠️ {invalidLog}");
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {invalidLog}\n");
+                        
+                        foreach (var invalidOrder in invalidOrders.Take(3)) // 처음 3건만 로그
+                        {
+                            var detailLog = $"[배치 {batchNumber}]   - 주문번호: {invalidOrder.OrderNumber}, 수취인명: {invalidOrder.RecipientName}, 주소: {invalidOrder.Address}";
+                            progress?.Report($"  {detailLog}");
+                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {detailLog}\n");
+                        }
+                    }
+                    
+                    // === 2단계: InvoiceDto 변환 ===
+                    var conversionLog = $"[배치 {batchNumber}] 2단계: InvoiceDto 변환 시작 (유효한 Order: {validOrders.Count}건)";
+                    progress?.Report($"🔄 {conversionLog}");
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {conversionLog}\n");
+                    
+                    var invoiceDtos = new List<InvoiceDto>();
+                    var invalidDtos = new List<InvoiceDto>();
+                    
+                    foreach (var order in validOrders)
+                    {
+                        try
+                        {
+                            var dto = InvoiceDto.FromOrder(order);
+                            if (dto.IsValid())
+                            {
+                                invoiceDtos.Add(dto);
+                            }
+                            else
+                            {
+                                invalidDtos.Add(dto);
+                                var invalidDtoLog = $"[배치 {batchNumber}] 유효하지 않은 InvoiceDto 생성 - 주문번호: {dto.OrderNumber}, 수취인명: {dto.RecipientName}, 주소: {dto.Address}";
+                                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {invalidDtoLog}\n");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            var conversionErrorLog = $"[배치 {batchNumber}] Order → InvoiceDto 변환 실패 - 주문번호: {order.OrderNumber}, 오류: {ex.Message}";
+                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {conversionErrorLog}\n");
+                            invalidDtos.Add(new InvoiceDto()); // 빈 DTO 추가
+                        }
+                    }
+                    
+                    var conversionResultLog = $"[배치 {batchNumber}] InvoiceDto 변환 완료 - 성공: {invoiceDtos.Count}건, 실패: {invalidDtos.Count}건";
+                    progress?.Report($"✅ {conversionResultLog}");
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {conversionResultLog}\n");
+                    
+                    // === 3단계: 데이터베이스 삽입 ===
+                    if (invoiceDtos.Count > 0)
+                    {
+                        var insertLog = $"[배치 {batchNumber}] 3단계: 데이터베이스 삽입 시작 - 테이블: {tableName}, 데이터: {invoiceDtos.Count}건";
+                        progress?.Report($"💾 {insertLog}");
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {insertLog}\n");
+                        
+                        try
+                        {
+                            // Repository를 통한 배치 삽입
+                            var insertStartTime = DateTime.Now;
+                            var insertResult = await _repository.InsertBatchAsync(tableName, invoiceDtos, progress);
+                            var insertEndTime = DateTime.Now;
+                            var insertDuration = (insertEndTime - insertStartTime).TotalMilliseconds;
+                            
+                            var insertResultLog = $"[배치 {batchNumber}] 데이터베이스 삽입 완료 - 성공: {insertResult}건, 소요시간: {insertDuration:F0}ms";
+                            progress?.Report($"✅ {insertResultLog}");
+                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {insertResultLog}\n");
+                            
+                            // 성능 분석
+                            if (insertDuration > 5000) // 5초 이상 소요 시
+                            {
+                                var performanceWarningLog = $"[배치 {batchNumber}] 성능 경고 - 삽입 시간이 5초 초과: {insertDuration:F0}ms";
+                                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {performanceWarningLog}\n");
+                            }
+                            
+                            return (insertResult, invalidOrders.Count + invalidDtos.Count);
+                        }
+                        catch (Exception ex)
+                        {
+                            var insertErrorLog = $"[배치 {batchNumber}] 데이터베이스 삽입 실패 (시도 {retry + 1}/{maxRetries + 1}): {ex.Message}";
+                            progress?.Report($"❌ {insertErrorLog}");
+                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {insertErrorLog}\n");
+                            
+                            var exceptionDetailLog = $"[배치 {batchNumber}] 삽입 실패 상세: {ex}";
+                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {exceptionDetailLog}\n");
+                            
+                            // 마지막 시도가 아니면 재시도
+                            if (retry < maxRetries)
+                            {
+                                var retryLog = $"[배치 {batchNumber}] 재시도 대기 중... ({retryDelays[retry]}ms 후 재시도)";
+                                progress?.Report($"🔄 {retryLog}");
+                                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {retryLog}\n");
+                                
+                                await Task.Delay(retryDelays[retry]);
+                                continue;
+                            }
+                            else
+                            {
+                                var finalFailureLog = $"[배치 {batchNumber}] 최대 재시도 횟수 초과 - 모든 데이터 삽입 실패";
+                                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {finalFailureLog}\n");
+                                
+                                return (0, batchOrders.Count);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var noValidDataLog = $"[배치 {batchNumber}] 유효한 InvoiceDto가 없음 - 모든 데이터 삽입 실패";
+                        progress?.Report($"⚠️ {noValidDataLog}");
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {noValidDataLog}\n");
+                        
                         return (0, batchOrders.Count);
                     }
-                    
-                    // 지정된 테이블에 배치 삽입
-                    var insertedCount = await _repository.InsertBatchAsync(tableName, invoiceDtos, progress, _currentBatchSize);
-                    
-                    var successCount = insertedCount;
-                    var failureCount = batchOrders.Count - insertedCount;
-                    
-                    if (retry > 0)
-                    {
-                        progress?.Report($"✅ 배치 {batchNumber}: 재시도 {retry}회 후 성공 (성공: {successCount}건, 실패: {failureCount}건)");
-                    }
-                    
-                    return (successCount, failureCount);
-                }
-                catch (Exception ex) when (retry < maxRetries)
-                {
-                    // 재시도 가능한 경우
-                    progress?.Report($"⚠️ 배치 {batchNumber}: 재시도 {retry + 1}/{maxRetries} ({ex.Message})");
-                    
-                    // 지수 백오프 적용
-                    await Task.Delay(retryDelays[retry]);
                 }
                 catch (Exception ex)
                 {
-                    // 최대 재시도 횟수 초과
-                    progress?.Report($"❌ 배치 {batchNumber}: 최대 재시도 횟수 초과 ({ex.Message})");
-                    return (0, batchOrders.Count);
+                    var batchErrorLog = $"[배치 {batchNumber}] 배치 처리 중 예외 발생 (시도 {retry + 1}/{maxRetries + 1}): {ex.Message}";
+                    progress?.Report($"❌ {batchErrorLog}");
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {batchErrorLog}\n");
+                    
+                    var exceptionStackLog = $"[배치 {batchNumber}] 예외 스택 트레이스: {ex}";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {exceptionStackLog}\n");
+                    
+                    // 마지막 시도가 아니면 재시도
+                    if (retry < maxRetries)
+                    {
+                        var retryLog = $"[배치 {batchNumber}] 재시도 대기 중... ({retryDelays[retry]}ms 후 재시도)";
+                        progress?.Report($"🔄 {retryLog}");
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {retryLog}\n");
+                        
+                        await Task.Delay(retryDelays[retry]);
+                        continue;
+                    }
+                    else
+                    {
+                        var finalFailureLog = $"[배치 {batchNumber}] 최대 재시도 횟수 초과 - 배치 처리 완전 실패";
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {finalFailureLog}\n");
+                        
+                        return (0, batchOrders.Count);
+                    }
                 }
             }
             
+            // 이 부분은 도달하지 않아야 하지만, 안전장치로 추가
             return (0, batchOrders.Count);
         }
 
@@ -826,7 +1048,7 @@ namespace LogisticManager.Services
 
             // === 4단계: 유효하지 않은 테이블명 처리 ===
             var errorMessage = $"유효하지 않은 테이블명입니다: {tableName}. " +
-                             "테이블명은 영문자, 숫자, 언더스코어(_)만 포함할 수 있으며, " +
+                             "테이블명은 영문자, 숫자, 언더스코어(_), 한글만 포함할 수 있으며, " +
                              "SQL 인젝션 방지를 위해 특수문자는 허용되지 않습니다.";
             
             Console.WriteLine($"[BatchProcessorService] ❌ {errorMessage}");
@@ -837,19 +1059,20 @@ namespace LogisticManager.Services
         /// 테이블명 유효성 검사 - SQL 인젝션 방지
         /// 
         /// 🛡️ 보안 검증 규칙:
-        /// - 영문자, 숫자, 언더스코어(_)만 허용
+        /// - 영문자, 숫자, 언더스코어(_), 한글 허용
         /// - 특수문자, 공백, SQL 키워드 차단
         /// - 최소/최대 길이 제한
         /// - 예약어 차단
         /// 
         /// 📋 검증 기준:
         /// - 길이: 1-64자
-        /// - 문자: 영문자, 숫자, 언더스코어만
-        /// - 시작: 영문자 또는 언더스코어
+        /// - 문자: 영문자, 숫자, 언더스코어, 한글 허용
+        /// - 시작: 영문자, 언더스코어, 한글
         /// - 예약어: SQL 키워드 차단
         /// 
         /// 💡 사용법:
         /// var isValid = IsValidTableName("custom_table_123");
+        /// var isValid = IsValidTableName("송장출력_사방넷원본변환_Dev");
         /// </summary>
         /// <param name="tableName">검증할 테이블명</param>
         /// <returns>유효성 여부</returns>
@@ -862,8 +1085,9 @@ namespace LogisticManager.Services
             if (tableName.Length < 1 || tableName.Length > 64)
                 return false;
 
-            // === 문자 패턴 검증 (영문자, 숫자, 언더스코어만 허용) ===
-            if (!System.Text.RegularExpressions.Regex.IsMatch(tableName, @"^[a-zA-Z_][a-zA-Z0-9_]*$"))
+            // === 문자 패턴 검증 (영문자, 숫자, 언더스코어, 한글 허용) ===
+            // 한글, 영문자, 숫자, 언더스코어만 허용
+            if (!System.Text.RegularExpressions.Regex.IsMatch(tableName, @"^[가-힣a-zA-Z_][가-힣a-zA-Z0-9_]*$"))
                 return false;
 
             // === SQL 예약어 차단 ===

@@ -258,18 +258,37 @@ namespace LogisticManager.Forms
                 if (result)
                 {
                     LogMessage("✅ Dropbox 연결 테스트 성공!");
+                    LogMessage("☁️ 파일 업로드 기능을 사용할 수 있습니다.");
                     lblStatus.Text = "연결 성공";
                     btnUploadFile.Enabled = true;
                 }
                 else
                 {
                     LogMessage("❌ Dropbox 연결 테스트 실패!");
+                    LogMessage("💡 App.config에서 Dropbox 인증 정보를 확인해주세요.");
+                    LogMessage("💡 Dropbox.AppKey, Dropbox.AppSecret, Dropbox.RefreshToken을 확인해주세요.");
                     lblStatus.Text = "연결 실패";
                 }
             }
             catch (Exception ex)
             {
                 LogMessage($"❌ 연결 테스트 오류: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    LogMessage($"🔍 상세 오류: {ex.InnerException.Message}");
+                }
+                
+                var errorMessage = "Dropbox 연결 테스트 중 오류가 발생했습니다.";
+                if (ex.Message.Contains("unauthorized") || ex.Message.Contains("인증"))
+                {
+                    errorMessage += "\n\n💡 Dropbox 인증 정보를 확인해주세요.";
+                }
+                else if (ex.Message.Contains("network") || ex.Message.Contains("연결"))
+                {
+                    errorMessage += "\n\n💡 네트워크 연결을 확인해주세요.";
+                }
+                
+                LogMessage(errorMessage);
                 lblStatus.Text = "연결 오류";
             }
             finally
@@ -313,6 +332,12 @@ namespace LogisticManager.Forms
                 return;
             }
 
+            if (!File.Exists(_selectedFilePath))
+            {
+                MessageBox.Show("선택된 파일이 존재하지 않습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
             try
             {
                 btnUploadFile.Enabled = false;
@@ -322,31 +347,78 @@ namespace LogisticManager.Forms
 
                 LogMessage($"☁️ 파일 업로드를 시작합니다: {Path.GetFileName(_selectedFilePath)}");
 
-                // App.config에서만 Dropbox 폴더 경로 읽기
+                // App.config에서 Dropbox 폴더 경로 읽기
                 var dropboxFolderPath = System.Configuration.ConfigurationManager.AppSettings["DropboxFolderPath"] ?? "/LogisticManager/";
                 LogMessage($"📁 업로드 폴더: {dropboxFolderPath}");
                 
-                // ㅎ.기타/Check폴더에 파일 업로드되고
-                var sharedUrl = await _dropboxService.UploadFileAsync(_selectedFilePath, dropboxFolderPath);
+                // 파일 업로드 시도 (최대 3회 재시도)
+                string? sharedUrl = null;
+                Exception? lastException = null;
+                
+                for (int attempt = 1; attempt <= 3; attempt++)
+                {
+                    try
+                    {
+                        LogMessage($"🔄 업로드 시도 {attempt}/3...");
+                        sharedUrl = await _dropboxService.UploadFileAsync(_selectedFilePath, dropboxFolderPath);
+                        LogMessage($"✅ 파일 업로드 완료! (시도 {attempt}/3)");
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastException = ex;
+                        LogMessage($"⚠️ 업로드 시도 {attempt}/3 실패: {ex.Message}");
+                        
+                        if (attempt < 3)
+                        {
+                            LogMessage("🔄 3초 후 재시도합니다...");
+                            await Task.Delay(3000);
+                        }
+                    }
+                }
 
-                LogMessage($"✅ 파일 업로드 완료!");
+                if (sharedUrl == null)
+                {
+                    throw lastException ?? new InvalidOperationException("파일 업로드에 실패했습니다.");
+                }
+
                 LogMessage($"🔗 공유 링크: {sharedUrl}");
-
                 lblStatus.Text = "업로드 완료";
                 
                 // 클립보드에 링크 복사
-                Clipboard.SetText(sharedUrl);
-                LogMessage("📋 공유 링크가 클립보드에 복사되었습니다.");
+                try
+                {
+                    Clipboard.SetText(sharedUrl);
+                    LogMessage("📋 공유 링크가 클립보드에 복사되었습니다.");
+                }
+                catch (Exception clipboardEx)
+                {
+                    LogMessage($"⚠️ 클립보드 복사 실패: {clipboardEx.Message}");
+                }
 
-                MessageBox.Show($"파일 업로드가 완료되었습니다!\n\n공유 링크가 클립보드에 복사되었습니다.", 
+                MessageBox.Show($"파일 업로드가 완료되었습니다!\n\n파일: {Path.GetFileName(_selectedFilePath)}\n공유 링크가 클립보드에 복사되었습니다.", 
                     "업로드 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
                 LogMessage($"❌ 파일 업로드 오류: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    LogMessage($"🔍 상세 오류: {ex.InnerException.Message}");
+                }
                 lblStatus.Text = "업로드 실패";
-                MessageBox.Show($"파일 업로드 중 오류가 발생했습니다:\n{ex.Message}", 
-                    "업로드 오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                
+                var errorMessage = $"파일 업로드 중 오류가 발생했습니다:\n{ex.Message}";
+                if (ex.Message.Contains("unauthorized") || ex.Message.Contains("인증"))
+                {
+                    errorMessage += "\n\n💡 Dropbox 인증 정보를 확인해주세요.";
+                }
+                else if (ex.Message.Contains("network") || ex.Message.Contains("연결"))
+                {
+                    errorMessage += "\n\n💡 네트워크 연결을 확인해주세요.";
+                }
+                
+                MessageBox.Show(errorMessage, "업로드 오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {

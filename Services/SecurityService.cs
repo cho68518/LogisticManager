@@ -343,39 +343,68 @@ namespace LogisticManager.Services
         /// <returns>JSON 파일에서 읽은 연결 문자열</returns>
         public static string GetSecureConnectionString()
         {
-            // JSON 파일에서 설정을 읽어서 연결 문자열 생성
-            var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-            var settings = new Dictionary<string, string>();
+            // settings.json에서 직접 데이터베이스 설정 읽기
+            var (server, database, user, password, port) = LoadDatabaseSettingsFromJson();
             
+            var connectionString = $"Server={server};Database={database};User Id={user};Password={password};Port={port};CharSet=utf8;Convert Zero Datetime=True;Allow User Variables=True;";
+            
+            Console.WriteLine($"🔗 SecurityService: 연결 문자열 생성 완료 (서버: {server}, DB: {database}, 사용자: {user})");
+            
+            return connectionString;
+        }
+
+        /// <summary>
+        /// settings.json에서 직접 데이터베이스 설정을 읽어오는 메서드
+        /// </summary>
+        /// <returns>데이터베이스 설정 튜플</returns>
+        private static (string server, string database, string user, string password, string port) LoadDatabaseSettingsFromJson()
+        {
             try
             {
+                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                
                 if (File.Exists(settingsPath))
                 {
                     var jsonContent = File.ReadAllText(settingsPath);
                     if (!string.IsNullOrEmpty(jsonContent))
                     {
-                        settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent) ?? new Dictionary<string, string>();
-                        Console.WriteLine($"✅ SecurityService: JSON에서 {settings.Count}개 설정 로드");
+                        Console.WriteLine($"📄 SecurityService: settings.json 파일 내용: {jsonContent}");
+                        
+                        var settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
+                        if (settings != null)
+                        {
+                            var server = settings.GetValueOrDefault("DB_SERVER", "gramwonlogis2.mycafe24.com");
+                            var database = settings.GetValueOrDefault("DB_NAME", "gramwonlogis2");
+                            var user = settings.GetValueOrDefault("DB_USER", "gramwonlogis2");
+                            var password = settings.GetValueOrDefault("DB_PASSWORD", "jung5516!");
+                            var port = settings.GetValueOrDefault("DB_PORT", "3306");
+                            
+                            Console.WriteLine($"✅ SecurityService: settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.");
+                            return (server, database, user, password, port);
+                        }
+                        else
+                        {
+                            Console.WriteLine("❌ SecurityService: settings.json 파싱 실패");
+                        }
                     }
+                    else
+                    {
+                        Console.WriteLine("⚠️ SecurityService: settings.json 파일이 비어있음");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"⚠️ SecurityService: settings.json 파일이 존재하지 않음: {settingsPath}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ SecurityService: JSON 파일 읽기 실패: {ex.Message}");
+                Console.WriteLine($"❌ SecurityService: settings.json 읽기 실패: {ex.Message}");
             }
             
-            // JSON에서 설정을 읽어오거나 기본값 사용
-            var server = settings.GetValueOrDefault("DB_SERVER", "gramwonlogis.mycafe24.com");
-            var database = settings.GetValueOrDefault("DB_NAME", "gramwonlogis");
-            var user = settings.GetValueOrDefault("DB_USER", "gramwonlogis");
-            var password = settings.GetValueOrDefault("DB_PASSWORD", "jung5516!");
-            var port = settings.GetValueOrDefault("DB_PORT", "3306");
-            
-            var connectionString = $"Server={server};Database={database};Uid={user};Pwd={password};CharSet=utf8mb4;Port={port};SslMode=none;AllowPublicKeyRetrieval=true;ConnectionTimeout=30;";
-            
-            Console.WriteLine($"🔗 SecurityService: 연결 문자열 생성 완료 (서버: {server}, DB: {database}, 사용자: {user})");
-            
-            return connectionString;
+            // 기본값 반환
+            Console.WriteLine("🔄 SecurityService: 기본값을 사용합니다.");
+            return ("gramwonlogis2.mycafe24.com", "gramwonlogis2", "gramwonlogis2", "jung5516!", "3306");
         }
         
         /// <summary>

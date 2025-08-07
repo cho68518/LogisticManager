@@ -9,6 +9,18 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <WarningsAsErrors />
     <WarningLevel>5</WarningLevel>
+    
+    <!-- 단일 실행파일 설정 (Windows Forms 호환성 고려) -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    
+    <!-- 애플리케이션 정보 -->
+    <AssemblyTitle>LogisticManager</AssemblyTitle>
+    <AssemblyDescription>물류 관리 시스템</AssemblyDescription>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,10 +39,34 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- 설정 파일들을 리소스로 포함 (실행 파일에만 포함) -->
+    <!-- 필요한 설정 파일들만 포함 -->
     <EmbeddedResource Include="App.config" />
-    <EmbeddedResource Include="settings.json" />
     <EmbeddedResource Include="column_mapping.json" />
+    <EmbeddedResource Include="table_mappings.json" />
+    <EmbeddedResource Include="settings.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 불필요한 파일들 제외 -->
+    <Compile Remove="Examples\**" />
+    <EmbeddedResource Remove="Examples\**" />
+    <None Remove="Examples\**" />
+    
+    <Compile Remove="**\*.md" />
+    <EmbeddedResource Remove="**\*.md" />
+    <None Remove="**\*.md" />
+    
+    <Compile Remove="**\*.txt" />
+    <EmbeddedResource Remove="**\*.txt" />
+    <None Remove="**\*.txt" />
+    
+    <Compile Remove="**\*Example.cs" />
+    <EmbeddedResource Remove="**\*Example.cs" />
+    <None Remove="**\*Example.cs" />
+    
+    <Compile Remove="**\*Test.cs" />
+    <EmbeddedResource Remove="**\*Test.cs" />
+    <None Remove="**\*Test.cs" />
   </ItemGroup>
 
   <PropertyGroup>

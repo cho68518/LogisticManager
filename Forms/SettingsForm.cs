@@ -136,10 +136,10 @@ namespace LogisticManager.Forms
             tabControl.Size = new Size(660, 420);
             tabControl.Font = new Font("맑은 고딕", 9F);
 
-            // 데이터베이스 설정 탭
-            var dbTab = new TabPage("🗄️ 데이터베이스 설정");
-            dbTab.Controls.Add(CreateDatabaseSettingsPanel());
-            tabControl.TabPages.Add(dbTab);
+            // 데이터베이스 설정 탭 (숨김 처리)
+            // var dbTab = new TabPage("🗄️ 데이터베이스 설정");
+            // dbTab.Controls.Add(CreateDatabaseSettingsPanel());
+            // tabControl.TabPages.Add(dbTab);
 
             // API 설정 탭 (숨김 처리)
             // var apiTab = new TabPage("🔗 API 설정");
@@ -716,11 +716,12 @@ namespace LogisticManager.Forms
                 
                 // 데이터베이스 설정 로드
                 Console.WriteLine("📊 데이터베이스 설정 로드 중...");
-                SetTextBoxValue("txtServer", settings.GetValueOrDefault("DB_SERVER", "gramwonlogis.mycafe24.com"));
-                SetTextBoxValue("txtDatabase", settings.GetValueOrDefault("DB_NAME", "gramwonlogis"));
-                SetTextBoxValue("txtUser", settings.GetValueOrDefault("DB_USER", "gramwonlogis"));
-                SetTextBoxValue("txtPassword", settings.GetValueOrDefault("DB_PASSWORD", "jung5516!"));
-                SetTextBoxValue("txtPort", settings.GetValueOrDefault("DB_PORT", "3306"));
+                var (server, database, user, password, port) = LoadDatabaseSettingsFromJson();
+                SetTextBoxValue("txtServer", server);
+                SetTextBoxValue("txtDatabase", database);
+                SetTextBoxValue("txtUser", user);
+                SetTextBoxValue("txtPassword", password);
+                SetTextBoxValue("txtPort", port);
 
                 // API 설정 로드
                 Console.WriteLine("🔗 API 설정 로드 중...");
@@ -1331,11 +1332,11 @@ namespace LogisticManager.Forms
         }
 
         /// <summary>
-        /// 저장된 환경 변수 설정으로 연결을 테스트하는 메서드
+        /// 저장된 settings.json 설정으로 연결을 테스트하는 메서드
         /// 
         /// 기능:
-        /// - 환경 변수에서 데이터베이스 설정을 읽어옴
-        /// - SecurityService를 통해 안전한 연결 문자열 생성
+        /// - settings.json에서 데이터베이스 설정을 읽어옴
+        /// - 안전한 연결 문자열 생성
         /// - 연결 테스트 수행
         /// - 성공/실패 메시지 표시
         /// 
@@ -1347,15 +1348,12 @@ namespace LogisticManager.Forms
         {
             try
             {
-                // 환경 변수에서 설정 읽기
-                var server = SecurityService.GetEnvironmentVariable("DB_SERVER");
-                var database = SecurityService.GetEnvironmentVariable("DB_NAME");
-                var user = SecurityService.GetEnvironmentVariable("DB_USER");
-                var port = SecurityService.GetEnvironmentVariable("DB_PORT");
+                // settings.json에서 설정 읽기
+                var (server, database, user, password, port) = LoadDatabaseSettingsFromJson();
 
                 if (string.IsNullOrEmpty(server) || string.IsNullOrEmpty(database) || string.IsNullOrEmpty(user))
                 {
-                    MessageBox.Show("⚠️ 저장된 데이터베이스 설정이 완전하지 않습니다.\n환경 변수를 확인해주세요.", "설정 확인", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("⚠️ 저장된 데이터베이스 설정이 완전하지 않습니다.\nsettings.json 파일을 확인해주세요.", "설정 확인", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
@@ -1363,8 +1361,8 @@ namespace LogisticManager.Forms
                 var connectionInfo = $"서버: {server}\n데이터베이스: {database}\n사용자: {user}\n포트: {port}";
                 MessageBox.Show($"🔍 저장된 설정으로 연결을 시도합니다...\n\n{connectionInfo}", "연결 테스트", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                // SecurityService를 통해 안전한 연결 문자열 생성
-                var connectionString = SecurityService.GetSecureConnectionString();
+                // 연결 문자열 생성
+                var connectionString = $"Server={server};Database={database};User Id={user};Password={password};Port={port};CharSet=utf8;Convert Zero Datetime=True;Allow User Variables=True;";
 
                 // 동기적으로 연결 테스트 실행
                 try
@@ -1400,5 +1398,52 @@ namespace LogisticManager.Forms
         }
 
         #endregion
+
+        /// <summary>
+        /// settings.json에서 직접 데이터베이스 설정을 읽어오는 메서드
+        /// </summary>
+        /// <returns>데이터베이스 설정 튜플</returns>
+        private (string server, string database, string user, string password, string port) LoadDatabaseSettingsFromJson()
+        {
+            try
+            {
+                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                
+                if (File.Exists(settingsPath))
+                {
+                    var jsonContent = File.ReadAllText(settingsPath);
+                    Console.WriteLine($"📄 SettingsForm: settings.json 파일 내용: {jsonContent}");
+                    
+                    var settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
+                    if (settings != null)
+                    {
+                        var server = settings.GetValueOrDefault("DB_SERVER", "gramwonlogis2.mycafe24.com");
+                        var database = settings.GetValueOrDefault("DB_NAME", "gramwonlogis2");
+                        var user = settings.GetValueOrDefault("DB_USER", "gramwonlogis2");
+                        var password = settings.GetValueOrDefault("DB_PASSWORD", "jung5516!");
+                        var port = settings.GetValueOrDefault("DB_PORT", "3306");
+                        
+                        Console.WriteLine($"✅ SettingsForm: settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.");
+                        return (server, database, user, password, port);
+                    }
+                    else
+                    {
+                        Console.WriteLine("❌ SettingsForm: settings.json 파싱 실패");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"⚠️ SettingsForm: settings.json 파일이 존재하지 않음: {settingsPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ SettingsForm: settings.json 읽기 실패: {ex.Message}");
+            }
+            
+            // 기본값 반환
+            Console.WriteLine("🔄 SettingsForm: 기본값을 사용합니다.");
+            return ("gramwonlogis2.mycafe24.com", "gramwonlogis2", "gramwonlogis2", "jung5516!", "3306");
+        }
     }
 } 
