@@ -209,9 +209,24 @@ namespace LogisticManager.Services
                             var excelColumnName = worksheet.Cells[1, col].Value?.ToString() ?? $"Column{col}";
                             var cellValue = worksheet.Cells[row, col].Value?.ToString() ?? string.Empty;
                             
+                            // 매핑된 컬럼명 가져오기
+                            var databaseColumnName = _mappingService.GetDatabaseColumn(excelColumnName, tableMappingKey);
+                            var columnName = databaseColumnName ?? excelColumnName;
+                            
                             // 데이터 타입에 따른 변환 적용
                             var convertedValue = ConvertCellValue(cellValue, excelColumnName, tableMappingKey);
-                            dataRow[col - 1] = convertedValue;
+                            
+                            // 컬럼명으로 데이터 설정
+                            if (dataTable.Columns.Contains(columnName))
+                            {
+                                dataRow[columnName] = convertedValue;
+                                
+                                // 디버깅을 위한 로그 추가
+                                if (row <= 3) // 처음 몇 행만 로깅
+                                {
+                                    Console.WriteLine($"[FileService] 행{row} 컬럼 '{excelColumnName}' → '{columnName}': '{cellValue}' → '{convertedValue}'");
+                                }
+                            }
                             
                             // 빈 셀이 아닌 경우 데이터가 있다고 표시
                             if (!string.IsNullOrEmpty(cellValue))

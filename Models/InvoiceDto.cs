@@ -134,6 +134,13 @@ namespace LogisticManager.Models
         /// <returns>변환된 InvoiceDto</returns>
         public static InvoiceDto FromOrder(Order order)
         {
+            // 디버깅을 위한 로그 추가
+            Console.WriteLine($"[InvoiceDto.FromOrder] Order 변환 시작");
+            Console.WriteLine($"  - RecipientPhone1: '{order.RecipientPhone1 ?? "(null)"}'");
+            Console.WriteLine($"  - RecipientPhone2: '{order.RecipientPhone2 ?? "(null)"}'");
+            Console.WriteLine($"  - ZipCode: '{order.ZipCode ?? "(null)"}'");
+            Console.WriteLine($"  - OptionName: '{order.OptionName ?? "(null)"}'");
+            
             return new InvoiceDto
             {
                 RecipientName = order.RecipientName ?? string.Empty,

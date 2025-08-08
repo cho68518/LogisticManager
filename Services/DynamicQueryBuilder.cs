@@ -88,7 +88,8 @@ namespace LogisticManager.Services
         public DynamicQueryBuilder(bool useReflectionFallback = true)
         {
             _useReflectionFallback = useReflectionFallback;
-            _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "table_mappings.json");
+            // 프로젝트 루트 디렉토리에서 설정 파일 찾기
+            _configPath = Path.Combine(Directory.GetCurrentDirectory(), "table_mappings.json");
             _tableMappings = LoadTableMappings();
             
             Console.WriteLine($"🔧 DynamicQueryBuilder 초기화 완료 - 설정 파일: {_configPath}");
@@ -489,34 +490,25 @@ namespace LogisticManager.Services
 
             foreach (var column in mapping.Columns)
             {
-                var value = GetPropertyValue(entity, column.PropertyName);
-                
-                // 필수 필드가 null인 경우 건너뛰기
-                if (column.IsRequired && value == null)
+                // INSERT에서 제외되는 컬럼 체크 (예: AUTO_INCREMENT 컬럼)
+                if (column.ExcludeFromInsert)
                 {
-                    var nullLog = $"[DynamicQueryBuilder] ⚠️ 필수 필드 '{column.PropertyName}'이 null이므로 건너뜀";
-                    Console.WriteLine(nullLog);
-                    File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {nullLog}\n");
+                    var excludeLog = $"[DynamicQueryBuilder] INSERT에서 제외: {column.PropertyName} (excludeFromInsert=true)";
+                    Console.WriteLine(excludeLog);
+                    File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {excludeLog}\n");
                     continue;
                 }
 
-                // null이 아닌 값만 포함
-                if (value != null)
-                {
-                    columns.Add(column.DatabaseColumn);
-                    parameters.Add($"@{column.PropertyName}");
-                    paramDict[column.PropertyName] = value;
-                    
-                    var mappingLog = $"[DynamicQueryBuilder] 컬럼 매핑: {column.PropertyName} → {column.DatabaseColumn} = {value}";
-                    Console.WriteLine(mappingLog);
-                    File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {mappingLog}\n");
-                }
-                else
-                {
-                    var skipLog = $"[DynamicQueryBuilder] null 값 건너뜀: {column.PropertyName} → {column.DatabaseColumn}";
-                    Console.WriteLine(skipLog);
-                    File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {skipLog}\n");
-                }
+                var value = GetPropertyValue(entity, column.PropertyName);
+                
+                // 모든 컬럼을 포함 (null이어도 포함)
+                columns.Add($"`{column.DatabaseColumn}`");
+                parameters.Add($"@{column.PropertyName}");
+                paramDict[$"@{column.PropertyName}"] = value ?? DBNull.Value;
+                
+                var mappingLog = $"[DynamicQueryBuilder] 컬럼 매핑: {column.PropertyName} → {column.DatabaseColumn} = {value ?? "(null)"}";
+                Console.WriteLine(mappingLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {mappingLog}\n");
             }
 
             if (columns.Count == 0)
@@ -524,7 +516,10 @@ namespace LogisticManager.Services
                 throw new InvalidOperationException($"테이블 '{tableName}'에 대한 유효한 컬럼이 없습니다.");
             }
 
-            var sql = $"INSERT INTO {tableName} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", parameters)})";
+            var columnList = string.Join(", ", columns);
+            Console.WriteLine($"[DynamicQueryBuilder] 컬럼 목록: {columnList}");
+            
+            var sql = $"INSERT INTO {tableName} ({columnList}) VALUES ({string.Join(", ", parameters)})";
             
             var sqlLog = $"[DynamicQueryBuilder] 생성된 SQL: {sql}";
             var paramLog = $"[DynamicQueryBuilder] 매개변수: {string.Join(", ", paramDict.Select(p => $"{p.Key}={p.Value}"))}";
@@ -634,7 +629,7 @@ namespace LogisticManager.Services
                 }
 
                 var parameterName = $"@{column.PropertyName}";
-                setClauses.Add($"{column.DatabaseColumn} = {parameterName}");
+                setClauses.Add($"`{column.DatabaseColumn}` = {parameterName}");
                 paramDict[parameterName] = value ?? DBNull.Value;
             }
 
@@ -1018,6 +1013,7 @@ namespace LogisticManager.Services
     /// - 속성명과 데이터베이스 컬럼명 매핑
     /// - 데이터 타입 정보 저장
     /// - 필수 필드 여부 표시
+    /// - INSERT/UPDATE 제외 설정
     /// </summary>
     public class DynamicColumnMapping
     {
@@ -1032,5 +1028,17 @@ namespace LogisticManager.Services
 
         /// <summary>필수 필드 여부</summary>
         public bool IsRequired { get; set; } = false;
+
+        /// <summary>INSERT에서 제외 여부 (AUTO_INCREMENT 등)</summary>
+        public bool ExcludeFromInsert { get; set; } = false;
+
+        /// <summary>UPDATE에서 제외 여부 (PRIMARY KEY 등)</summary>
+        public bool ExcludeFromUpdate { get; set; } = false;
+
+        /// <summary>자동 증가 컬럼 여부</summary>
+        public bool IsAutoIncrement { get; set; } = false;
+
+        /// <summary>기본키 여부</summary>
+        public bool IsPrimaryKey { get; set; } = false;
     }
 }

@@ -1,8 +1,52 @@
 {
   "송장출력_사방넷원본변환_Dev": {
     "tableName": "송장출력_사방넷원본변환_Dev",
-    "primaryKey": null,
     "columns": [
+      {
+        "propertyName": "Id",
+        "databaseColumn": "id",
+        "dataType": "INT",
+        "isRequired": true,
+        "isAutoIncrement": true,
+        "isPrimaryKey": true,
+        "excludeFromInsert": true
+      },
+      {
+        "propertyName": "Msg1",
+        "databaseColumn": "msg1",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "Msg2",
+        "databaseColumn": "msg2",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "Msg3",
+        "databaseColumn": "msg3",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "Msg4",
+        "databaseColumn": "msg4",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "Msg5",
+        "databaseColumn": "msg5",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "Msg6",
+        "databaseColumn": "msg6",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
       {
         "propertyName": "RecipientName",
         "databaseColumn": "수취인명",
@@ -31,7 +75,7 @@
         "propertyName": "Address",
         "databaseColumn": "주소",
         "dataType": "VARCHAR",
-        "isRequired": false
+        "isRequired": true
       },
       {
         "propertyName": "OptionName",
@@ -43,7 +87,7 @@
         "propertyName": "Quantity",
         "databaseColumn": "수량",
         "dataType": "INT",
-        "isRequired": false
+        "isRequired": true
       },
       {
         "propertyName": "SpecialNote",
@@ -82,6 +126,96 @@
         "isRequired": false
       },
       {
+        "propertyName": "DeliveryCost",
+        "databaseColumn": "택배비용",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "BoxSize",
+        "databaseColumn": "박스크기",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "PrintCount",
+        "databaseColumn": "출력개수",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "InvoiceQuantity",
+        "databaseColumn": "송장수량",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "Star1",
+        "databaseColumn": "별표1",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "Star2",
+        "databaseColumn": "별표2",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "ProductCount",
+        "databaseColumn": "품목개수",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "DeliveryQuantity",
+        "databaseColumn": "택배수량",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "DeliveryQuantity1",
+        "databaseColumn": "택배수량1",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "DeliveryQuantitySum",
+        "databaseColumn": "택배수량합산",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "InvoiceSeparator",
+        "databaseColumn": "송장구분자",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "InvoiceType",
+        "databaseColumn": "송장구분",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "InvoiceTypeFinal",
+        "databaseColumn": "송장구분최종",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "Location",
+        "databaseColumn": "위치",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
+        "propertyName": "LocationConverted",
+        "databaseColumn": "위치변환",
+        "dataType": "VARCHAR",
+        "isRequired": false
+      },
+      {
         "propertyName": "OrderNumberMall",
         "databaseColumn": "주문번호(쇼핑몰)",
         "dataType": "VARCHAR",
@@ -90,13 +224,13 @@
       {
         "propertyName": "PaymentAmount",
         "databaseColumn": "결제금액",
-        "dataType": "DECIMAL",
+        "dataType": "VARCHAR",
         "isRequired": false
       },
       {
         "propertyName": "OrderAmount",
         "databaseColumn": "주문금액",
-        "dataType": "DECIMAL",
+        "dataType": "VARCHAR",
         "isRequired": false
       },
       {
@@ -122,132 +256,6 @@
         "databaseColumn": "배송송",
         "dataType": "VARCHAR",
         "isRequired": false
-      }
-    ]
-  },
-  "invoice_table": {
-    "tableName": "invoice_table",
-    "primaryKey": "OrderNumber",
-    "columns": [
-      {
-        "propertyName": "RecipientName",
-        "databaseColumn": "수취인명",
-        "dataType": "VARCHAR",
-        "isRequired": true
-      },
-      {
-        "propertyName": "RecipientPhone",
-        "databaseColumn": "수취인연락처",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "RecipientAddress",
-        "databaseColumn": "수취인주소",
-        "dataType": "VARCHAR",
-        "isRequired": true
-      },
-      {
-        "propertyName": "OrderNumber",
-        "databaseColumn": "주문번호",
-        "dataType": "VARCHAR",
-        "isRequired": true
-      },
-      {
-        "propertyName": "ProductCode",
-        "databaseColumn": "품목코드",
-        "dataType": "VARCHAR",
-        "isRequired": true
-      },
-      {
-        "propertyName": "ProductName",
-        "databaseColumn": "품목명",
-        "dataType": "VARCHAR",
-        "isRequired": true
-      },
-      {
-        "propertyName": "Quantity",
-        "databaseColumn": "수량",
-        "dataType": "INT",
-        "isRequired": true
-      },
-      {
-        "propertyName": "UnitPrice",
-        "databaseColumn": "단가",
-        "dataType": "DECIMAL",
-        "isRequired": false
-      },
-      {
-        "propertyName": "TotalAmount",
-        "databaseColumn": "총금액",
-        "dataType": "DECIMAL",
-        "isRequired": false
-      },
-      {
-        "propertyName": "OrderDate",
-        "databaseColumn": "주문일자",
-        "dataType": "DATE",
-        "isRequired": false
-      },
-      {
-        "propertyName": "DeliveryDate",
-        "databaseColumn": "배송일자",
-        "dataType": "DATE",
-        "isRequired": false
-      },
-      {
-        "propertyName": "Status",
-        "databaseColumn": "상태",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "Notes",
-        "databaseColumn": "비고",
-        "dataType": "TEXT",
-        "isRequired": false
-      }
-    ]
-  },
-  "shipment_table": {
-    "tableName": "shipment_table",
-    "primaryKey": "ShipmentId",
-    "columns": [
-      {
-        "propertyName": "ShipmentId",
-        "databaseColumn": "배송번호",
-        "dataType": "VARCHAR",
-        "isRequired": true
-      },
-      {
-        "propertyName": "OrderNumber",
-        "databaseColumn": "주문번호",
-        "dataType": "VARCHAR",
-        "isRequired": true
-      },
-      {
-        "propertyName": "RecipientName",
-        "databaseColumn": "수취인명",
-        "dataType": "VARCHAR",
-        "isRequired": true
-      },
-      {
-        "propertyName": "RecipientAddress",
-        "databaseColumn": "수취인주소",
-        "dataType": "VARCHAR",
-        "isRequired": true
-      },
-      {
-        "propertyName": "ShipmentDate",
-        "databaseColumn": "배송일자",
-        "dataType": "DATE",
-        "isRequired": true
-      },
-      {
-        "propertyName": "Status",
-        "databaseColumn": "배송상태",
-        "dataType": "VARCHAR",
-        "isRequired": true
       }
     ]
   }

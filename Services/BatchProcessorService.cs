@@ -101,7 +101,7 @@ namespace LogisticManager.Services
         /// - 데이터베이스 부하: 적정 수준 유지
         /// - 실패 시 롤백 비용: 최소화
         /// </summary>
-        private const int DEFAULT_BATCH_SIZE = 500;
+        private const int DEFAULT_BATCH_SIZE = 100;
         
         /// <summary>
         /// 최소 배치 크기 - 메모리 극한 상황에서의 최후 보루

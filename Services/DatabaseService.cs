@@ -556,115 +556,151 @@ namespace LogisticManager.Services
         /// <returns>모든 쿼리가 성공하면 true, 아니면 false</returns>
         public async Task<bool> ExecuteParameterizedTransactionAsync(IEnumerable<(string sql, Dictionary<string, object> parameters)> queriesWithParameters)
         {
-            // MySQL 연결 생성
-            using var connection = new MySqlConnection(_connectionString);
+            const int maxRetries = 3;
+            var retryDelays = new[] { 1000, 2000, 4000 }; // 지수 백오프 (밀리초)
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
             
-            try
+            for (int retry = 0; retry <= maxRetries; retry++)
             {
-                // 데이터베이스 연결
-                await connection.OpenAsync();
-                var startLog = "✅ DatabaseService: 매개변수화된 트랜잭션 시작";
-                Console.WriteLine(startLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {startLog}\n");
-                
-                // 트랜잭션 시작
-                using var transaction = await connection.BeginTransactionAsync();
+                // MySQL 연결 생성
+                using var connection = new MySqlConnection(_connectionString);
                 
                 try
                 {
-                    var totalAffectedRows = 0;
-                    var queryCount = 0;
+                    // 데이터베이스 연결
+                    await connection.OpenAsync();
+                    var startLog = $"[DatabaseService] 매개변수화된 트랜잭션 시작 (시도 {retry + 1}/{maxRetries + 1})";
+                    Console.WriteLine(startLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {startLog}\n");
                     
-                    foreach (var (sql, parameters) in queriesWithParameters)
+                    // 트랜잭션 시작
+                    using var transaction = await connection.BeginTransactionAsync();
+                    
+                    try
                     {
-                        queryCount++;
-                        var queryLog = $"[DatabaseService] 쿼리 {queryCount} 실행 시작";
-                        var sqlLog = $"[DatabaseService] SQL: {sql}";
-                        var paramLog = $"[DatabaseService] 매개변수: {string.Join(", ", parameters.Select(p => $"{p.Key}={p.Value}"))}";
+                        var totalAffectedRows = 0;
+                        var queryCount = 0;
                         
-                        Console.WriteLine(queryLog);
-                        Console.WriteLine(sqlLog);
-                        Console.WriteLine(paramLog);
-                        File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {queryLog}\n");
-                        File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {sqlLog}\n");
-                        File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paramLog}\n");
-                        
-                        try
+                        foreach (var (sql, parameters) in queriesWithParameters)
                         {
-                            using var command = new MySqlCommand(sql, connection, transaction);
+                            queryCount++;
+                            var queryLog = $"[DatabaseService] 쿼리 {queryCount} 실행 시작";
+                            var sqlLog = $"[DatabaseService] SQL: {sql}";
+                            var paramLog = $"[DatabaseService] 매개변수: {string.Join(", ", parameters.Select(p => $"{p.Key}={p.Value}"))}";
                             
-                            // 매개변수 추가
-                            foreach (var param in parameters)
+                            Console.WriteLine(queryLog);
+                            Console.WriteLine(sqlLog);
+                            Console.WriteLine(paramLog);
+                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {queryLog}\n");
+                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {sqlLog}\n");
+                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paramLog}\n");
+                            
+                            try
                             {
-                                command.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                                using var command = new MySqlCommand(sql, connection, transaction);
+                                command.CommandTimeout = 300; // 5분 타임아웃 설정
+                                
+                                // 매개변수 추가
+                                foreach (var param in parameters)
+                                {
+                                    command.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                                }
+                                
+                                // 쿼리 실행
+                                var affectedRows = await command.ExecuteNonQueryAsync();
+                                totalAffectedRows += affectedRows;
+                                
+                                var successLog = $"[DatabaseService] 쿼리 {queryCount} 성공 - 영향받은 행: {affectedRows}";
+                                Console.WriteLine(successLog);
+                                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {successLog}\n");
                             }
-                            
-                            // 쿼리 실행
-                            var affectedRows = await command.ExecuteNonQueryAsync();
-                            totalAffectedRows += affectedRows;
-                            
-                            var successLog = $"[DatabaseService] 쿼리 {queryCount} 성공 - 영향받은 행: {affectedRows}";
-                            Console.WriteLine(successLog);
-                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {successLog}\n");
+                            catch (MySqlException ex) when (ex.Number == 1205 || // 데드락
+                                                          ex.Number == 1213 || // 데드락 감지
+                                                          ex.Number == 1037 || // 메모리 부족
+                                                          ex.Number == 2006 || // 서버 연결 끊김
+                                                          ex.Number == 2013)   // 연결 유실
+                            {
+                                var errorLog = $"[DatabaseService] 쿼리 {queryCount} 실패 (일시적 오류): {ex.Message}";
+                                var detailLog = $"[DatabaseService] 상세 오류 (MySQL 오류 번호: {ex.Number}): {ex}";
+                                
+                                Console.WriteLine(errorLog);
+                                Console.WriteLine(detailLog);
+                                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorLog}\n");
+                                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {detailLog}\n");
+                                
+                                // 트랜잭션 롤백
+                                await transaction.RollbackAsync();
+                                
+                                if (retry < maxRetries)
+                                {
+                                    var retryLog = $"[DatabaseService] 일시적 오류로 인한 재시도 준비 - {retryDelays[retry]}ms 후 재시도";
+                                    Console.WriteLine(retryLog);
+                                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {retryLog}\n");
+                                    
+                                    await Task.Delay(retryDelays[retry]);
+                                    throw; // 외부 catch 블록으로 전파하여 전체 트랜잭션 재시도
+                                }
+                                
+                                var maxRetriesLog = $"[DatabaseService] 최대 재시도 횟수 초과 - 트랜잭션 실패";
+                                Console.WriteLine(maxRetriesLog);
+                                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {maxRetriesLog}\n");
+                                return false;
+                            }
+                            catch (Exception ex)
+                            {
+                                var errorLog = $"[DatabaseService] 쿼리 {queryCount} 실패 (영구적 오류): {ex.Message}";
+                                var detailLog = $"[DatabaseService] 상세 오류: {ex}";
+                                
+                                Console.WriteLine(errorLog);
+                                Console.WriteLine(detailLog);
+                                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorLog}\n");
+                                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {detailLog}\n");
+                                
+                                // 트랜잭션 롤백
+                                await transaction.RollbackAsync();
+                                return false; // 영구적 오류는 재시도하지 않음
+                            }
                         }
-                        catch (Exception ex)
-                        {
-                            var errorLog = $"[DatabaseService] 쿼리 {queryCount} 실패: {ex.Message}";
-                            var detailLog = $"[DatabaseService] 상세 오류: {ex}";
-                            
-                            Console.WriteLine(errorLog);
-                            Console.WriteLine(detailLog);
-                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorLog}\n");
-                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {detailLog}\n");
-                            
-                            // 트랜잭션 롤백
-                            await transaction.RollbackAsync();
-                            
-                            var rollbackLog = $"[DatabaseService] 트랜잭션 롤백 완료 - 총 {queryCount}개 쿼리 중 {queryCount}번째 쿼리에서 실패";
-                            Console.WriteLine(rollbackLog);
-                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {rollbackLog}\n");
-                            
-                            return false;
-                        }
+                        
+                        // 모든 쿼리 성공 시 커밋
+                        await transaction.CommitAsync();
+                        
+                        var commitLog = $"[DatabaseService] 트랜잭션 커밋 완료 - 총 {queryCount}개 쿼리, {totalAffectedRows}개 행 영향받음";
+                        Console.WriteLine(commitLog);
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {commitLog}\n");
+                        
+                        return true;
                     }
-                    
-                    // 모든 쿼리 성공 시 커밋
-                    await transaction.CommitAsync();
-                    
-                    var commitLog = $"[DatabaseService] 트랜잭션 커밋 완료 - 총 {queryCount}개 쿼리, {totalAffectedRows}개 행 영향받음";
-                    Console.WriteLine(commitLog);
-                    File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {commitLog}\n");
-                    
-                    return true;
+                    catch (Exception ex) when (retry < maxRetries)
+                    {
+                        var retryLog = $"[DatabaseService] 트랜잭션 실패 - 재시도 {retry + 1}/{maxRetries}: {ex.Message}";
+                        Console.WriteLine(retryLog);
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {retryLog}\n");
+                        
+                        await Task.Delay(retryDelays[retry]);
+                        continue;
+                    }
                 }
                 catch (Exception ex)
                 {
-                    // 트랜잭션 롤백
-                    await transaction.RollbackAsync();
+                    if (retry < maxRetries)
+                    {
+                        var retryLog = $"[DatabaseService] 데이터베이스 연결 실패 - 재시도 {retry + 1}/{maxRetries}";
+                        Console.WriteLine(retryLog);
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {retryLog}\n");
+                        
+                        await Task.Delay(retryDelays[retry]);
+                        continue;
+                    }
                     
-                    var transactionErrorLog = $"[DatabaseService] 트랜잭션 실행 중 예외 발생: {ex.Message}";
-                    var transactionDetailLog = $"[DatabaseService] 트랜잭션 상세 오류: {ex}";
-                    
-                    Console.WriteLine(transactionErrorLog);
-                    Console.WriteLine(transactionDetailLog);
-                    File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {transactionErrorLog}\n");
-                    File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {transactionDetailLog}\n");
-                    
+                    var errorLog = $"[DatabaseService] 데이터베이스 연결 실패 (최대 재시도 횟수 초과): {ex.Message}";
+                    Console.WriteLine(errorLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorLog}\n");
                     return false;
                 }
             }
-            catch (Exception ex)
-            {
-                var connectionErrorLog = $"[DatabaseService] 데이터베이스 연결 실패: {ex.Message}";
-                var connectionDetailLog = $"[DatabaseService] 연결 상세 오류: {ex}";
-                
-                Console.WriteLine(connectionErrorLog);
-                Console.WriteLine(connectionDetailLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {connectionErrorLog}\n");
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {connectionDetailLog}\n");
-                
-                return false;
-            }
+            
+            return false;
         }
 
         #endregion

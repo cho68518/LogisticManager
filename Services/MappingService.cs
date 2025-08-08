@@ -20,7 +20,9 @@ namespace LogisticManager.Services
 
         public MappingService()
         {
-            _mappingFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "column_mapping.json");
+            // 프로젝트 루트 디렉토리에서 설정 파일 찾기
+            _mappingFilePath = Path.Combine(Directory.GetCurrentDirectory(), "column_mapping.json");
+            Console.WriteLine($"[MappingService] 설정 파일 경로: {_mappingFilePath}");
             LoadMappingConfiguration();
         }
 
@@ -69,11 +71,33 @@ namespace LogisticManager.Services
         /// <returns>데이터베이스 컬럼명</returns>
         public string? GetDatabaseColumn(string excelColumn, string tableMappingKey = "order_table")
         {
+            Console.WriteLine($"[MappingService] 매핑 요청: '{excelColumn}' (테이블: {tableMappingKey})");
+            
             if (_configuration?.Mappings.TryGetValue(tableMappingKey, out var tableMapping) == true && tableMapping != null)
             {
+                Console.WriteLine($"[MappingService] 테이블 매핑 찾음: {tableMapping.MappingId}, 컬럼 수: {tableMapping.Columns.Count}");
+                
+                // 사용 가능한 모든 컬럼명 출력
+                var availableColumns = string.Join(", ", tableMapping.Columns.Keys);
+                Console.WriteLine($"[MappingService] 사용 가능한 컬럼들: {availableColumns}");
+                
                 if (tableMapping.Columns.TryGetValue(excelColumn, out var columnMapping))
                 {
-                    return columnMapping.DbColumn; // 수정: DatabaseColumn -> DbColumn
+                    Console.WriteLine($"[MappingService] ✅ 매핑 성공: '{excelColumn}' → '{columnMapping.DbColumn}'");
+                    return columnMapping.DbColumn;
+                }
+                else
+                {
+                    Console.WriteLine($"[MappingService] ❌ 매핑 실패: '{excelColumn}' 컬럼을 찾을 수 없음");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[MappingService] ❌ 테이블 매핑 '{tableMappingKey}'를 찾을 수 없음");
+                if (_configuration?.Mappings != null)
+                {
+                    var availableTables = string.Join(", ", _configuration.Mappings.Keys);
+                    Console.WriteLine($"[MappingService] 사용 가능한 테이블들: {availableTables}");
                 }
             }
             return null;

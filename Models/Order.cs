@@ -376,6 +376,10 @@ namespace LogisticManager.Models
                     Console.WriteLine($"[매핑정보] 매핑 처리 시작: {tableMapping.MappingId}");
                     Console.WriteLine($"[매핑정보] 엑셀 컬럼 수: {tableMapping.Columns.Count}, 추가 DB 컬럼 수: {tableMapping.AdditionalColumns.Count}");
                     
+                    // 엑셀 컬럼 목록 로깅
+                    var availableColumns = string.Join(", ", row.Table.Columns.Cast<System.Data.DataColumn>().Select(c => c.ColumnName));
+                    Console.WriteLine($"[매핑정보] 엑셀에서 사용 가능한 컬럼들: {availableColumns}");
+                    
                     // 매핑 정보를 사용하여 동적으로 변환
                     foreach (var columnMapping in tableMapping.Columns)
                     {
@@ -540,12 +544,12 @@ namespace LogisticManager.Models
                 Console.WriteLine($"[빌드정보] 예외 상세: {ex}");
             }
             
-            // === 주문번호 자동 생성 처리 ===
-            // 주문번호가 비어있거나 null인 경우 자동으로 생성
-            if (string.IsNullOrEmpty(order.OrderNumber) || order.OrderNumber.Trim() == string.Empty)
+            // === 주문번호 처리 ===
+            // 엑셀에서 읽은 주문번호를 그대로 사용
+            if (row.Table.Columns.Contains("주문번호"))
             {
-                order.OrderNumber = order.GenerateOrderNumber();
-                Console.WriteLine($"[Order.FromDataRow] 주문번호 자동 생성: {order.OrderNumber} (수취인명: {order.RecipientName ?? "UNKNOWN"})");
+                order.OrderNumber = row["주문번호"]?.ToString() ?? string.Empty;
+                Console.WriteLine($"[Order.FromDataRow] 주문번호: {order.OrderNumber} (수취인명: {order.RecipientName ?? "UNKNOWN"})");
             }
             
             return order;
@@ -703,12 +707,11 @@ namespace LogisticManager.Models
             var isValid = true;
             var missingFields = new List<string>();
             
-            // 주문번호 검사 (필수) - 비어있으면 자동 생성
+            // 주문번호 검사 (필수)
             if (string.IsNullOrEmpty(OrderNumber) || OrderNumber.Trim() == string.Empty)
             {
-                // 주문번호가 비어있으면 자동으로 생성
-                OrderNumber = GenerateOrderNumber();
-                Console.WriteLine($"[Order] 주문번호 자동 생성: {OrderNumber} (수취인명: {RecipientName})");
+                isValid = false;
+                missingFields.Add("주문번호");
             }
             
             // 수취인명 검사 (필수)
