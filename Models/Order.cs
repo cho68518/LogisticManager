@@ -386,9 +386,10 @@ namespace LogisticManager.Models
                         var excelColumnName = columnMapping.Key;
                         var dbColumnName = columnMapping.Value.DbColumn;
                         
-                        if (row.Table.Columns.Contains(excelColumnName))
+                        // DataTable 컬럼명은 DB 컬럼명 기준으로 생성되므로 dbColumnName 기준으로 조회해야 함
+                        if (row.Table.Columns.Contains(dbColumnName))
                         {
-                            var cellValue = row[excelColumnName];
+                            var cellValue = row[dbColumnName];
                             var stringValue = cellValue?.ToString() ?? string.Empty;
                             
                             Console.WriteLine($"[매핑정보] 처리 중: {excelColumnName} → {dbColumnName} = '{stringValue}'");
@@ -529,6 +530,9 @@ namespace LogisticManager.Models
                         order.InvoiceName = row["송장명"]?.ToString() ?? string.Empty;
                     if (row.Table.Columns.Contains("수량"))
                         order.Quantity = int.TryParse(row["수량"]?.ToString(), out var qty) ? qty : 0;
+                    // 별표2 값 매핑 (엑셀에 컬럼이 없을 수 있어 변환 단계에서 생성된 컬럼을 그대로 사용)
+                    if (row.Table.Columns.Contains("별표2"))
+                        order.Star2 = row["별표2"]?.ToString() ?? string.Empty;
                 }
                 
                 // === 디버깅 정보 출력 ===

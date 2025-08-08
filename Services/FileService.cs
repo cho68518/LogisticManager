@@ -235,10 +235,18 @@ namespace LogisticManager.Services
                             {
                                 dataRow[columnName] = convertedValue;
                                 
-                                // 디버깅을 위한 로그 추가
-                                if (row <= 3) // 처음 몇 행만 로깅
+                                // 디버깅을 위한 로그 추가 (쇼핑몰 컬럼 특별 처리)
+                                if (row <= 3 || columnName == "쇼핑몰") // 처음 몇 행만 로깅 + 쇼핑몰 컬럼은 항상 로깅
                                 {
                                     Console.WriteLine($"[FileService] 행{row} 컬럼 '{excelColumnName}' → '{columnName}': '{cellValue}' → '{convertedValue}'");
+                                }
+                            }
+                            else
+                            {
+                                // 컬럼이 존재하지 않는 경우 로깅
+                                if (row <= 3)
+                                {
+                                    Console.WriteLine($"[FileService] ⚠️ 행{row} 컬럼 '{columnName}'이 DataTable에 존재하지 않음");
                                 }
                             }
                             

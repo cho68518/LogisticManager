@@ -4,8 +4,10 @@ using System.IO;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Dropbox.Api;
+using Dropbox.Api.Files;
 using Newtonsoft.Json.Linq;
 using System.Linq; // Added for FirstOrDefault
+using System.Collections.Generic; // Added for List
 
 namespace LogisticManager.Services
 {
@@ -329,6 +331,119 @@ namespace LogisticManager.Services
             {
                 Console.WriteLine($"Dropbox 연결 테스트 실패: {ex.Message}");
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Dropbox에서 파일을 다운로드하는 메서드
+        /// </summary>
+        /// <param name="dropboxPath">Dropbox 파일 경로 (예: /folder/file.xlsx)</param>
+        /// <param name="localFilePath">로컬 저장 경로</param>
+        /// <returns>다운로드 성공 여부</returns>
+        public async Task<bool> DownloadFileAsync(string dropboxPath, string localFilePath)
+        {
+            try
+            {
+                Console.WriteLine($"파일 다운로드 시작: {dropboxPath} -> {localFilePath}");
+
+                // Dropbox 인증 정보 확인
+                if (string.IsNullOrEmpty(_appKey) || string.IsNullOrEmpty(_appSecret) || string.IsNullOrEmpty(_refreshToken))
+                {
+                    throw new InvalidOperationException("Dropbox 인증 정보가 설정되지 않았습니다. App.config에서 Dropbox.AppKey, Dropbox.AppSecret, Dropbox.RefreshToken을 확인해주세요.");
+                }
+
+                // 유효한 클라이언트 확보
+                var client = await GetClientAsync();
+
+                // 파일 존재 여부 확인
+                try
+                {
+                    var fileMetadata = await client.Files.GetMetadataAsync(dropboxPath);
+                    if (fileMetadata.IsFolder)
+                    {
+                        throw new InvalidOperationException($"지정된 경로는 폴더입니다: {dropboxPath}");
+                    }
+                    
+                    // 파일 크기 정보 출력 (FileMetadata 타입인 경우에만 Size 속성 접근)
+                    long fileSize = 0;
+                    if (fileMetadata is FileMetadata fileMeta)
+                    {
+                        fileSize = (long)fileMeta.Size;
+                    }
+                    Console.WriteLine($"파일 발견: {fileMetadata.Name} (크기: {fileSize} bytes)");
+                }
+                catch (Dropbox.Api.ApiException<Dropbox.Api.Files.GetMetadataError> ex)
+                {
+                    throw new FileNotFoundException($"Dropbox에서 파일을 찾을 수 없습니다: {dropboxPath}", ex);
+                }
+
+                // 로컬 디렉토리 생성
+                var localDirectory = Path.GetDirectoryName(localFilePath);
+                if (!string.IsNullOrEmpty(localDirectory) && !Directory.Exists(localDirectory))
+                {
+                    Directory.CreateDirectory(localDirectory);
+                    Console.WriteLine($"로컬 디렉토리 생성: {localDirectory}");
+                }
+
+                // 파일 다운로드
+                using (var response = await client.Files.DownloadAsync(dropboxPath))
+                using (var fileStream = File.Create(localFilePath))
+                {
+                    var contentStream = await response.GetContentAsStreamAsync();
+                    await contentStream.CopyToAsync(fileStream);
+                }
+
+                Console.WriteLine($"파일 다운로드 완료: {localFilePath}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"파일 다운로드 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Dropbox에서 파일 목록을 조회하는 메서드
+        /// </summary>
+        /// <param name="folderPath">조회할 폴더 경로 (예: /folder/)</param>
+        /// <returns>파일 목록</returns>
+        public async Task<List<string>> ListFilesAsync(string folderPath)
+        {
+            try
+            {
+                Console.WriteLine($"폴더 내용 조회 시작: {folderPath}");
+
+                // Dropbox 인증 정보 확인
+                if (string.IsNullOrEmpty(_appKey) || string.IsNullOrEmpty(_appSecret) || string.IsNullOrEmpty(_refreshToken))
+                {
+                    throw new InvalidOperationException("Dropbox 인증 정보가 설정되지 않았습니다.");
+                }
+
+                // 유효한 클라이언트 확보
+                var client = await GetClientAsync();
+
+                var fileList = new List<string>();
+
+                // 폴더 내용 조회
+                var listFolderResult = await client.Files.ListFolderAsync(folderPath);
+                
+                foreach (var item in listFolderResult.Entries)
+                {
+                    if (item.IsFile)
+                    {
+                        fileList.Add(item.PathDisplay);
+                        Console.WriteLine($"파일 발견: {item.Name}");
+                    }
+                }
+
+                Console.WriteLine($"폴더 내용 조회 완료: {fileList.Count}개 파일");
+                return fileList;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"폴더 내용 조회 오류: {ex.Message}");
+                throw;
             }
         }
         #endregion

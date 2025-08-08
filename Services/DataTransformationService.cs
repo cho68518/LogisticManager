@@ -1,6 +1,7 @@
 using System;
 using System.Data;
 using System.Text.RegularExpressions;
+using System.IO;
 
 namespace LogisticManager.Services
 {
@@ -127,6 +128,35 @@ namespace LogisticManager.Services
             }
 
             Console.WriteLine($"[DataTransformationService] 데이터 변환 시작 - 총 {dataTable.Rows.Count}개 행 처리");
+
+            // 별표2 컬럼이 없으면 생성 (엑셀에 없을 수 있으므로 메모리 내에서 보강)
+            try
+            {
+                if (!dataTable.Columns.Contains("별표2"))
+                {
+                    dataTable.Columns.Add("별표2", typeof(string));
+                    var initLog = "[DataTransformationService] 별표2 컬럼이 없어 생성함 (기본값: 빈 문자열)";
+                    Console.WriteLine(initLog);
+                    File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {initLog}\n");
+                }
+                else
+                {
+                    // 기존 컬럼이 존재하더라도 null 값은 빈 문자열로 초기화하여 INSERT 시 누락 방지
+                    foreach (DataRow row in dataTable.Rows)
+                    {
+                        if (row["별표2"] == DBNull.Value || row["별표2"] == null)
+                        {
+                            row["별표2"] = string.Empty;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                var initErr = $"[DataTransformationService] 별표2 컬럼 생성 실패: {ex.Message}";
+                Console.WriteLine(initErr);
+                File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {initErr}\n");
+            }
 
             int transformedCount = 0;
             int errorCount = 0;
@@ -296,6 +326,102 @@ namespace LogisticManager.Services
                     row["주소"] = transformedValue;
                     hasChanges = true;
                     Console.WriteLine($"🏠 [행{rowNumber}] 주소 변환: '{originalValue}' → '{transformedValue}'");
+                }
+            }
+
+            // 배송메세지 변환 ('★' 제거)
+            // - SQL 기준: SET 배송메세지 = REPLACE(배송메세지, '★', '') WHERE 배송메세지 LIKE '%★%'
+            // - 목적: 불필요한 특수기호 제거로 라벨 출력/DB 저장 호환성 개선
+            if (dataTable.Columns.Contains("배송메세지"))
+            {
+                var originalSpecialNote = row["배송메세지"]?.ToString() ?? string.Empty;
+                var transformedSpecialNote = RemoveFilledStarFromSpecialNote(originalSpecialNote);
+
+                if (!string.Equals(originalSpecialNote, transformedSpecialNote, StringComparison.Ordinal))
+                {
+                    row["배송메세지"] = transformedSpecialNote;
+                    hasChanges = true;
+                    Console.WriteLine($"📝 [행{rowNumber}] 배송메세지 '★' 제거: '{originalSpecialNote}' → '{transformedSpecialNote}'");
+                }
+            }
+
+            // 별표2 컬럼 처리 - 제주특별자치도 주소 감지
+            // - SQL 기준: SET 별표2 = '제주' WHERE 주소 LIKE '%제주특별%'
+            // - 주소에 '제주특별' 또는 '제주 특별'이 포함된 경우 별표2를 '제주'로 설정
+            // - 목적: 제주도 배송 구분을 위한 별표2 컬럼 활용
+            // - 중복 처리 방지: 데이터베이스 레벨 처리는 비활성화하여 메모리 내 처리만 수행
+            if (dataTable.Columns.Contains("별표2") && dataTable.Columns.Contains("주소"))
+            {
+                // 디버깅: 컬럼 존재 확인 로그
+                var logMessage = $"🔍 [행{rowNumber}] 별표2/주소 컬럼 확인: 별표2={dataTable.Columns.Contains("별표2")}, 주소={dataTable.Columns.Contains("주소")}";
+                Console.WriteLine(logMessage);
+                File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+            }
+            else
+            {
+                // 필요한 컬럼이 없는 경우 로그 출력
+                var logMessage = $"⚠️ [행{rowNumber}] 별표2 처리 건너뜀: 별표2컬럼={dataTable.Columns.Contains("별표2")}, 주소컬럼={dataTable.Columns.Contains("주소")}";
+                Console.WriteLine(logMessage);
+                File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+            }
+            
+            if (dataTable.Columns.Contains("별표2") && dataTable.Columns.Contains("주소"))
+            {
+                try
+                {
+                    // 안전한 데이터 추출
+                    var addressValue = row["주소"];
+                    var star2Value = row["별표2"];
+                    
+                    // 디버깅: 원본 데이터 확인
+                    var logMessage = $"🔍 [행{rowNumber}] 별표2 처리 시작: 주소타입={addressValue?.GetType().Name}, 별표2타입={star2Value?.GetType().Name}";
+                    Console.WriteLine(logMessage);
+                    File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                    
+                    // null 체크 및 문자열 변환
+                    var addressString = addressValue?.ToString() ?? string.Empty;
+                    var originalStar2String = star2Value?.ToString() ?? string.Empty;
+                    
+                    // 디버깅: 변환된 문자열 확인
+                    logMessage = $"🔍 [행{rowNumber}] 별표2 문자열 변환: 주소='{addressString}', 별표2='{originalStar2String}'";
+                    Console.WriteLine(logMessage);
+                    File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                    
+                    // 변환 로직 실행
+                    var transformedStar2String = TransformStar2ByAddress(originalStar2String, addressString);
+                    
+                    // 디버깅: 변환 결과 확인
+                    logMessage = $"🔍 [행{rowNumber}] 별표2 변환 결과: '{originalStar2String}' → '{transformedStar2String}'";
+                    Console.WriteLine(logMessage);
+                    File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                    
+                    // 값이 변경된 경우에만 업데이트
+                    if (!string.Equals(originalStar2String, transformedStar2String, StringComparison.Ordinal))
+                    {
+                        row["별표2"] = transformedStar2String;
+                        hasChanges = true;
+                        logMessage = $"⭐ [행{rowNumber}] 별표2 변환: '{originalStar2String}' → '{transformedStar2String}' (주소: {addressString})";
+                        Console.WriteLine(logMessage);
+                        File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                    }
+                    else
+                    {
+                        logMessage = $"ℹ️ [행{rowNumber}] 별표2 변환 없음: 값이 동일함";
+                        Console.WriteLine(logMessage);
+                        File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // 별표2 처리 중 오류 발생 시 로그 출력 후 계속 진행
+                    var errorMessage = $"⚠️ [DataTransformationService] 별표2 처리 오류 (행{rowNumber}): {ex.Message}";
+                    Console.WriteLine(errorMessage);
+                    File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorMessage}\n");
+                    
+                    var stackTraceMessage = $"⚠️ [DataTransformationService] 별표2 처리 오류 상세: {ex.StackTrace}";
+                    Console.WriteLine(stackTraceMessage);
+                    File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {stackTraceMessage}\n");
+                    // 오류가 발생해도 다른 변환 작업은 계속 진행
                 }
             }
 
@@ -976,6 +1102,92 @@ namespace LogisticManager.Services
         }
 
         /// <summary>
+        /// 주소 기반으로 별표2 컬럼을 변환하는 메서드 (SQL 로직 기준)
+        /// 
+        /// 🎯 주요 기능:
+        /// - 주소에 '제주특별' 또는 '제주 특별'이 포함된 경우 별표2를 '제주'로 설정
+        /// - SQL 로직과 동일한 규칙 적용
+        /// - 대소문자 구분 없이 처리
+        /// - 공백 포함 형태도 처리 ('제주 특별')
+        /// 
+        /// 🔄 변환 규칙:
+        /// - 주소 LIKE '%제주특별%' → 별표2 = '제주'
+        /// - 주소 LIKE '%제주 특별%' → 별표2 = '제주'
+        /// - 기타 주소: 원본 별표2 값 유지
+        /// 
+        /// 📋 변환 예시:
+        /// - "제주특별자치도 제주시" → 별표2: "제주"
+        /// - "제주 특별자치도 서귀포시" → 별표2: "제주"
+        /// - "제주특별자치도 서귀포시" → 별표2: "제주"
+        /// - "서울특별시 강남구" → 별표2: 원본 유지
+        /// - "부산광역시 해운대구" → 별표2: 원본 유지
+        /// 
+        /// ⚠️ 처리 방식:
+        /// - 대소문자 구분 없이 '제주특별' 또는 '제주 특별' 포함 여부 확인
+        /// - 주소가 null이거나 빈 문자열인 경우 원본 별표2 값 유지
+        /// - 예외 발생 시 원본 별표2 값 반환
+        /// 
+        /// 💡 사용 목적:
+        /// - 제주도 배송 구분을 위한 별표2 컬럼 활용
+        /// - 배송 시스템에서 제주도 특별 처리 대상 식별
+        /// - 물류 처리 시 제주도 배송 구분
+        /// - 데이터베이스 저장 시 제주도 배송 정보 포함
+        /// 
+        /// 🔧 SQL 대응:
+        /// ```sql
+        /// UPDATE orders 
+        /// SET 별표2 = '제주' 
+        /// WHERE 주소 LIKE '%제주특별%' OR 주소 LIKE '%제주 특별%'
+        /// ```
+        /// </summary>
+        /// <param name="originalStar2Value">원본 별표2 값</param>
+        /// <param name="addressValue">주소 값</param>
+        /// <returns>변환된 별표2 값</returns>
+        private string TransformStar2ByAddress(string originalStar2Value, string addressValue)
+        {
+            try
+            {
+                // 입력값 검증 및 안전한 처리
+                if (string.IsNullOrWhiteSpace(addressValue))
+                {
+                    return originalStar2Value ?? string.Empty;
+                }
+
+                // null 체크 및 안전한 문자열 처리
+                var safeOriginalValue = originalStar2Value ?? string.Empty;
+                var safeAddressValue = addressValue.Trim();
+
+                // 제주도 주소 패턴 확인 (대소문자 구분 없이)
+                bool isJejuAddress = safeAddressValue.Contains("제주특별", StringComparison.OrdinalIgnoreCase) || 
+                                   safeAddressValue.Contains("제주 특별", StringComparison.OrdinalIgnoreCase);
+
+                if (isJejuAddress)
+                {
+                    // SQL의 SET 별표2 = '제주' 로직 구현
+                    var transformedValue = "제주";
+                    var logMessage = $"⭐ [별표2 변환규칙] 제주특별자치도 주소 감지: 주소='{safeAddressValue}', 별표2 '{safeOriginalValue}' → '{transformedValue}'";
+                    Console.WriteLine(logMessage);
+                    File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                    return transformedValue;
+                }
+
+                // 조건에 맞지 않으면 원본 반환
+                return safeOriginalValue;
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"⚠️ [DataTransformationService] 별표2 변환 실패: 별표2={originalStar2Value}, 주소={addressValue} - {ex.Message}";
+                Console.WriteLine(errorMessage);
+                File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorMessage}\n");
+                
+                var stackTraceMessage = $"⚠️ [DataTransformationService] 별표2 변환 실패 상세: {ex.StackTrace}";
+                Console.WriteLine(stackTraceMessage);
+                File.AppendAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "star2_debug.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {stackTraceMessage}\n");
+                return originalStar2Value ?? string.Empty; // 변환 실패 시 원본 반환
+            }
+        }
+
+        /// <summary>
         /// 날짜/시간 데이터를 표준 형식으로 정규화하는 메서드
         /// 
         /// 🎯 주요 기능:
@@ -1041,6 +1253,37 @@ namespace LogisticManager.Services
             {
                 Console.WriteLine($"⚠️ [DataTransformationService] 날짜 변환 실패: {dateTimeValue} - {ex.Message}");
                 return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"); // 변환 실패 시 현재 시간 반환
+            }
+        }
+
+        /// <summary>
+        /// 배송메세지 내 '★' 문자를 제거 (SQL REPLACE 대응)
+        /// </summary>
+        /// <param name="specialNote">원본 배송메세지</param>
+        /// <returns>'★' 제거된 배송메세지</returns>
+        private string RemoveFilledStarFromSpecialNote(string specialNote)
+        {
+            if (string.IsNullOrEmpty(specialNote))
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                if (specialNote.Contains('★'))
+                {
+                    var before = specialNote;
+                    var after = specialNote.Replace("★", string.Empty);
+                    Console.WriteLine($"📝 [배송메세지 정제] '★' 제거: '{before}' → '{after}'");
+                    return after;
+                }
+
+                return specialNote;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ [DataTransformationService] 배송메세지 정제 실패: {ex.Message}");
+                return specialNote;
             }
         }
 

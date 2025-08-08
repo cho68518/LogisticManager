@@ -34,6 +34,11 @@ namespace LogisticManager.Services
         private readonly object _lockObject = new object();
 
         /// <summary>
+        /// 로그 파일 경로 (읽기 전용)
+        /// </summary>
+        public string LogFilePath => _logFilePath;
+
+        /// <summary>
         /// 로그 관리 서비스 생성자
         /// </summary>
         /// <param name="logFilePath">로그 파일 경로</param>

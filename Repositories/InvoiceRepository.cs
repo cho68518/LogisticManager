@@ -578,7 +578,8 @@ namespace LogisticManager.Repositories
             var sql = $@"
                 UPDATE {tableName}
                 SET 주소 = CONCAT(주소, '*')
-                WHERE 품목코드 IN ('{codeList}')";
+                WHERE 품목코드 IN ('{codeList}')
+                  AND RIGHT(주소, 1) <> '*'"; // 주소 끝에 이미 '*'가 있는 경우 중복 추가 방지
             
             // 쿼리 구성 설명:
             // 1. UPDATE {tableName}: 지정된 테이블명 사용
@@ -744,7 +745,7 @@ namespace LogisticManager.Repositories
         /// - LIKE 연산자 활용
         /// 
         /// 💡 사용법:
-        /// var marked = await repository.MarkJejuAddressAsync(new[] { "%제주특별%", "%제주 제주%" });
+        /// var marked = await repository.MarkJejuAddressAsync(new[] { "%제주특별%", "%제주 특별%" });
         /// </summary>
         /// <param name="addressPatterns">제주도 주소 패턴 목록</param>
         /// <returns>마킹된 행 수</returns>

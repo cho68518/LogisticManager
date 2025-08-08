@@ -68,6 +68,14 @@ namespace LogisticManager.Models
         [MaxLength(100, ErrorMessage = "쇼핑몰명은 100자를 초과할 수 없습니다.")]
         public string StoreName { get; set; } = string.Empty;
 
+        /// <summary>별표1</summary>
+        [MaxLength(50)]
+        public string Star1 { get; set; } = string.Empty;
+
+        /// <summary>별표2</summary>
+        [MaxLength(50)]
+        public string Star2 { get; set; } = string.Empty;
+
         #endregion
 
         #region 상품 정보
@@ -141,7 +149,7 @@ namespace LogisticManager.Models
             Console.WriteLine($"  - ZipCode: '{order.ZipCode ?? "(null)"}'");
             Console.WriteLine($"  - OptionName: '{order.OptionName ?? "(null)"}'");
             
-            return new InvoiceDto
+            var dto = new InvoiceDto
             {
                 RecipientName = order.RecipientName ?? string.Empty,
                 Phone1 = order.RecipientPhone1 ?? order.RecipientPhone ?? string.Empty,
@@ -153,6 +161,8 @@ namespace LogisticManager.Models
                 SpecialNote = order.ShippingMessage ?? order.SpecialNote ?? string.Empty,
                 OrderNumber = order.OrderNumber ?? string.Empty,
                 StoreName = order.MallName ?? order.StoreName ?? string.Empty,
+                Star1 = order.Star1 ?? string.Empty,
+                Star2 = order.Star2 ?? string.Empty,
                 CollectedAt = order.CollectionTime ?? DateTime.Now,
                 ProductName = order.InvoiceName ?? order.ProductName ?? string.Empty,
                 ProductCode = order.ProductCode ?? string.Empty,
@@ -164,6 +174,28 @@ namespace LogisticManager.Models
                 OrderStatus = order.OrderStatus ?? order.ProcessingStatus ?? string.Empty,
                 ShippingType = order.DeliverySend ?? order.ShippingType ?? string.Empty
             };
+
+            // 별표2 최종 보정 로직 (안전망)
+            // - 메모리 변환 또는 매핑 단계에서 누락되었을 경우를 대비해 주소를 재검사하여 '제주' 세팅
+            // - 주소에 '제주특별' 또는 '제주 특별'이 포함되면 별표2를 '제주'로 설정
+            try
+            {
+                if (string.IsNullOrWhiteSpace(dto.Star2))
+                {
+                    var addr = dto.Address?.Trim() ?? string.Empty;
+                    if (addr.Contains("제주특별", StringComparison.OrdinalIgnoreCase) ||
+                        addr.Contains("제주 특별", StringComparison.OrdinalIgnoreCase))
+                    {
+                        dto.Star2 = "제주";
+                    }
+                }
+            }
+            catch
+            {
+                // 보정 중 예외는 무시 (핵심 저장 로직 방해 금지)
+            }
+
+            return dto;
         }
 
         #endregion
