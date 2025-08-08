@@ -884,7 +884,7 @@ namespace LogisticManager.Processors
                 // 🆕 App.config에서 테이블명을 동적으로 읽어와서 사용
                 var tableName = GetTableName("Tables.Invoice.Dev");
                 var tableLog = $"🔍 대상 테이블: {tableName}";
-                progress?.Report(tableLog);
+                //progress?.Report(tableLog);
                 File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {tableLog}\n");
                 
                 // 테이블 존재 여부 확인
@@ -932,7 +932,8 @@ namespace LogisticManager.Processors
                     if (truncateSuccess)
                     {
                         // UI에 성공 메시지 전달
-                        var truncateSuccessLog = $"✅ 테이블 초기화 완료 (테이블: {tableName})";
+                        //var truncateSuccessLog = $"✅ 테이블 초기화 완료 (테이블: {tableName})";
+                        var truncateSuccessLog = $"✅ 테이블 초기화 완료";
                         progress?.Report(truncateSuccessLog);
                         File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {truncateSuccessLog}\n");
                         
@@ -986,7 +987,7 @@ namespace LogisticManager.Processors
                 
                 // ==================== 2단계: 타입 안전한 데이터 변환 ====================
                 var conversionLog = "🔄 데이터 변환 중... (DataTable → Order 객체)";
-                progress?.Report(conversionLog);
+                //progress?.Report(conversionLog);
                 File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {conversionLog}\n");
                 
                 // === DataTable에서 Order 객체로 안전한 변환 ===
