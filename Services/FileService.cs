@@ -10,6 +10,7 @@ namespace LogisticManager.Services
     /// 
     /// 주요 기능:
     /// - Excel 파일을 DataTable로 읽기 (ColumnMapping 적용)
+    /// - 읽어온 데이터의 값 변환 및 정규화 (DataTransformationService 사용)
     /// - DataTable을 Excel 파일로 저장
     /// - 파일 선택 대화상자 제공
     /// - 출력 파일 경로 생성
@@ -19,6 +20,7 @@ namespace LogisticManager.Services
     /// - EPPlus (Excel 파일 처리)
     /// - System.Data (DataTable 사용)
     /// - MappingService (컬럼 매핑 처리)
+    /// - DataTransformationService (데이터 값 변환 및 정규화)
     /// 
     /// 설정 파일:
     /// - settings.json에서 InputFolderPath, OutputFolderPath 읽기
@@ -27,8 +29,10 @@ namespace LogisticManager.Services
     /// 처리 과정:
     /// 1. 설정 파일에서 폴더 경로 읽기
     /// 2. EPPlus 라이센스 설정
-    /// 3. Excel 파일 읽기/쓰기 작업 수행 (매핑 적용)
-    /// 4. 오류 처리 및 로깅
+    /// 3. Excel 파일 읽기 (매핑 적용)
+    /// 4. 데이터 값 변환 및 정규화 수행
+    /// 5. Excel 파일 쓰기 작업 수행
+    /// 6. 오류 처리 및 로깅
     /// </summary>
     public class FileService
     {
@@ -52,6 +56,12 @@ namespace LogisticManager.Services
         /// </summary>
         private readonly MappingService _mappingService;
 
+        /// <summary>
+        /// 데이터 변환 서비스 인스턴스
+        /// 엑셀에서 읽어온 데이터의 값을 변환하고 정규화하는 서비스
+        /// </summary>
+        private readonly DataTransformationService _transformationService;
+
         #endregion
 
         #region 생성자 (Constructor)
@@ -64,6 +74,7 @@ namespace LogisticManager.Services
         /// 2. EPPlus 라이센스 설정 (NonCommercial)
         /// 3. 기본 폴더 경로 설정
         /// 4. MappingService 인스턴스 생성
+        /// 5. DataTransformationService 인스턴스 생성
         /// 
         /// 설정 파일 구조:
         /// - INPUT_FOLDER_PATH: 입력 파일 폴더 경로
@@ -112,6 +123,9 @@ namespace LogisticManager.Services
             
             // MappingService 인스턴스 생성
             _mappingService = new MappingService();
+            
+            // DataTransformationService 인스턴스 생성
+            _transformationService = new DataTransformationService();
         }
 
         #endregion
@@ -244,6 +258,12 @@ namespace LogisticManager.Services
                 }
 
                 Console.WriteLine($"✅ FileService: Excel 파일 읽기 완료 (매핑 적용) - {dataTable.Rows.Count}행, {dataTable.Columns.Count}열");
+                
+                // 📊 데이터 변환 및 정규화 수행
+                Console.WriteLine($"🔄 FileService: 데이터 변환 및 정규화 시작...");
+                dataTable = _transformationService.TransformData(dataTable);
+                Console.WriteLine($"✨ FileService: 데이터 변환 및 정규화 완료");
+                
                 return dataTable;
             }
             catch (Exception ex)

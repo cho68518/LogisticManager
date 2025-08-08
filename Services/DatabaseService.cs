@@ -42,6 +42,12 @@ namespace LogisticManager.Services
         /// Excel 컬럼명과 데이터베이스 컬럼명 간의 매핑 처리
         /// </summary>
         private readonly MappingService _mappingService;
+        
+        /// <summary>
+        /// 로그 파일 관리를 위한 서비스
+        /// 로그 파일 크기 자동 관리 및 클리어 기능
+        /// </summary>
+        private readonly LogManagementService _logManagementService;
 
         #endregion
 
@@ -106,6 +112,9 @@ namespace LogisticManager.Services
             
             // MappingService 인스턴스 생성
             _mappingService = new MappingService();
+            
+            // 로그 관리 서비스 초기화
+            _logManagementService = new LogManagementService();
             
             Console.WriteLine("✅ DatabaseService 초기화 완료");
         }
@@ -173,6 +182,42 @@ namespace LogisticManager.Services
             // 기본값 반환
             Console.WriteLine("🔄 기본값을 사용합니다.");
             return ("gramwonlogis2.mycafe24.com", "gramwonlogis2", "gramwonlogis2", "jung5516!", "3306");
+        }
+
+        #endregion
+
+        #region 로그 관리 헬퍼 메서드
+
+        /// <summary>
+        /// 로그 파일에 안전하게 메시지 작성 (크기 관리 포함)
+        /// 
+        /// 🎯 주요 기능:
+        /// - 로그 파일 크기 자동 체크 및 필요시 클리어
+        /// - 스레드 안전한 로그 작성
+        /// - 예외 발생 시 안전한 처리
+        /// 
+        /// 💡 사용 목적:
+        /// - 로그 파일 크기 자동 관리
+        /// - 시스템 안정성 보장
+        /// - 로그 작성 성능 최적화
+        /// </summary>
+        /// <param name="message">작성할 로그 메시지</param>
+        private void WriteLogSafely(string message)
+        {
+            try
+            {
+                // 로그 파일 크기 체크 및 필요시 클리어
+                _logManagementService.CheckAndClearLogFileIfNeeded();
+                
+                // 로그 파일에 메시지 작성
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}\n");
+            }
+            catch (Exception ex)
+            {
+                // 로그 작성 실패 시 콘솔에만 출력 (시스템 안정성 보장)
+                Console.WriteLine($"[DatabaseService] 로그 작성 실패: {ex.Message}");
+            }
         }
 
         #endregion
@@ -571,7 +616,7 @@ namespace LogisticManager.Services
                     await connection.OpenAsync();
                     var startLog = $"[DatabaseService] 매개변수화된 트랜잭션 시작 (시도 {retry + 1}/{maxRetries + 1})";
                     Console.WriteLine(startLog);
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {startLog}\n");
+                    WriteLogSafely(startLog);
                     
                     // 트랜잭션 시작
                     using var transaction = await connection.BeginTransactionAsync();
@@ -591,9 +636,9 @@ namespace LogisticManager.Services
                             Console.WriteLine(queryLog);
                             Console.WriteLine(sqlLog);
                             Console.WriteLine(paramLog);
-                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {queryLog}\n");
-                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {sqlLog}\n");
-                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paramLog}\n");
+                            WriteLogSafely(queryLog);
+                            WriteLogSafely(sqlLog);
+                            WriteLogSafely(paramLog);
                             
                             try
                             {
@@ -612,7 +657,7 @@ namespace LogisticManager.Services
                                 
                                 var successLog = $"[DatabaseService] 쿼리 {queryCount} 성공 - 영향받은 행: {affectedRows}";
                                 Console.WriteLine(successLog);
-                                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {successLog}\n");
+                                WriteLogSafely(successLog);
                             }
                             catch (MySqlException ex) when (ex.Number == 1205 || // 데드락
                                                           ex.Number == 1213 || // 데드락 감지

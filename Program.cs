@@ -47,6 +47,15 @@ namespace LogisticManager
         [STAThread]
         static void Main()
         {
+            // 로그 관리 서비스 초기화
+            var logManagementService = new LogManagementService();
+            
+            // 로그 파일 크기 체크 및 필요시 클리어
+            logManagementService.CheckAndClearLogFileIfNeeded();
+            
+            // 로그 파일 상태 출력
+            logManagementService.PrintLogFileStatus();
+            
             // 로그 파일에 시작 기록
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
             File.AppendAllText(logPath, $"=== 애플리케이션 시작: {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===\n");

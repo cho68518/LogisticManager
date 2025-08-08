@@ -169,6 +169,7 @@ namespace LogisticManager.Services
         /// - 대용량 데이터 처리를 위한 스트리밍 지원
         /// </summary>
         private readonly IInvoiceRepository _repository;
+        private readonly LogManagementService _logManagementService;
         
         /// <summary>
         /// 현재 배치 크기 - 실시간 적응형 성능 조정의 핵심 상태 변수
@@ -291,18 +292,58 @@ namespace LogisticManager.Services
                 "IInvoiceRepository는 BatchProcessorService의 핵심 의존성입니다. " +
                 "의존성 주입 설정을 확인하거나 유효한 Repository 구현체를 제공해주세요.");
             
-            // === 2단계: 배치 처리 시스템 초기 상태 설정 ===
+            // === 2단계: 로그 관리 서비스 초기화 ===
+            // 로그 파일 크기 자동 관리 기능 추가
+            _logManagementService = new LogManagementService();
+            
+            // === 3단계: 배치 처리 시스템 초기 상태 설정 ===
             // 현재 배치 크기를 경험적 최적값으로 초기화
             // 이후 시스템 성능에 따라 동적으로 조정됨
             _currentBatchSize = DEFAULT_BATCH_SIZE;
             
-            // === 3단계: 고성능 배치 처리 엔진 준비 완료 로그 ===
+            // === 4단계: 고성능 배치 처리 엔진 준비 완료 로그 ===
             // 개발 및 운영 환경에서 초기화 상태 확인을 위한 로그 출력
             Console.WriteLine("✅ [BatchProcessorService] 초기화 완료");
             Console.WriteLine($"   🎯 초기 배치 크기: {_currentBatchSize}건");
             Console.WriteLine($"   📊 메모리 임계치: {MEMORY_THRESHOLD_MB}MB");
             Console.WriteLine($"   🔧 배치 크기 범위: {MIN_BATCH_SIZE}~{MAX_BATCH_SIZE}건");
             Console.WriteLine($"   🏗️ Repository 타입: {repository.GetType().Name}");
+        }
+
+        #endregion
+
+        #region 로그 관리 헬퍼 메서드
+
+        /// <summary>
+        /// 로그 파일에 안전하게 메시지 작성 (크기 관리 포함)
+        /// 
+        /// 🎯 주요 기능:
+        /// - 로그 파일 크기 자동 체크 및 필요시 클리어
+        /// - 스레드 안전한 로그 작성
+        /// - 예외 발생 시 안전한 처리
+        /// 
+        /// 💡 사용 목적:
+        /// - 로그 파일 크기 자동 관리
+        /// - 시스템 안정성 보장
+        /// - 로그 작성 성능 최적화
+        /// </summary>
+        /// <param name="message">작성할 로그 메시지</param>
+        private void WriteLogSafely(string message)
+        {
+            try
+            {
+                // 로그 파일 크기 체크 및 필요시 클리어
+                _logManagementService.CheckAndClearLogFileIfNeeded();
+                
+                // 로그 파일에 메시지 작성
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}\n");
+            }
+            catch (Exception ex)
+            {
+                // 로그 작성 실패 시 콘솔에만 출력 (시스템 안정성 보장)
+                Console.WriteLine($"[BatchProcessorService] 로그 작성 실패: {ex.Message}");
+            }
         }
 
         #endregion
@@ -476,7 +517,7 @@ namespace LogisticManager.Services
             // === 상세 로깅 시작 ===
             var startLog = $"[원본데이터적재] 대용량 데이터 처리 시작 - 총 {totalCount:N0}건, 테이블: {targetTableName}";
             progress?.Report($"🚀 {startLog}");
-            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {startLog}\n");
+            WriteLogSafely(startLog);
             
             // === 데이터 유효성 사전 검사 ===
             var validOrderCount = orderList.Count(o => o.IsValid());
@@ -484,12 +525,12 @@ namespace LogisticManager.Services
             
             var validationLog = $"[원본데이터적재] 데이터 유효성 사전 검사 - 유효: {validOrderCount:N0}건, 무효: {invalidOrderCount:N0}건";
             progress?.Report($"🔍 {validationLog}");
-            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {validationLog}\n");
+            WriteLogSafely(validationLog);
             
             if (invalidOrderCount > 0)
             {
                 var invalidDetailsLog = $"[원본데이터적재] 무효 데이터 상세 분석:";
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {invalidDetailsLog}\n");
+                WriteLogSafely(invalidDetailsLog);
                 
                 var invalidOrders = orderList.Where(o => !o.IsValid()).Take(10).ToList(); // 처음 10건만 로그
                 foreach (var invalidOrder in invalidOrders)
@@ -505,7 +546,7 @@ namespace LogisticManager.Services
                         invalidFields.Add("수량");
 
                     var detailLog = $"[원본데이터적재]   - 주문번호: {invalidOrder.OrderNumber ?? "(없음)"}, 무효필드: {string.Join(", ", invalidFields)}";
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {detailLog}\n");
+                    WriteLogSafely(detailLog);
                 }
             }
 
@@ -514,7 +555,7 @@ namespace LogisticManager.Services
                 // 메모리 사용량 확인 및 배치 크기 최적화
                 var memoryLog = $"[원본데이터적재] 메모리 상태 확인 - 초기 배치 크기: {_currentBatchSize}건";
                 progress?.Report($"💾 {memoryLog}");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {memoryLog}\n");
+                WriteLogSafely(memoryLog);
                 
                 OptimizeBatchSize();
                 
@@ -529,7 +570,7 @@ namespace LogisticManager.Services
                     
                     var batchStartLog = $"[원본데이터적재] 배치 {batchNumber} 시작 - 범위: {i+1}~{endIndex} ({batchOrders.Count}건)";
                     progress?.Report($"📦 {batchStartLog}");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {batchStartLog}\n");
+                    WriteLogSafely(batchStartLog);
                     
                     try
                     {
