@@ -491,10 +491,10 @@ namespace LogisticManager.Processors
                 // - 단위 테스트 가능한 구조로 데이터 정제 로직 품질 보장
                 // - 트랜잭션 처리로 부분 실패 시에도 데이터 일관성 유지
                 
-                finalProgress?.Report("🔧 [3단계] 1차 데이터 정제 및 비즈니스 규칙 적용 중...");
+                finalProgress?.Report("🔧 [3단계] 비즈니스 규칙 적용 중...");
                 await ProcessFirstStageDataOptimized(finalProgress);
                 finalProgressReporter?.Report(20);
-                finalProgress?.Report("✅ [3단계 완료] 데이터 품질 향상 및 비즈니스 규칙 적용 완료");
+                finalProgress?.Report("✅ [3단계 완료] 비즈니스 규칙 적용 완료");
 
                 // ==================== 4단계: 고급 특수 처리 및 비즈니스 로직 적용 (20-60%) [현재 비활성화] ====================
                 
@@ -1277,7 +1277,7 @@ namespace LogisticManager.Processors
             try
             {
                 // === 1차 데이터 가공 프로세스 시작 알림 ===
-                progress?.Report("🔧 1차 데이터 가공 시작: Repository 패턴 적용된 단계별 처리");
+                //progress?.Report("🔧 1차 데이터 가공 시작: Repository 패턴 적용된 단계별 처리");
                 
                 // ==================== 1단계: 특정 품목코드 주문건의 주소에 별표 마킹 ====================
                 // 품목코드 "7710", "7720"에 해당하는 주문건의 주소 앞에 별표(*) 추가
@@ -2812,6 +2812,7 @@ namespace LogisticManager.Processors
                                         if (nullableColumns.Contains(columnName))
                                         {
                                             parameters[$"@{columnName}"] = DBNull.Value;
+                                            Console.WriteLine($"🔧 행 {insertedCount + 1} 컬럼 '{columnName}' NULL 설정 (허용됨)");
                                         }
                                         else
                                         {
@@ -2834,6 +2835,7 @@ namespace LogisticManager.Processors
                                         else
                                         {
                                             parameters[$"@{columnName}"] = stringValue;
+                                            Console.WriteLine($"🔧 행 {insertedCount + 1} 컬럼 '{columnName}' 값 설정: '{stringValue}'");
                                         }
                                     }
                                 }
@@ -2843,6 +2845,7 @@ namespace LogisticManager.Processors
                                     if (nullableColumns.Contains(columnName))
                                     {
                                         parameters[$"@{columnName}"] = DBNull.Value;
+                                        Console.WriteLine($"🔧 행 {insertedCount + 1} 컬럼 '{columnName}' NULL 설정 (엑셀에 없음, 허용됨)");
                                     }
                                     else
                                     {

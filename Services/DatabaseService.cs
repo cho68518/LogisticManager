@@ -1021,18 +1021,22 @@ namespace LogisticManager.Services
         /// 
         /// 📋 주요 기능:
         /// - 익명 객체를 Dictionary&lt;string, object&gt;로 변환
+        /// - 이미 Dictionary인 경우 그대로 반환
         /// - 리플렉션을 사용한 프로퍼티 추출
         /// - null 안전성 보장
         /// - 매개변수 접두사 자동 추가 (@)
         /// 
         /// 🔄 처리 과정:
-        /// 1. 입력 객체의 프로퍼티들을 리플렉션으로 추출
-        /// 2. 각 프로퍼티 이름에 @ 접두사 추가
-        /// 3. null 값을 DBNull.Value로 변환
-        /// 4. Dictionary 형태로 반환
+        /// 1. 입력 객체가 이미 Dictionary인지 확인
+        /// 2. Dictionary인 경우 그대로 반환
+        /// 3. 그렇지 않은 경우 리플렉션으로 프로퍼티 추출
+        /// 4. 각 프로퍼티 이름에 @ 접두사 추가
+        /// 5. null 값을 DBNull.Value로 변환
+        /// 6. Dictionary 형태로 반환
         /// 
         /// 💡 사용 목적:
         /// - 익명 객체를 SQL 매개변수로 변환
+        /// - 이미 Dictionary인 경우 처리
         /// - 매개변수화된 쿼리 지원
         /// - SQL 인젝션 방지
         /// - 타입 안전성 보장
@@ -1048,8 +1052,11 @@ namespace LogisticManager.Services
         /// 
         /// var dict2 = ConvertObjectToDictionary(new { value = (string?)null });
         /// // 결과: { "@value": DBNull.Value }
+        /// 
+        /// var dict3 = ConvertObjectToDictionary(new Dictionary<string, object> { { "@key", "value" } });
+        /// // 결과: { "@key": "value" } (그대로 반환)
         /// </summary>
-        /// <param name="obj">변환할 객체 (익명 객체 등)</param>
+        /// <param name="obj">변환할 객체 (익명 객체, Dictionary 등)</param>
         /// <returns>Dictionary 형태의 매개변수 (키: @프로퍼티명, 값: 프로퍼티값)</returns>
         private Dictionary<string, object> ConvertObjectToDictionary(object obj)
         {
@@ -1061,6 +1068,18 @@ namespace LogisticManager.Services
             
             try
             {
+                // 이미 Dictionary<string, object>인 경우 그대로 반환
+                if (obj is Dictionary<string, object> existingDict)
+                {
+                    // 기존 Dictionary의 값들을 복사하면서 null 값을 DBNull.Value로 변환
+                    foreach (var kvp in existingDict)
+                    {
+                        dictionary[kvp.Key] = kvp.Value ?? DBNull.Value;
+                    }
+                    Console.WriteLine($"✅ DatabaseService: 기존 Dictionary 사용 - {dictionary.Count}개 매개변수");
+                    return dictionary;
+                }
+                
                 // 리플렉션을 사용하여 객체의 프로퍼티들 추출
                 var properties = obj.GetType().GetProperties();
                 
