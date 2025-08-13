@@ -444,6 +444,80 @@ namespace LogisticManager.Services
 
         #endregion
 
+        #region Excel 파일 저장 (헤더 없음) (Excel File Saving without Header)
+
+        /// <summary>
+        /// DataTable을 Excel 파일로 저장하는 메서드 (헤더 없음)
+        /// 
+        /// 처리 과정:
+        /// 1. 출력 디렉토리 존재 확인 및 생성
+        /// 2. EPPlus를 사용하여 새로운 Excel 파일 생성
+        /// 3. 워크시트 생성 및 이름 설정
+        /// 4. 헤더 행 작성하지 않음 (header=False)
+        /// 5. 데이터 행들을 Excel에 작성
+        /// 6. 파일 저장 및 리소스 해제
+        /// 
+        /// 파일 형식:
+        /// - .xlsx 확장자 사용
+        /// - 첫 번째 행부터 데이터 시작 (헤더 없음)
+        /// - 모든 데이터는 문자열로 저장
+        /// 
+        /// 예외 처리:
+        /// - DirectoryNotFoundException: 디렉토리 생성 실패
+        /// - IOException: 파일 쓰기 오류
+        /// - UnauthorizedAccessException: 파일 접근 권한 오류
+        /// </summary>
+        /// <param name="dataTable">저장할 데이터</param>
+        /// <param name="filePath">저장할 파일 경로</param>
+        /// <param name="sheetName">워크시트 이름 (기본값: "Sheet1")</param>
+        /// <returns>저장 성공 여부</returns>
+        public bool SaveDataTableToExcelWithoutHeader(DataTable dataTable, string filePath, string sheetName = "Sheet1")
+        {
+            try
+            {
+                // 출력 디렉토리 존재 확인 및 생성
+                var directoryPath = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directoryPath))
+                {
+                    EnsureDirectoryExists(directoryPath);
+                }
+
+                // EPPlus를 사용하여 새로운 Excel 파일 생성
+                using (var package = new ExcelPackage())
+                {
+                    // 워크시트 생성 및 이름 설정
+                    var worksheet = package.Workbook.Worksheets.Add(sheetName);
+
+                    // 헤더 행 작성하지 않음 (header=False)
+                    // 데이터 행들을 Excel에 작성 (첫 번째 행부터 시작)
+                    for (int row = 0; row < dataTable.Rows.Count; row++)
+                    {
+                        for (int col = 0; col < dataTable.Columns.Count; col++)
+                        {
+                            var cellValue = dataTable.Rows[row][col]?.ToString() ?? string.Empty;
+                            worksheet.Cells[row + 1, col + 1].Value = cellValue; // +1이 아닌 +1 (헤더 없음)
+                        }
+                    }
+
+                    // 컬럼 너비 자동 조정
+                    worksheet.Cells.AutoFitColumns();
+
+                    // 파일 저장
+                    package.SaveAs(new FileInfo(filePath));
+                }
+
+                Console.WriteLine($"✅ FileService: Excel 파일 저장 완료 (헤더 없음) - {filePath}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ FileService: Excel 파일 저장 실패 (헤더 없음): {ex.Message}");
+                return false;
+            }
+        }
+
+        #endregion
+
         #region 파일 선택 및 경로 관리 (File Selection and Path Management)
 
         /// <summary>

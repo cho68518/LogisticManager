@@ -750,6 +750,19 @@ namespace LogisticManager.Services
 
         #endregion
 
+        #region 연결 문자열 관리 (Connection String Management)
+
+        /// <summary>
+        /// 현재 데이터베이스 연결 문자열을 반환하는 메서드
+        /// </summary>
+        /// <returns>데이터베이스 연결 문자열</returns>
+        public string GetConnectionString()
+        {
+            return _connectionString;
+        }
+
+        #endregion
+
         #region Excel 데이터 삽입 (Excel Data Insertion)
 
         /// <summary>

@@ -1,0 +1,71 @@
+DELIMITER $$
+
+DROP PROCEDURE IF EXISTS sp_ProcessStarInvoice$$
+
+CREATE PROCEDURE sp_ProcessStarInvoice()
+BEGIN
+    -- 루프 종료를 위한 변수
+    DECLARE done INT DEFAULT FALSE;
+
+    -- 별표송장 테이블의 각 컬럼 값을 저장할 변수 선언
+    DECLARE var_품번코드   VARCHAR(255);
+    DECLARE var_상품명     VARCHAR(255);
+    DECLARE var_배송메세지 VARCHAR(255);
+    DECLARE var_수취인명   VARCHAR(255);
+    DECLARE var_적요       VARCHAR(255);
+	DECLARE var_내용       VARCHAR(255);
+
+    DECLARE cur CURSOR FOR SELECT 품번코드, 상품, 배송메세지, 수취인명 FROM 별표송장;
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+
+    -- EXIT: 핸들러 실행 후 프로시저 종료
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        SELECT '오류가 발생하여 모든 작업이 롤백되었습니다.' AS ErrorMessage;
+    END;
+
+    START TRANSACTION;
+
+    -- 커서 열기
+    OPEN cur;
+
+    read_loop: LOOP
+        FETCH cur INTO TRIM(var_품번코드), TRIM(var_상품명), TRIM(var_배송메세지), TRIM(var_수취인명);
+
+        IF done THEN
+            LEAVE read_loop;
+        END IF;
+
+        -- 조건 1: 품번코드 또는 상품명이 비어있지 않은 경우
+        IF (var_품번코드 IS NOT NULL AND var_품번코드 != '') OR (var_상품명 IS NOT NULL AND var_상품명 != '') THEN
+            INSERT INTO 송장출력_관리자 (품절제품코드, 상품명)
+            VALUES (var_품번코드, var_상품명);
+        END IF;
+
+        -- 조건 2: 배송메세지가 비어있지 않은 경우
+        IF var_배송메세지 IS NOT NULL AND var_배송메세지 != '' THEN
+            INSERT INTO 송장출력_관리자_배송메세지 (배송메세지)
+            VALUES (var_배송메세지);
+        END IF;
+
+        -- 조건 3: 수취인명이 비어있지 않은 경우
+        IF var_수취인명 IS NOT NULL AND var_수취인명 != '' THEN
+            INSERT INTO 송장출력_관리자_이름 (수취인명)
+            VALUES (var_수취인명);
+        END IF;
+
+    END LOOP;
+
+    -- 커서 닫기
+    CLOSE cur;
+
+    -- 모든 작업이 오류 없이 완료되었으면 최종 적용(커밋)
+    COMMIT;
+    -- 성공 메시지 반환
+    SELECT '작업완료.' AS SuccessMessage;
+
+END$$
+
+DELIMITER ;

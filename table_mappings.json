@@ -1,4 +1,86 @@
 {
+  "송장출력_톡딜불가": {
+    "tableName": "송장출력_톡딜불가",
+    "columns": [
+      {
+        "propertyName": "Id",
+        "databaseColumn": "id",
+        "dataType": "INT",
+        "isRequired": true,
+        "isAutoIncrement": true,
+        "isPrimaryKey": true,
+        "excludeFromInsert": true
+      },
+      {
+        "propertyName": "ShoppingMall",
+        "databaseColumn": "쇼핑몰",
+        "dataType": "VARCHAR(255)",
+        "isRequired": false,
+        "description": "쇼핑몰명"
+      },
+      {
+        "propertyName": "ProductCode",
+        "databaseColumn": "품목코드",
+        "dataType": "VARCHAR(255)",
+        "isRequired": false,
+        "description": "상품 품목 코드"
+      },
+      {
+        "propertyName": "ProductName",
+        "databaseColumn": "상품명",
+        "dataType": "VARCHAR(255)",
+        "isRequired": false,
+        "description": "상품명"
+      },
+      {
+        "propertyName": "RequiredCode1",
+        "databaseColumn": "필수코드1",
+        "dataType": "VARCHAR(255)",
+        "isRequired": false,
+        "description": "1차 필수 분류 코드"
+      },
+      {
+        "propertyName": "RequiredCode1ProductName",
+        "databaseColumn": "필수코드1상품명",
+        "dataType": "VARCHAR(255)",
+        "isRequired": false,
+        "description": "1차 필수 분류 코드에 해당하는 상품명"
+      },
+      {
+        "propertyName": "RequiredCode2",
+        "databaseColumn": "필수코드2",
+        "dataType": "VARCHAR(255)",
+        "isRequired": false,
+        "description": "2차 필수 분류 코드"
+      },
+      {
+        "propertyName": "RequiredCode2ProductName",
+        "databaseColumn": "필수코드2상품명",
+        "dataType": "VARCHAR(255)",
+        "isRequired": false,
+        "description": "2차 필수 분류 코드에 해당하는 상품명"
+      },
+      {
+        "propertyName": "RequiredCode3",
+        "databaseColumn": "필수코드3",
+        "dataType": "VARCHAR(255)",
+        "isRequired": false,
+        "description": "3차 필수 분류 코드"
+      },
+      {
+        "propertyName": "RequiredCode3ProductName",
+        "databaseColumn": "필수코드3상품명",
+        "dataType": "VARCHAR(255)",
+        "isRequired": false,
+        "description": "3차 필수 분류 코드에 해당하는 상품명"
+      }
+    ],
+    "description": "톡딜 불가 상품 정보 테이블 - 필수코드 기반 상품 분류",
+    "businessPurpose": "톡딜 배송이 불가능한 상품들을 체계적으로 분류하고 관리",
+    "dataSource": "쇼핑몰별 상품 분류 데이터",
+    "updateFrequency": "일간",
+    "dataRetention": "1년"
+  },
   "송장출력_사방넷원본변환_Dev": {
     "tableName": "송장출력_사방넷원본변환_Dev",
     "columns": [

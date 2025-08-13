@@ -99,6 +99,16 @@ namespace LogisticManager.Forms
         private Button btnDropboxTest = null!;
 
         /// <summary>
+        /// 판매입력 데이터 처리 버튼 - ProcessSalesInputData 메서드를 독립적으로 실행
+        /// </summary>
+        private Button btnSalesDataProcess = null!;
+
+        /// <summary>
+        /// 디버그용 판매입력 데이터 처리 버튼 - 문제 진단용
+        /// </summary>
+        private Button btnDebugSalesData = null!;
+
+        /// <summary>
         /// KakaoWork 테스트 버튼
         /// </summary>
         private Button btnKakaoWorkTest = null!;
@@ -224,6 +234,15 @@ namespace LogisticManager.Forms
             btnStartProcess.Enabled = false;  // 파일이 선택되기 전까지 비활성화
             btnStartProcess.Click += BtnStartProcess_Click;
 
+            // 판매입력 데이터 처리 버튼 생성 및 설정 (독립 실행용) - 현재 숨김 처리
+            btnSalesDataProcess = CreateModernButton("📊 판매입력 데이터 처리", new Point(180, 160), new Size(150, 45), Color.FromArgb(155, 89, 182));
+            btnSalesDataProcess.Click += BtnSalesDataProcess_Click;
+            btnSalesDataProcess.Visible = false; // 버튼 숨김 처리
+
+            // 디버그용 버튼 (임시)
+            btnDebugSalesData = CreateModernButton("🐛 디버그: 판매입력", new Point(340, 160), new Size(120, 45), Color.FromArgb(231, 76, 60));
+            btnDebugSalesData.Click += BtnDebugSalesData_Click;
+
             // 진행률 표시바 생성 및 설정
             progressBar = new ProgressBar
             {
@@ -275,6 +294,7 @@ namespace LogisticManager.Forms
                 btnKakaoWorkTest,
                 btnExit,
                 btnStartProcess,
+                btnSalesDataProcess,
                 progressBar,
                 lblStatus,
                 txtLog
@@ -682,6 +702,125 @@ namespace LogisticManager.Forms
                 btnStartProcess.Enabled = true;
                 btnSelectFile.Enabled = true;
                 btnSettings.Enabled = true;
+            }
+        }
+
+        #endregion
+
+        #region 판매입력 데이터 처리 (Sales Data Processing)
+
+        /// <summary>
+        /// 판매입력 데이터 처리 버튼 클릭 이벤트 핸들러
+        /// ProcessSalesInputData 메서드를 독립적으로 실행
+        /// </summary>
+        /// <param name="sender">이벤트 발생 객체</param>
+        /// <param name="e">이벤트 인수</param>
+        private async void BtnSalesDataProcess_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                // UI 상태 변경
+                btnSalesDataProcess.Enabled = false;
+                btnSalesDataProcess.Text = "처리 중...";
+                lblStatus.Text = "판매입력 데이터 처리 중...";
+                lblStatus.ForeColor = Color.FromArgb(243, 156, 18);
+
+                LogMessage("📊 판매입력 데이터 처리 시작...");
+
+                // InvoiceProcessor 인스턴스 생성
+                var processor = new InvoiceProcessor(_fileService, _databaseService, _apiService);
+
+                // ProcessSalesInputData 메서드 직접 호출
+                var result = await processor.ProcessSalesInputData();
+
+                if (result)
+                {
+                    LogMessage("✅ 판매입력 데이터 처리가 성공적으로 완료되었습니다!");
+                    lblStatus.Text = "판매입력 데이터 처리 완료";
+                    lblStatus.ForeColor = Color.FromArgb(46, 204, 113);
+                    MessageBox.Show("판매입력 데이터 처리가 성공적으로 완료되었습니다!", "완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    LogMessage("❌ 판매입력 데이터 처리에 실패했습니다.");
+                    lblStatus.Text = "판매입력 데이터 처리 실패";
+                    lblStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                    MessageBox.Show("판매입력 데이터 처리에 실패했습니다.\n\n로그 파일(app.log)을 확인하여 상세 오류 내용을 파악하세요.", "실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"❌ 판매입력 데이터 처리 중 오류가 발생했습니다: {ex.Message}");
+                lblStatus.Text = "오류 발생";
+                lblStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                MessageBox.Show($"판매입력 데이터 처리 중 오류가 발생했습니다:\n{ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                // UI 상태 복원
+                btnSalesDataProcess.Enabled = true;
+                btnSalesDataProcess.Text = "📊 판매입력 데이터 처리";
+            }
+        }
+
+        #endregion
+
+        #region 디버그 메서드 (Debug Methods)
+
+        /// <summary>
+        /// 디버그용 판매입력 데이터 처리 버튼 클릭 이벤트 핸들러
+        /// ProcessSalesInputData 메서드만 독립적으로 실행하여 문제 진단
+        /// </summary>
+        /// <param name="sender">이벤트 발생 객체</param>
+        /// <param name="e">이벤트 인수</param>
+        private async void BtnDebugSalesData_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                // UI 상태 변경
+                btnDebugSalesData.Enabled = false;
+                btnDebugSalesData.Text = "디버그 중...";
+                lblStatus.Text = "디버그: 판매입력 데이터 처리 중...";
+                lblStatus.ForeColor = Color.FromArgb(243, 156, 18);
+
+                LogMessage("🐛 디버그: 판매입력 데이터 처리 시작...");
+
+                // InvoiceProcessor 인스턴스 생성
+                var processor = new InvoiceProcessor(_fileService, _databaseService, _apiService);
+
+                // ProcessSalesInputData 메서드 직접 호출
+                LogMessage("🐛 ProcessSalesInputData 메서드 호출 시작...");
+                var result = await processor.ProcessSalesInputData();
+                LogMessage($"🐛 ProcessSalesInputData 메서드 호출 완료 - 결과: {result}");
+
+                if (result)
+                {
+                    LogMessage("✅ 디버그: 판매입력 데이터 처리가 성공적으로 완료되었습니다!");
+                    lblStatus.Text = "디버그: 판매입력 데이터 처리 완료";
+                    lblStatus.ForeColor = Color.FromArgb(46, 204, 113);
+                    MessageBox.Show("디버그: 판매입력 데이터 처리가 성공적으로 완료되었습니다!", "디버그 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    LogMessage("❌ 디버그: 판매입력 데이터 처리에 실패했습니다.");
+                    lblStatus.Text = "디버그: 판매입력 데이터 처리 실패";
+                    lblStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                    MessageBox.Show("디버그: 판매입력 데이터 처리에 실패했습니다.\n\n로그 파일(app.log)을 확인하여 상세 오류 내용을 파악하세요.", "디버그 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"❌ 디버그: 판매입력 데이터 처리 중 오류가 발생했습니다: {ex.Message}");
+                LogMessage($"❌ 디버그: 상세 오류: {ex.StackTrace}");
+                lblStatus.Text = "디버그: 오류 발생";
+                lblStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                MessageBox.Show($"디버그: 판매입력 데이터 처리 중 오류가 발생했습니다:\n{ex.Message}\n\n상세 오류:\n{ex.StackTrace}", "디버그 오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                // UI 상태 복원
+                btnDebugSalesData.Enabled = true;
+                btnDebugSalesData.Text = "🐛 디버그: 판매입력";
             }
         }
 

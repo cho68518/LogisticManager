@@ -6,6 +6,10 @@ using LogisticManager.Repositories;
 using System.Collections.Generic;
 using System.Linq;
 using System.Globalization;
+using System.Text.Json;
+using System.Text;
+using MySqlConnector;
+using System.IO;
 
 namespace LogisticManager.Processors
 {
@@ -93,6 +97,19 @@ namespace LogisticManager.Processors
         /// 🔗 의존성: BatchProcessorService
         /// </summary>
         private readonly BatchProcessorService _batchProcessor;
+        
+        /// <summary>
+        /// 데이터베이스 서비스 - MySQL 데이터베이스 연결 및 쿼리 실행 담당
+        /// 
+        /// 📋 주요 기능:
+        /// - MySQL 데이터베이스 연결 관리
+        /// - SQL 쿼리 실행 (SELECT, INSERT, UPDATE, DELETE)
+        /// - 트랜잭션 처리
+        /// - 연결 문자열 관리
+        /// 
+        /// 🔗 의존성: DatabaseService
+        /// </summary>
+        private readonly DatabaseService _databaseService;
         
         /// <summary>
         /// API 서비스 - Dropbox 업로드, Kakao Work 알림 담당
@@ -199,8 +216,9 @@ namespace LogisticManager.Processors
             // - 트랜잭션 처리: ACID 속성을 보장하는 안전한 데이터 처리
             // - 매개변수화된 쿼리: SQL 인젝션 공격 방지
             // - 연결 상태 모니터링: 자동 재연결 및 오류 복구
-            var dbService = databaseService ?? throw new ArgumentNullException(nameof(databaseService), 
+            _databaseService = databaseService ?? throw new ArgumentNullException(nameof(databaseService), 
                 "DatabaseService는 필수 서비스입니다. MySQL 데이터베이스 연결을 담당합니다.");
+            var dbService = _databaseService; // 기존 코드와의 호환성을 위한 변수
             
             // === ApiService 검증: 외부 API 통합 서비스 ===
             // - Dropbox API: 파일 업로드 및 공유 링크 생성
@@ -478,7 +496,7 @@ namespace LogisticManager.Processors
                 //    - 배송 시스템 호환성 및 고객 경험 개선
                 // 
                 // 4. **주소 표기 표준화**
-                //    - 특수문자 중점(·) 제거로 배송 라벨 인쇄 시 오류 방지
+                //    - 특수문자 중점("·") 제거로 배송 라벨 인쇄 시 오류 방지
                 //    - 택배사 시스템 호환성 향상 및 배송 오류 감소
                 // 
                 // 5. **결제수단 코드 표준화**
@@ -498,57 +516,74 @@ namespace LogisticManager.Processors
 
                 // ==================== 4단계: 고급 특수 처리 및 비즈니스 로직 적용 (20-60%) [현재 비활성화] ====================
                 
-                // ⭐ [4단계 - 현재 비활성화] 고도화된 물류 특수 처리 시스템
-                // 
-                // 📋 물류 업계 특화 고급 처리 로직 (파이썬 레거시 → C# Repository 패턴 전환):
-                // 
-                // 🏷️ **4-1. 지능형 별표 마킹 시스템** (ProcessSpecialMarking)
-                //    - 외부 별표 파일 기반 자동 상품 분류 및 마킹
-                //    - 품목코드별, 배송메시지별, 수취인명별 다차원 별표 처리
-                //    - 제주도 특수 지역 자동 감지 및 별표 적용
-                //    - 고객별 맞춤 마킹 규칙 적용 (VIP 고객, 대량 주문 등)
-                // 
-                // 🏝️ **4-2. 제주도 특수 지역 처리** (ProcessJejuMarking) - ✅ 구현 완료
-                //    - 주소 패턴 분석: "제주특별", "제주 제주" 자동 감지
-                //    - 제주도 배송비 자동 계산 및 적용
-                //    - 항공 운송 필요 상품 자동 분류
-                //    - 제주도 전용 물류센터 자동 배정
-                // 
-                // 📦 **4-3. 박스 상품 최적화 처리** (ProcessBoxMarking) - ✅ 구현 완료  
-                //    - 박스 상품 자동 감지 및 "▨▧▦" 접두사 추가
-                //    - 박스 수량 분할 로직 (1박스 = N개 개별 상품)
-                //    - 포장 최적화 알고리즘 적용
-                //    - 부피 기반 배송비 자동 계산
-                // 
-                // 🎁 **4-4. 합포장 최적화 시스템** (ProcessMergePacking)
-                //    - 동일 고객 다중 주문 자동 감지 및 합포장 처리
-                //    - 합포장 변경 데이터 실시간 로드 및 적용
-                //    - 배송비 절약 효과 자동 계산
-                //    - 포장 효율성 극대화 알고리즘
-                // 
-                // 🎯 **4-5. 카카오 이벤트 및 프로모션 엔진** (ProcessKakaoEvent)
-                //    - 카카오톡스토어 연동 이벤트 자동 적용
-                //    - 실시간 프로모션 코드 검증 및 할인 적용
-                //    - 이벤트별 특수 배송 옵션 자동 설정
-                //    - 마케팅 캠페인 효과 추적 데이터 생성
-                // 
-                // 💬 **4-6. 지능형 메시지 시스템** (ProcessMessage)
-                //    - 송장구분별 맞춤 메시지 자동 생성
-                //    - 고객 배송 경험 개선을 위한 안내 메시지 삽입
-                //    - 특수 상황 알림 메시지 자동 적용
-                //    - 다국어 메시지 지원 (한국어, 영어, 중국어 등)
-                // 
-                // 💡 Repository 패턴 전환 효과:
-                // - 레거시 파이썬 코드 대비 10배 빠른 처리 속도
-                // - 타입 안전성 보장으로 런타임 오류 99% 감소
-                // - 단위 테스트 커버리지 90% 이상 달성 가능
-                // - 메모리 사용량 50% 절약 (C# 최적화 효과)
-                
+                // ⭐ [4단계 ]
+                 
                 finalProgress?.Report("⭐ [4단계]  특수 처리 시작");
+                
                 // 송장출력 메세지 생성
+                finalProgress?.Report("📜 [4-1]  송장출력 메세지 처리");
                 Console.WriteLine("🔍 ProcessInvoiceMessageData 메서드 호출 시작...");
+                finalProgressReporter?.Report(30);
                 await ProcessInvoiceMessageData(); // 📝 4-1송장출력 메세지 데이터 처리
                 Console.WriteLine("✅ ProcessInvoiceMessageData 메서드 호출 완료");
+
+                
+                //합포장 처리 프로시져 호출
+                // 🎁 합포장 최적화 프로시저 호출 (ProcessMergePacking1)
+                finalProgress?.Report("📜 [4-2]  합포장 최적화 처리");                
+                Console.WriteLine("🔍 ProcessMergePacking1 메서드 호출 시작...");
+                await ProcessMergePacking1(); // 📝 4-2 합포장 최적화 프로시저 호출
+                finalProgressReporter?.Report(35);
+                Console.WriteLine("✅ ProcessMergePacking1 메서드 호출 완료");
+
+                // 송장분리처리 루틴 추가
+                // 감천 특별출고 처리 루틴
+                finalProgress?.Report("📜 [4-3]  감천 특별출고 처리");
+                Console.WriteLine("🔍 ProcessInvoiceSplit 메서드 호출 시작...");
+                await ProcessInvoiceSplit(); // 📝 4-3 송장분리처리 루틴 호출
+                finalProgressReporter?.Report(40);
+                Console.WriteLine("✅ ProcessInvoiceSplit 메서드 호출 완료");       
+
+                // 판매입력_이카운트자료 (테이블 -> 엑셀 생성)
+                // - 윈도우: Win + . (마침표) 키를 누르면 이모지 선택창이 나옵니다.
+                // - macOS: Control + Command + Space 키를 누르면 이모지 선택창이 나옵니다.
+                // - 또는 https://emojipedia.org/ 사이트에서 원하는 이모지를 복사해서 사용할 수 있습니다.
+                // - C# 문자열에 직접 유니코드 이모지를 넣어도 되고, \uXXXX 형식의 유니코드 이스케이프를 사용할 수도 있습니다.
+                // 예시: finalProgress?.Report("✅ 처리 완료!"); // 이모지는 위 방법으로 복사해서 붙여넣기
+                finalProgress?.Report("📜 [4-4]  판매입력_이카운트자료 생성 및 업로드 처리");
+                Console.WriteLine("🔍 ProcessSalesInputData 메서드 호출 시작...");
+                Console.WriteLine($"🔍 ProcessSalesInputData 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                finalProgressReporter?.Report(45);
+                Console.WriteLine("🔍 ProcessSalesInputData 메서드 실행 중...");
+                
+                try
+                {
+                    var salesDataResult = await ProcessSalesInputData(); // 📝 4-4 판매입력_이카운트자료 엑셀 생성
+                    Console.WriteLine($"✅ ProcessSalesInputData 메서드 호출 완료 - 결과: {salesDataResult}");
+                    Console.WriteLine($"✅ ProcessSalesInputData 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ ProcessSalesInputData 실행 중 오류 발생: {ex.Message}");
+                    Console.WriteLine($"❌ ProcessSalesInputData 오류 상세: {ex.StackTrace}");
+                    // 오류가 발생해도 전체 프로세스는 계속 진행
+                } 
+
+                // 톡딜불가 처리
+                finalProgress?.Report("📜 [4-5]  톡딜불가 처리");
+                Console.WriteLine("🔍 ProcessTalkDealUnavailable 메서드 호출 시작...");
+                await ProcessTalkDealUnavailable(); // 📝 4-5 톡딜불가 처리
+                finalProgressReporter?.Report(50);
+                Console.WriteLine("✅ ProcessTalkDealUnavailable 메서드 호출 완료");
+
+                // 송장출력관리 처리    
+                finalProgress?.Report("📜 [4-6]  송장출력관리 처리");
+                Console.WriteLine("🔍 ProcessInvoiceManagement 메서드 호출 시작...");
+                await ProcessInvoiceManagement(); // 📝 4-6 송장출력관리 처리
+                finalProgressReporter?.Report(55);
+                Console.WriteLine("✅ ProcessInvoiceManagement 메서드 호출 완료");
+
+
                 //await ProcessSpecialMarking(); // 🏷️ 지능형 별표 마킹
                 //await ProcessJejuMarking();    // 🏝️ 제주도 특수 지역 처리  
                 //await ProcessBoxMarking();     // 📦 박스 상품 최적화
@@ -558,36 +593,6 @@ namespace LogisticManager.Processors
                 //finalProgressReporter?.Report(60);
                 //finalProgress?.Report("✅ [4단계 완료] 고급 특수 처리 완료 - 물류 최적화 적용됨");
 
-                // ==================== 5단계: AI 기반 출고지별 최적 분류 시스템 (60-80%) [현재 비활성화] ====================
-                
-                // 📦 [5단계 - 현재 비활성화] 지능형 물류센터 배정 및 최적화 시스템
-                // 
-                // 🏭 전국 물류센터 네트워크 기반 최적 배송 경로 계산:
-                // 
-                // 🎯 **5-1. 송장구분자 지능형 설정** (SetShipmentIdentifier)
-                //    - 상품 특성 분석: 냉장/냉동, 일반, 대형, 위험물 등 자동 분류
-                //    - 배송지 분석: 도심/외곽, 접근성, 특수 지역 등 고려
-                //    - 고객 등급 반영: VIP, 일반, 대량 주문 등 차별화 서비스
-                // 
-                // 🏷️ **5-2. 송장구분 최적화** (SetShipmentType)
-                //    - 택배사별 최적 배송 옵션 자동 선택
-                //    - 당일배송, 익일배송, 일반배송 등 서비스 레벨 자동 결정
-                //    - 배송비 최적화 알고리즘 적용
-                // 
-                // 🎯 **5-3. 송장구분최종 검증** (SetFinalShipmentType)
-                //    - 다중 검증 로직으로 배송 오류 사전 방지
-                //    - 특수 상황 예외 처리 (천재지변, 교통 마비 등)
-                //    - 고객 요청사항 반영 (부재시 처리, 배송시간 지정 등)
-                // 
-                // 📍 **5-4. 물리적 위치 최적화** (SetLocation)
-                //    - GPS 기반 정확한 배송지 좌표 계산
-                //    - 건물별, 층별 상세 위치 정보 매핑
-                //    - 배송 효율성 극대화를 위한 경로 최적화
-                // 
-                // 🔄 **5-5. 위치변환 및 표준화** (SetLocationConversion)
-                //    - 주소 표기법 통일 (구 주소 → 신 주소 자동 변환)
-                //    - 국제 표준 주소 형식 지원
-                //    - 배송업체별 주소 형식 최적화
                 
                 //finalProgress?.Report("📦 [5단계] AI 기반 출고지별 최적 분류 시작...");
                 //await ClassifyAndProcessByShipmentCenter(); // 🎯 지능형 물류센터 배정
@@ -674,16 +679,7 @@ namespace LogisticManager.Processors
                 finalProgress?.Report($"⏱️ 총 처리 시간: {processingDuration.TotalSeconds:F1}초");
                 finalProgress?.Report($"📊 현재 활성화 단계: 1-2단계 (데이터 수집 및 적재)");
                 finalProgress?.Report($"🚀 향후 확장 예정: 3-7단계 (고급 처리 및 자동화)");
-                
-                // === 비즈니스 연속성 및 데이터 품질 보장 확인 ===
-                // 현재 구현된 핵심 기능들의 성공적 완료 상태 확인:
-                // ✅ 1단계: 다중 쇼핑몰 Excel 데이터 통합 및 검증 완료
-                // ✅ 2단계: 엔터프라이즈급 DB 초기화 및 대용량 데이터 적재 완료
-                // 🔄 3-7단계: 고급 비즈니스 로직 (향후 단계별 활성화 예정)
-                
-                // === 성공 반환 및 상위 시스템 연동 ===
-                // true 반환으로 상위 호출자에게 전체 워크플로우 성공 알림
-                // 이를 통해 후속 프로세스 (알림, 로깅, 모니터링 등) 트리거 가능
+
                 return await Task.FromResult(true);
             }
             catch (Exception ex)
@@ -1001,19 +997,24 @@ namespace LogisticManager.Processors
                 // === 데이터 유효성 검사 및 필터링 ===
                 // Order.IsValid(): 필수 필드(수취인명, 주소, 주문번호 등) 검증
                 // 유효하지 않은 데이터 제외하여 DB 삽입 오류 사전 방지
-                // === 유효성 검사: 모든 데이터가 유효해야만 처리 진행 ===
-                // - 유효하지 않은 데이터가 하나라도 있으면 전체 롤백 및 상세 로그 출력
+                // === 유효성 검사: 일부 오류가 있어도 계속 진행 (완화된 검증) ===
+                // - 유효하지 않은 데이터는 제외하고 유효한 데이터만 처리
+                // - 전체 롤백하지 않고 부분적으로 처리 진행
                 var invalidOrders = orders
                     .Select((order, idx) => new { Order = order, Index = idx })
                     .Where(x => !x.Order.IsValid())
                     .ToList();
 
+                // validOrders 변수를 메서드 시작 부분에서 선언
+                var validOrders = new List<Order>();
+
                 if (invalidOrders.Count > 0)
                 {
-                    // 유효하지 않은 데이터가 존재할 경우 상세 로그 작성
-                    var errorLog = new System.Text.StringBuilder();
-                    errorLog.AppendLine("[처리중지] 유효하지 않은 데이터가 발견되어 처리를 중단합니다.");
-                    foreach (var item in invalidOrders)
+                    // 유효하지 않은 데이터가 존재할 경우 경고 로그 작성 (처리 중단하지 않음)
+                    var warningLog = new System.Text.StringBuilder();
+                    warningLog.AppendLine($"[경고] 유효하지 않은 데이터 {invalidOrders.Count}건이 발견되었습니다. 해당 데이터는 제외하고 처리합니다.");
+                    
+                    foreach (var item in invalidOrders.Take(5)) // 처음 5개만 상세 로그
                     {
                         // 어떤 필드가 잘못됐는지 상세히 표시
                         var invalidFields = new List<string>();
@@ -1026,18 +1027,42 @@ namespace LogisticManager.Processors
                         if (item.Order.Quantity <= 0)
                             invalidFields.Add("수량");
 
-                        errorLog.AppendLine(
+                        warningLog.AppendLine(
                             $"  - 행 {item.Index + 1}: 유효성 실패 [원인: {string.Join(", ", invalidFields)}], 주문번호: {item.Order.OrderNumber ?? "(없음)"}"
                         );
                     }
-                    progress?.Report(errorLog.ToString());
-                    Console.WriteLine(errorLog.ToString());
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorLog.ToString()}\n");
-                    throw new InvalidOperationException("[처리중지] 유효하지 않은 데이터가 포함되어 있습니다. 상세 내용은 로그를 확인하세요.");
+                    
+                    if (invalidOrders.Count > 5)
+                    {
+                        warningLog.AppendLine($"  ... 외 {invalidOrders.Count - 5}건");
+                    }
+                    
+                    // 경고 로그 출력 (처리 중단하지 않음)
+                    progress?.Report(warningLog.ToString());
+                    Console.WriteLine(warningLog.ToString());
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {warningLog.ToString()}\n");
+                    
+                    // 유효하지 않은 데이터 제거
+                    validOrders = orders.Where(order => order.IsValid()).ToList();
+                    
+                    if (validOrders.Count == 0)
+                    {
+                        var noValidDataError = "[처리중지] 유효한 데이터가 하나도 없습니다. 처리를 중단합니다.";
+                        progress?.Report(noValidDataError);
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {noValidDataError}\n");
+                        throw new InvalidOperationException(noValidDataError);
+                    }
+                    
+                    // 유효한 데이터만으로 계속 진행
+                    var validDataLog = $"📊 유효한 데이터 {validOrders.Count:N0}건으로 처리 계속 진행";
+                    progress?.Report(validDataLog);
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {validDataLog}\n");
                 }
-
-                // 모든 데이터가 유효한 경우에만 처리 진행
-                var validOrders = orders.ToList();
+                else
+                {
+                    // 모든 데이터가 유효한 경우
+                    validOrders = orders.ToList();
+                }
                 
                 // === 변환 결과 통계 보고 ===
                 var conversionStatsLog = $"📊 데이터 변환 완료: 총 {data.Rows.Count}건 → 유효 {validOrders.Count}건";
@@ -1122,6 +1147,1518 @@ namespace LogisticManager.Processors
                 throw;
             }
         }
+        /// <summary>
+        /// 합포장 최적화 프로시저 호출 루틴
+        /// 
+        /// 📋 주요 기능:
+        /// - DB에 저장된 합포장 최적화 프로시저(ProcessMergePacking1) 호출
+        /// - 프로시저 실행 결과 및 상세 오류 정보 로깅
+        /// - 예외 발생 시 상세 원인 분석 및 사용자에게 명확히 안내
+        /// 
+        /// ⚠️ 예외 처리:
+        /// - DB 연결 실패, 프로시저 실행 오류, 반환값 이상 등 모든 예외를 상세하게 기록
+        /// - 오류 발생 시 로그 파일 및 콘솔에 상세 정보 출력
+        /// 
+        /// 💡 유지보수성:
+        /// - 프로시저명, 파라미터 등은 상수로 분리하여 추후 확장 용이
+        /// - 결과 메시지 및 오류 메시지 한글 주석과 함께 기록
+        /// </summary>
+        /// <returns>Task</returns>
+        private async Task ProcessMergePacking1()
+        {
+            const string METHOD_NAME = "ProcessMergePacking1";
+            const string TABLE_NAME = "송장출력_특수출력_합포장변경";
+            const string PROCEDURE_NAME = "sp_MergePacking1";
+            const string CONFIG_KEY = "DropboxFolderPath2";
+            
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            var startTime = DateTime.Now;
+            
+            try
+            {
+                // === 1단계: 처리 시작 로깅 ===
+                var startLog = $"[{METHOD_NAME}] 합포장 변경 처리 시작 - {startTime:yyyy-MM-dd HH:mm:ss}";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {startLog}\n");
+                _progress?.Report($"📦 {startLog}");
+                
+                // === 2단계: DropboxFolderPath2 설정 확인 ===
+                var dropboxPath = System.Configuration.ConfigurationManager.AppSettings[CONFIG_KEY];
+                if (string.IsNullOrEmpty(dropboxPath))
+                {
+                    var configError = $"[{METHOD_NAME}] ❌ {CONFIG_KEY} 설정이 없습니다.";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {configError}\n");
+                    throw new InvalidOperationException(configError);
+                }
+                
+                var configLog = $"[{METHOD_NAME}] ✅ {CONFIG_KEY} 설정 확인: {dropboxPath}";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {configLog}\n");
+                _progress?.Report(configLog);
+                
+                // === 3단계: 엑셀 파일 다운로드 및 읽기 ===
+                var downloadLog = $"[{METHOD_NAME}] 📥 Dropbox에서 엑셀 파일 다운로드 시작: {dropboxPath}";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {downloadLog}\n");
+                _progress?.Report(downloadLog);
+                
+                // Dropbox API를 사용하여 파일 다운로드
+                string localFilePath;
+                try
+                {
+                    // 임시 파일 경로 생성
+                    var tempDir = Path.GetTempPath();
+                    var fileName = Path.GetFileName(dropboxPath);
+                    if (string.IsNullOrEmpty(fileName))
+                    {
+                        fileName = "합포장변경.xlsx";
+                    }
+                    localFilePath = Path.Combine(tempDir, $"temp_{DateTime.Now:yyyyMMdd_HHmmss}_{fileName}");
+                    
+                    // Dropbox에서 파일 다운로드
+                    var dropboxService = DropboxService.Instance;
+                    var downloadSuccess = await dropboxService.DownloadFileAsync(dropboxPath, localFilePath);
+                    if (!downloadSuccess)
+                    {
+                        var downloadError = $"[{METHOD_NAME}] ❌ Dropbox 파일 다운로드 실패: {dropboxPath}";
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {downloadError}\n");
+                        throw new InvalidOperationException(downloadError);
+                    }
+                    
+                    var downloadCompleteLog = $"[{METHOD_NAME}] ✅ Dropbox 파일 다운로드 완료: {localFilePath}";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {downloadCompleteLog}\n");
+                }
+                catch (Exception ex)
+                {
+                    var downloadExceptionError = $"[{METHOD_NAME}] ❌ Dropbox 파일 다운로드 중 예외 발생: {ex.Message}";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {downloadExceptionError}\n");
+                    throw new InvalidOperationException($"Dropbox 파일 다운로드 실패: {ex.Message}", ex);
+                }
+                
+                // FileService를 사용하여 엑셀 파일 읽기 (로컬 파일 경로 사용)
+                var excelData = _fileService.ReadExcelToDataTable(localFilePath, "merge_packing_table");
+                if (excelData?.Rows == null || excelData.Rows.Count == 0)
+                {
+                    var noDataError = $"[{METHOD_NAME}] ❌ 엑셀 파일에서 데이터를 읽을 수 없습니다.";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {noDataError}\n");
+                    throw new InvalidOperationException(noDataError);
+                }
+                
+                var dataLoadLog = $"[{METHOD_NAME}] ✅ 엑셀 데이터 로드 완료: {excelData.Rows.Count:N0}건";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {dataLoadLog}\n");
+                _progress?.Report(dataLoadLog);
+                
+                // 임시 파일 정리
+                try
+                {
+                    if (File.Exists(localFilePath))
+                    {
+                        File.Delete(localFilePath);
+                        var cleanupLog = $"[{METHOD_NAME}] 🗑️ 임시 파일 정리 완료: {localFilePath}";
+                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {cleanupLog}\n");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var cleanupWarningLog = $"[{METHOD_NAME}] ⚠️ 임시 파일 정리 실패: {ex.Message}";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {cleanupWarningLog}\n");
+                    // 임시 파일 정리 실패는 무시하고 계속 진행
+                }
+                
+                // === 4단계: 테이블 존재여부 확인 ===
+                var tableCheckLog = $"[{METHOD_NAME}] 🔍 테이블 존재여부 확인: {TABLE_NAME}";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {tableCheckLog}\n");
+                _progress?.Report(tableCheckLog);
+                
+                var tableExists = await CheckTableExistsAsync(TABLE_NAME);
+                if (!tableExists)
+                {
+                    var tableNotFoundError = $"[{METHOD_NAME}] ❌ 테이블이 존재하지 않습니다: {TABLE_NAME}";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {tableNotFoundError}\n");
+                    throw new InvalidOperationException(tableNotFoundError);
+                }
+                
+                var tableExistsLog = $"[{METHOD_NAME}] ✅ 테이블 존재 확인: {TABLE_NAME}";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {tableExistsLog}\n");
+                
+                // === 5단계: 테이블 TRUNCATE ===
+                var truncateLog = $"[{METHOD_NAME}] 🗑️ 테이블 TRUNCATE 시작: {TABLE_NAME}";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {truncateLog}\n");
+                _progress?.Report(truncateLog);
+                
+                var truncateQuery = $"TRUNCATE TABLE {TABLE_NAME}";
+                await _invoiceRepository.ExecuteNonQueryAsync(truncateQuery);
+                
+                var truncateCompleteLog = $"[{METHOD_NAME}] ✅ 테이블 TRUNCATE 완료: {TABLE_NAME}";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {truncateCompleteLog}\n");
+                
+                // === 6단계: 컬럼 매핑 검증 ===
+                var mappingLog = $"[{METHOD_NAME}] 🔗 컬럼 매핑 검증 시작";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {mappingLog}\n");
+                _progress?.Report(mappingLog);
+                
+                var columnMapping = ValidateColumnMappingAsync(TABLE_NAME, excelData);
+                if (columnMapping == null || !columnMapping.Any())
+                {
+                    var mappingError = $"[{METHOD_NAME}] ❌ 컬럼 매핑 검증 실패";
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {mappingError}\n");
+                    throw new InvalidOperationException(mappingError);
+                }
+                
+                var mappingCompleteLog = $"[{METHOD_NAME}] ✅ 컬럼 매핑 검증 완료: {columnMapping.Count}개 컬럼";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {mappingCompleteLog}\n");
+                
+                // === 7단계: 엑셀 데이터를 테이블에 INSERT ===
+                var insertLog = $"[{METHOD_NAME}] 📝 데이터 INSERT 시작: {excelData.Rows.Count:N0}건";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {insertLog}\n");
+                _progress?.Report(insertLog);
+                
+                var insertCount = await InsertDataWithMappingAsync(TABLE_NAME, excelData, columnMapping);
+                
+                var insertCompleteLog = $"[{METHOD_NAME}] ✅ 데이터 INSERT 완료: {insertCount:N0}건";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {insertCompleteLog}\n");
+                
+                // === 8단계: MergePacking1 프로시저 호출 ===
+                // 아래 프로시저 호출 부분은 임시로 주석 처리합니다.
+                var procedureLog = $"[{METHOD_NAME}] 🚀 {PROCEDURE_NAME} 프로시저 호출 시작";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {procedureLog}\n");
+                _progress?.Report(procedureLog);
+                
+                var procedureResult = await ExecuteMergePackingProcedureAsync(PROCEDURE_NAME);
+                
+                var procedureCompleteLog = $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 완료: {procedureResult}";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {procedureCompleteLog}\n");
+                
+                // === 9단계: 처리 완료 ===
+                var endTime = DateTime.Now;
+                var duration = endTime - startTime;
+                var completionLog = $"[{METHOD_NAME}] 🎉 합포장 변경 처리 완료 - 소요시간: {duration.TotalSeconds:F1}초";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {completionLog}\n");
+                _progress?.Report(completionLog);
+                
+                // === 10단계: 성공 통계 로깅 ===
+                var successStats = $"[{METHOD_NAME}] 📊 처리 통계 - 데이터: {insertCount:N0}건, 프로시저결과: {procedureResult}, 소요시간: {duration.TotalSeconds:F1}초";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {successStats}\n");
+            }
+            catch (Exception ex)
+            {
+                // === 오류 처리 및 로깅 ===
+                var errorTime = DateTime.Now;
+                var errorDuration = errorTime - startTime;
+                
+                var errorLog = $"[{METHOD_NAME}] ❌ 오류 발생 - {errorTime:yyyy-MM-dd HH:mm:ss} (소요시간: {errorDuration.TotalSeconds:F1}초)";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorLog}\n");
+                
+                var errorDetailLog = $"[{METHOD_NAME}] ❌ 오류 상세: {ex.Message}";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorDetailLog}\n");
+                
+                var errorStackTraceLog = $"[{METHOD_NAME}] ❌ 스택 트레이스: {ex.StackTrace}";
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorStackTraceLog}\n");
+                
+                // === 사용자에게 오류 메시지 전달 ===
+                var userErrorMessage = $"❌ 합포장 변경 처리 실패: {ex.Message}";
+                _progress?.Report(userErrorMessage);
+                
+                // === 예외 재발생 ===
+                throw new Exception($"합포장 변경 처리 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+
+        // 감천 특별출고 처리 루틴
+        // 송장구분 업데이트 ('합포장'/'단일')
+        // '단일' 송장 데이터 이동
+        // '합포장' 데이터에 대한 최종 구분자 업데이트
+        // 조건에 맞는 '합포장' 데이터 이동
+        private async Task ProcessInvoiceSplit()
+        {
+            const string METHOD_NAME = "ProcessInvoiceSplit1";
+            const string TABLE_NAME = "송장출력_특수출력_감천분리출고";
+            const string PROCEDURE_NAME = "sp_InvoiceSplit";
+            const string CONFIG_KEY = "DropboxFolderPath3";
+            
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            var startTime = DateTime.Now;
+            
+            try
+            {
+                // === 1단계: 처리 시작 로깅 ===
+                var startLog = $"[{METHOD_NAME}] 감천 특별출고 처리 시작 - {startTime:yyyy-MM-dd HH:mm:ss}";
+                WriteLogWithFlush(logPath, startLog);
+                _progress?.Report($"📦 {startLog}");
+                
+                // 로그 파일 상태 진단 및 콘솔 출력
+                var logStatus = DiagnoseLogFileStatus(logPath);
+                Console.WriteLine(logStatus);
+                
+                // === 2단계: DropboxFolderPath3 설정 확인 ===
+                var dropboxPath = System.Configuration.ConfigurationManager.AppSettings[CONFIG_KEY];
+                if (string.IsNullOrEmpty(dropboxPath))
+                {
+                    var configError = $"[{METHOD_NAME}] ❌ {CONFIG_KEY} 설정이 없습니다.";
+                    WriteLogWithFlush(logPath, configError);
+                    throw new InvalidOperationException(configError);
+                }
+                
+                var configLog = $"[{METHOD_NAME}] ✅ {CONFIG_KEY} 설정 확인: {dropboxPath}";
+                WriteLogWithFlush(logPath, configLog);
+                _progress?.Report(configLog);
+                
+                // === 3단계: 엑셀 파일 다운로드 및 읽기 ===
+                var downloadLog = $"[{METHOD_NAME}] 📥 Dropbox에서 엑셀 파일 다운로드 시작: {dropboxPath}";
+                WriteLogWithFlush(logPath, downloadLog);
+                _progress?.Report(downloadLog);
+                
+                // Dropbox API를 사용하여 파일 다운로드
+                string localFilePath;
+                try
+                {
+                    // 임시 파일 경로 생성
+                    var tempDir = Path.GetTempPath();
+                    var fileName = Path.GetFileName(dropboxPath);
+                    if (string.IsNullOrEmpty(fileName))
+                    {
+                        fileName = "부산감천센터분리송장.xlsx";
+                    }
+                    localFilePath = Path.Combine(tempDir, $"temp_{DateTime.Now:yyyyMMdd_HHmmss}_{fileName}");
+                    
+                    // Dropbox에서 파일 다운로드
+                    var dropboxService = DropboxService.Instance;
+                    var downloadSuccess = await dropboxService.DownloadFileAsync(dropboxPath, localFilePath);
+                    if (!downloadSuccess)
+                    {
+                        var downloadError = $"[{METHOD_NAME}] ❌ Dropbox 파일 다운로드 실패: {dropboxPath}";
+                        WriteLogWithFlush(logPath, downloadError);
+                        throw new InvalidOperationException(downloadError);
+                    }
+                    
+                    var downloadCompleteLog = $"[{METHOD_NAME}] ✅ Dropbox 파일 다운로드 완료: {localFilePath}";
+                    WriteLogWithFlush(logPath, downloadCompleteLog);
+                }
+                catch (Exception ex)
+                {
+                    var downloadExceptionError = $"[{METHOD_NAME}] ❌ Dropbox 파일 다운로드 중 예외 발생: {ex.Message}";
+                    WriteLogWithFlush(logPath, downloadExceptionError);
+                    throw new InvalidOperationException($"Dropbox 파일 다운로드 실패: {ex.Message}", ex);
+                }
+                
+                // FileService를 사용하여 엑셀 파일 읽기 (로컬 파일 경로 사용)
+                var excelData = _fileService.ReadExcelToDataTable(localFilePath, "gamcheon_separation_table");
+                if (excelData?.Rows == null || excelData.Rows.Count == 0)
+                {
+                    var noDataError = $"[{METHOD_NAME}] ❌ 엑셀 파일에서 데이터를 읽을 수 없습니다.";
+                    WriteLogWithFlush(logPath, noDataError);
+                    throw new InvalidOperationException(noDataError);
+                }
+                
+                var dataLoadLog = $"[{METHOD_NAME}] ✅ 엑셀 데이터 로드 완료: {excelData.Rows.Count:N0}건";
+                WriteLogWithFlush(logPath, dataLoadLog);
+                _progress?.Report(dataLoadLog);
+                
+                // 임시 파일 정리
+                try
+                {
+                    if (File.Exists(localFilePath))
+                    {
+                        File.Delete(localFilePath);
+                        var cleanupLog = $"[{METHOD_NAME}] 🗑️ 임시 파일 정리 완료: {localFilePath}";
+                        WriteLogWithFlush(logPath, cleanupLog);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var cleanupWarningLog = $"[{METHOD_NAME}] ⚠️ 임시 파일 정리 실패: {ex.Message}";
+                    WriteLogWithFlush(logPath, cleanupWarningLog);
+                    // 임시 파일 정리 실패는 무시하고 계속 진행
+                }
+                
+                // === 4단계: 테이블 존재여부 확인 ===
+                var tableCheckLog = $"[{METHOD_NAME}] 🔍 테이블 존재여부 확인: {TABLE_NAME}";
+                WriteLogWithFlush(logPath, tableCheckLog);
+                _progress?.Report(tableCheckLog);
+                
+                var tableExists = await CheckTableExistsAsync(TABLE_NAME);
+                if (!tableExists)
+                {
+                    var tableNotFoundError = $"[{METHOD_NAME}] ❌ 테이블이 존재하지 않습니다: {TABLE_NAME}";
+                    WriteLogWithFlush(logPath, tableNotFoundError);
+                    throw new InvalidOperationException(tableNotFoundError);
+                }
+                
+                var tableExistsLog = $"[{METHOD_NAME}] ✅ 테이블 존재 확인: {TABLE_NAME}";
+                WriteLogWithFlush(logPath, tableExistsLog);
+                
+                // === 5단계: 테이블 TRUNCATE ===
+                var truncateLog = $"[{METHOD_NAME}] 🗑️ 테이블 TRUNCATE 시작: {TABLE_NAME}";
+                WriteLogWithFlush(logPath, truncateLog);
+                _progress?.Report(truncateLog);
+                
+                var truncateQuery = $"TRUNCATE TABLE {TABLE_NAME}";
+                await _invoiceRepository.ExecuteNonQueryAsync(truncateQuery);
+                
+                var truncateCompleteLog = $"[{METHOD_NAME}] ✅ 테이블 TRUNCATE 완료: {TABLE_NAME}";
+                WriteLogWithFlush(logPath, truncateCompleteLog);
+                
+                // === 6단계: 컬럼 매핑 검증 ===
+                var mappingLog = $"[{METHOD_NAME}] 🔗 컬럼 매핑 검증 시작";
+                WriteLogWithFlush(logPath, mappingLog);
+                _progress?.Report(mappingLog);
+                
+                var columnMapping = ValidateColumnMappingAsync(TABLE_NAME, excelData);
+                if (columnMapping == null || !columnMapping.Any())
+                {
+                    var mappingError = $"[{METHOD_NAME}] ❌ 컬럼 매핑 검증 실패";
+                    WriteLogWithFlush(logPath, mappingError);
+                    throw new InvalidOperationException(mappingError);
+                }
+                
+                var mappingCompleteLog = $"[{METHOD_NAME}] ✅ 컬럼 매핑 검증 완료: {columnMapping.Count}개 컬럼";
+                WriteLogWithFlush(logPath, mappingCompleteLog);
+                
+                // === 7단계: 엑셀 데이터를 테이블에 INSERT ===
+                var insertLog = $"[{METHOD_NAME}] 📝 데이터 INSERT 시작: {excelData.Rows.Count:N0}건";
+                WriteLogWithFlush(logPath, insertLog);
+                _progress?.Report(insertLog);
+                
+                var insertCount = await InsertDataWithMappingAsync(TABLE_NAME, excelData, columnMapping);
+                
+                var insertCompleteLog = $"[{METHOD_NAME}] ✅ 데이터 INSERT 완료: {insertCount:N0}건";
+                WriteLogWithFlush(logPath, insertCompleteLog);
+                
+                // === 8단계: sp_InvoiceSplit 프로시저 호출 ===
+                var procedureLog = $"[{METHOD_NAME}] 🚀 {PROCEDURE_NAME} 프로시저 호출 시작";
+                WriteLogWithFlush(logPath, procedureLog);
+                _progress?.Report(procedureLog);
+                
+                string procedureResult = "";
+                
+                try
+                {
+                    // 프로시저 실행 전 로그 파일 상태 재확인
+                    var preProcedureLog = $"[{METHOD_NAME}] 🔍 프로시저 실행 전 로그 파일 상태 확인";
+                    WriteLogWithFlush(logPath, preProcedureLog);
+                    
+                    // 프로시저 실행
+                    procedureResult = await ExecuteStoredProcedureAsync(PROCEDURE_NAME);
+                    
+                    // 프로시저 실행 결과 상세 검증
+                    if (string.IsNullOrEmpty(procedureResult))
+                    {
+                        var nullResultLog = $"[{METHOD_NAME}] ⚠️ 프로시저 실행 결과가 null 또는 빈 문자열입니다.";
+                        WriteLogWithFlush(logPath, nullResultLog);
+                        Console.WriteLine($"⚠️ {nullResultLog}");
+                        
+                        throw new InvalidOperationException("프로시저 실행 결과가 비어있습니다.");
+                    }
+                    
+                    // 결과에 오류 키워드가 포함되어 있는지 확인
+                    var errorKeywords = new[] { "Error", "오류", "실패", "Exception", "SQLSTATE", "ROLLBACK" };
+                    var hasError = errorKeywords.Any(keyword => 
+                        procedureResult.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+                    
+                    if (hasError)
+                    {
+                        var validationErrorLog = $"[{METHOD_NAME}] ⚠️ 프로시저 실행 결과에 오류 키워드 발견: {procedureResult}";
+                        WriteLogWithFlush(logPath, validationErrorLog);
+                        Console.WriteLine($"⚠️ {validationErrorLog}");
+                        
+                        throw new InvalidOperationException($"프로시저 실행 결과에 오류가 포함되어 있습니다: {procedureResult}");
+                    }
+                    
+                    // 성공 키워드 확인
+                    var successKeywords = new[] { "Success", "성공", "완료", "완료되었습니다" };
+                    var hasSuccess = successKeywords.Any(keyword => 
+                        procedureResult.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+                    
+                    if (hasSuccess)
+                    {
+                        var procedureCompleteLog = $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 성공: {procedureResult}";
+                        WriteLogWithFlush(logPath, procedureCompleteLog);
+                        _progress?.Report(procedureCompleteLog);
+                    }
+                    else
+                    {
+                        var procedureCompleteLog = $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 완료: {procedureResult}";
+                        WriteLogWithFlush(logPath, procedureCompleteLog);
+                        _progress?.Report(procedureCompleteLog);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var procedureErrorLog = $"[{METHOD_NAME}] ❌ {PROCEDURE_NAME} 프로시저 실행 실패: {ex.Message}";
+                    WriteLogWithFlush(logPath, procedureErrorLog);
+                    Console.WriteLine($"❌ {procedureErrorLog}");
+                    
+                    var procedureDetailLog = $"[{METHOD_NAME}] ❌ {PROCEDURE_NAME} 프로시저 상세 오류: {ex}";
+                    WriteLogWithFlush(logPath, procedureDetailLog);
+                    Console.WriteLine($"❌ {procedureDetailLog}");
+                    
+                    // 프로시저 실행 실패 시 로그 파일 상태 재확인
+                    var postErrorLog = $"[{METHOD_NAME}] 🔍 프로시저 실행 실패 후 로그 파일 상태 확인";
+                    WriteLogWithFlush(logPath, postErrorLog);
+                    
+                    throw; // 상위로 오류 전파
+                }
+                
+                // === 9단계: 처리 완료 ===
+                var endTime = DateTime.Now;
+                var duration = endTime - startTime;
+                var completionLog = $"[{METHOD_NAME}] 🎉 감천 특별출고 처리 완료 - 소요시간: {duration.TotalSeconds:F1}초";
+                WriteLogWithFlush(logPath, completionLog);
+                _progress?.Report(completionLog);
+                
+                // === 10단계: 성공 통계 로깅 ===
+                var successStats = $"[{METHOD_NAME}] 📊 처리 통계 - 데이터: {insertCount:N0}건, 프로시저결과: {procedureResult}, 소요시간: {duration.TotalSeconds:F1}초";
+                WriteLogWithFlush(logPath, successStats);
+            }
+            catch (Exception ex)
+            {
+                // === 오류 처리 및 로깅 ===
+                var errorTime = DateTime.Now;
+                var errorDuration = errorTime - startTime;
+                
+                var errorLog = $"[{METHOD_NAME}] ❌ 오류 발생 - {errorTime:yyyy-MM-dd HH:mm:ss} (소요시간: {errorDuration.TotalSeconds:F1}초)";
+                WriteLogWithFlush(logPath, errorLog);
+                
+                var errorDetailLog = $"[{METHOD_NAME}] ❌ 오류 상세: {ex.Message}";
+                WriteLogWithFlush(logPath, errorDetailLog);
+                
+                var errorStackTraceLog = $"[{METHOD_NAME}] ❌ 스택 트레이스: {ex.StackTrace}";
+                WriteLogWithFlush(logPath, errorStackTraceLog);
+                
+                // === 사용자에게 오류 메시지 전달 ===
+                var userErrorMessage = $"❌ 감천 특별출고 처리 실패: {ex.Message}";
+                WriteLogWithFlush(logPath, userErrorMessage);
+                
+                // === 예외 재발생 ===
+                throw new Exception($"감천 특별출고 처리 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+
+        // 톡딜불가 처리
+        private async Task ProcessTalkDealUnavailable()
+        {
+            const string METHOD_NAME = "ProcessTalkDealUnavailable";
+            const string TABLE_NAME = "송장출력_톡딜불가";
+            const string PROCEDURE_NAME = "sp_TalkDealUnavailable";
+            const string CONFIG_KEY = "DropboxFolderPath5";
+            
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            var startTime = DateTime.Now;
+            
+            try
+            {
+                // === 1단계: 처리 시작 로깅 ===
+                var startLog = $"[{METHOD_NAME}] 톡딜불가 처리 시작 - {startTime:yyyy-MM-dd HH:mm:ss}";
+                WriteLogWithFlush(logPath, startLog);
+                _progress?.Report($"📦 {startLog}");
+                
+                // 로그 파일 상태 진단 및 콘솔 출력
+                var logStatus = DiagnoseLogFileStatus(logPath);
+                Console.WriteLine(logStatus);
+                
+                // === 2단계: DropboxFolderPath3 설정 확인 ===
+                var dropboxPath = System.Configuration.ConfigurationManager.AppSettings[CONFIG_KEY];
+                if (string.IsNullOrEmpty(dropboxPath))
+                {
+                    var configError = $"[{METHOD_NAME}] ❌ {CONFIG_KEY} 설정이 없습니다.";
+                    WriteLogWithFlush(logPath, configError);
+                    throw new InvalidOperationException(configError);
+                }
+                
+                var configLog = $"[{METHOD_NAME}] ✅ {CONFIG_KEY} 설정 확인: {dropboxPath}";
+                WriteLogWithFlush(logPath, configLog);
+                _progress?.Report(configLog);
+                
+                // === 3단계: 엑셀 파일 다운로드 및 읽기 ===
+                var downloadLog = $"[{METHOD_NAME}] 📥 Dropbox에서 엑셀 파일 다운로드 시작: {dropboxPath}";
+                WriteLogWithFlush(logPath, downloadLog);
+                _progress?.Report(downloadLog);
+                
+                // Dropbox API를 사용하여 파일 다운로드
+                string localFilePath;
+                try
+                {
+                    // 임시 파일 경로 생성
+                    var tempDir = Path.GetTempPath();
+                    var fileName = Path.GetFileName(dropboxPath);
+                    if (string.IsNullOrEmpty(fileName))
+                    {
+                        fileName = "톡딜불가.xlsx";
+                    }
+                    localFilePath = Path.Combine(tempDir, $"temp_{DateTime.Now:yyyyMMdd_HHmmss}_{fileName}");
+                    
+                    // Dropbox에서 파일 다운로드
+                    var dropboxService = DropboxService.Instance;
+                    var downloadSuccess = await dropboxService.DownloadFileAsync(dropboxPath, localFilePath);
+                    if (!downloadSuccess)
+                    {
+                        var downloadError = $"[{METHOD_NAME}] ❌ Dropbox 파일 다운로드 실패: {dropboxPath}";
+                        WriteLogWithFlush(logPath, downloadError);
+                        throw new InvalidOperationException(downloadError);
+                    }
+                    
+                    var downloadCompleteLog = $"[{METHOD_NAME}] ✅ Dropbox 파일 다운로드 완료: {localFilePath}";
+                    WriteLogWithFlush(logPath, downloadCompleteLog);
+                }
+                catch (Exception ex)
+                {
+                    var downloadExceptionError = $"[{METHOD_NAME}] ❌ Dropbox 파일 다운로드 중 예외 발생: {ex.Message}";
+                    WriteLogWithFlush(logPath, downloadExceptionError);
+                    throw new InvalidOperationException($"Dropbox 파일 다운로드 실패: {ex.Message}", ex);
+                }
+                
+                // FileService를 사용하여 엑셀 파일 읽기 (로컬 파일 경로 사용)
+                var excelData = _fileService.ReadExcelToDataTable(localFilePath, "talkdeal_unavailable_table");
+                if (excelData?.Rows == null || excelData.Rows.Count == 0)
+                {
+                    var noDataError = $"[{METHOD_NAME}] ❌ 엑셀 파일에서 데이터를 읽을 수 없습니다.";
+                    WriteLogWithFlush(logPath, noDataError);
+                    throw new InvalidOperationException(noDataError);
+                }
+                
+                var originalDataCount = excelData.Rows.Count;
+                var dataLoadLog = $"[{METHOD_NAME}] ✅ 엑셀 데이터 로드 완료: {originalDataCount:N0}건";
+                WriteLogWithFlush(logPath, dataLoadLog);
+                _progress?.Report(dataLoadLog);
+                
+                // === 3-1단계: 엑셀 데이터 전처리 ===
+                var preprocessLog = $"[{METHOD_NAME}] 🔧 엑셀 데이터 전처리 시작";
+                WriteLogWithFlush(logPath, preprocessLog);
+                _progress?.Report(preprocessLog);
+                
+                // 전처리: 빈 행 제거 및 null 값 처리
+                var processedData = PreprocessExcelData(excelData);
+                
+                var preprocessCompleteLog = $"[{METHOD_NAME}] ✅ 엑셀 데이터 전처리 완료: {originalDataCount:N0}건 → {processedData.Rows.Count:N0}건";
+                WriteLogWithFlush(logPath, preprocessCompleteLog);
+                _progress?.Report(preprocessCompleteLog);
+                
+                // 전처리된 데이터를 이후 로직에서 사용
+                excelData = processedData;
+                
+                // 임시 파일 정리
+                try
+                {
+                    if (File.Exists(localFilePath))
+                    {
+                        File.Delete(localFilePath);
+                        var cleanupLog = $"[{METHOD_NAME}] 🗑️ 임시 파일 정리 완료: {localFilePath}";
+                        WriteLogWithFlush(logPath, cleanupLog);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var cleanupWarningLog = $"[{METHOD_NAME}] ⚠️ 임시 파일 정리 실패: {ex.Message}";
+                    WriteLogWithFlush(logPath, cleanupWarningLog);
+                    // 임시 파일 정리 실패는 무시하고 계속 진행
+                }
+                
+                // === 4단계: 테이블 존재여부 확인 ===
+                var tableCheckLog = $"[{METHOD_NAME}] 🔍 테이블 존재여부 확인: {TABLE_NAME}";
+                WriteLogWithFlush(logPath, tableCheckLog);
+                _progress?.Report(tableCheckLog);
+                
+                var tableExists = await CheckTableExistsAsync(TABLE_NAME);
+                if (!tableExists)
+                {
+                    var tableNotFoundError = $"[{METHOD_NAME}] ❌ 테이블이 존재하지 않습니다: {TABLE_NAME}";
+                    WriteLogWithFlush(logPath, tableNotFoundError);
+                    throw new InvalidOperationException(tableNotFoundError);
+                }
+                
+                var tableExistsLog = $"[{METHOD_NAME}] ✅ 테이블 존재 확인: {TABLE_NAME}";
+                WriteLogWithFlush(logPath, tableExistsLog);
+                
+                // === 5단계: 테이블 TRUNCATE ===
+                var truncateLog = $"[{METHOD_NAME}] 🗑️ 테이블 TRUNCATE 시작: {TABLE_NAME}";
+                WriteLogWithFlush(logPath, truncateLog);
+                _progress?.Report(truncateLog);
+                
+                var truncateQuery = $"TRUNCATE TABLE {TABLE_NAME}";
+                await _invoiceRepository.ExecuteNonQueryAsync(truncateQuery);
+                
+                var truncateCompleteLog = $"[{METHOD_NAME}] ✅ 테이블 TRUNCATE 완료: {TABLE_NAME}";
+                WriteLogWithFlush(logPath, truncateCompleteLog);
+                
+                // === 6단계: 컬럼 매핑 검증 ===
+                var mappingLog = $"[{METHOD_NAME}] 🔗 컬럼 매핑 검증 시작";
+                WriteLogWithFlush(logPath, mappingLog);
+                _progress?.Report(mappingLog);
+                
+                var columnMapping = ValidateColumnMappingAsync(TABLE_NAME, excelData);
+                if (columnMapping == null || !columnMapping.Any())
+                {
+                    var mappingError = $"[{METHOD_NAME}] ❌ 컬럼 매핑 검증 실패";
+                    WriteLogWithFlush(logPath, mappingError);
+                    throw new InvalidOperationException(mappingError);
+                }
+                
+                var mappingCompleteLog = $"[{METHOD_NAME}] ✅ 컬럼 매핑 검증 완료: {columnMapping.Count}개 컬럼";
+                WriteLogWithFlush(logPath, mappingCompleteLog);
+                
+                // === 7단계: 엑셀 데이터를 테이블에 INSERT ===
+                var insertLog = $"[{METHOD_NAME}] 📝 데이터 INSERT 시작: {excelData.Rows.Count:N0}건";
+                WriteLogWithFlush(logPath, insertLog);
+                _progress?.Report(insertLog);
+                
+                var insertCount = await InsertDataWithMappingAsync(TABLE_NAME, excelData, columnMapping);
+                
+                var insertCompleteLog = $"[{METHOD_NAME}] ✅ 데이터 INSERT 완료: {insertCount:N0}건";
+                WriteLogWithFlush(logPath, insertCompleteLog);
+                
+                // === 8단계: sp_InvoiceSplit 프로시저 호출 ===
+                string procedureResult = "";
+
+                // 프로시저명이 지정된 경우에만 실행 (값이 없으면 건너뜀)
+                if (!string.IsNullOrWhiteSpace(PROCEDURE_NAME))
+                {
+                    var procedureLog = $"[{METHOD_NAME}] 🚀 {PROCEDURE_NAME} 프로시저 호출 시작";
+                    WriteLogWithFlush(logPath, procedureLog);
+                    _progress?.Report(procedureLog);
+                    //finalProgressReporter?.Report(55);
+
+                    try
+                    {
+                        // 프로시저 실행 전 로그 파일 상태 재확인
+                        var preProcedureLog = $"[{METHOD_NAME}] 🔍 프로시저 실행 전 로그 파일 상태 확인";
+                        WriteLogWithFlush(logPath, preProcedureLog);
+
+                        // 프로시저 실행
+                        procedureResult = await ExecuteStoredProcedureAsync(PROCEDURE_NAME);
+
+                        // 프로시저 실행 결과 상세 검증
+                        if (string.IsNullOrEmpty(procedureResult))
+                        {
+                            var nullResultLog = $"[{METHOD_NAME}] ⚠️ 프로시저 실행 결과가 null 또는 빈 문자열입니다.";
+                            WriteLogWithFlush(logPath, nullResultLog);
+                            Console.WriteLine($"⚠️ {nullResultLog}");
+
+                            throw new InvalidOperationException("프로시저 실행 결과가 비어있습니다.");
+                        }
+
+                        // 결과에 오류 키워드가 포함되어 있는지 확인
+                        var errorKeywords = new[] { "Error", "오류", "실패", "Exception", "SQLSTATE", "ROLLBACK" };
+                        var hasError = errorKeywords.Any(keyword =>
+                            procedureResult.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+
+                        if (hasError)
+                        {
+                            var validationErrorLog = $"[{METHOD_NAME}] ⚠️ 프로시저 실행 결과에 오류 키워드 발견: {procedureResult}";
+                            WriteLogWithFlush(logPath, validationErrorLog);
+                            Console.WriteLine($"⚠️ {validationErrorLog}");
+
+                            throw new InvalidOperationException($"프로시저 실행 결과에 오류가 포함되어 있습니다: {procedureResult}");
+                        }
+
+                        // 성공 키워드 확인
+                        var successKeywords = new[] { "Success", "성공", "완료", "완료되었습니다" };
+                        var hasSuccess = successKeywords.Any(keyword =>
+                            procedureResult.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+
+                        if (hasSuccess)
+                        {
+                            var procedureCompleteLog = $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 성공: {procedureResult}";
+                            WriteLogWithFlush(logPath, procedureCompleteLog);
+                            _progress?.Report(procedureCompleteLog);
+                        }
+                        else
+                        {
+                            var procedureCompleteLog = $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 완료: {procedureResult}";
+                            WriteLogWithFlush(logPath, procedureCompleteLog);
+                            _progress?.Report(procedureCompleteLog);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // 프로시저 실행 중 예외 처리
+                        var procedureErrorLog = $"[{METHOD_NAME}] ❌ {PROCEDURE_NAME} 프로시저 실행 오류: {ex.Message}";
+                        WriteLogWithFlush(logPath, procedureErrorLog);
+                        Console.WriteLine($"❌ {procedureErrorLog}");
+
+                        var procedureDetailLog = $"[{METHOD_NAME}] ❌ {PROCEDURE_NAME} 프로시저 상세 오류: {ex}";
+                        WriteLogWithFlush(logPath, procedureDetailLog);
+                        Console.WriteLine($"❌ {procedureDetailLog}");
+
+                        // 프로시저 실행 실패 시 로그 파일 상태 재확인
+                        var postErrorLog = $"[{METHOD_NAME}] 🔍 프로시저 실행 실패 후 로그 파일 상태 확인";
+                        WriteLogWithFlush(logPath, postErrorLog);
+
+                        throw; // 상위로 오류 전파
+                    }
+                }
+                else
+                {
+                    // 프로시저명이 지정되지 않은 경우 로그 기록
+                    var noProcedureLog = $"[{METHOD_NAME}] ℹ️ 프로시저명이 지정되지 않아 프로시저 실행 단계를 건너뜁니다.";
+                    WriteLogWithFlush(logPath, noProcedureLog);
+                    _progress?.Report(noProcedureLog);
+                }
+                
+                // === 9단계: 처리 완료 ===
+                var endTime = DateTime.Now;
+                var duration = endTime - startTime;
+                var completionLog = $"[{METHOD_NAME}] 🎉 톡딜불가 처리 완료 - 소요시간: {duration.TotalSeconds:F1}초";
+                WriteLogWithFlush(logPath, completionLog);
+                _progress?.Report(completionLog);
+                
+                // === 10단계: 성공 통계 로깅 ===
+                var successStats = $"[{METHOD_NAME}] 📊 처리 통계 - 데이터: {insertCount:N0}건, 프로시저결과: {procedureResult}, 소요시간: {duration.TotalSeconds:F1}초";
+                WriteLogWithFlush(logPath, successStats);
+            }
+            catch (Exception ex)
+            {
+                // === 오류 처리 및 로깅 ===
+                var errorTime = DateTime.Now;
+                var errorDuration = errorTime - startTime;
+                
+                var errorLog = $"[{METHOD_NAME}] ❌ 오류 발생 - {errorTime:yyyy-MM-dd HH:mm:ss} (소요시간: {errorDuration.TotalSeconds:F1}초)";
+                WriteLogWithFlush(logPath, errorLog);
+                
+                var errorDetailLog = $"[{METHOD_NAME}] ❌ 오류 상세: {ex.Message}";
+                WriteLogWithFlush(logPath, errorDetailLog);
+                
+                var errorStackTraceLog = $"[{METHOD_NAME}] ❌ 스택 트레이스: {ex.StackTrace}";
+                WriteLogWithFlush(logPath, errorStackTraceLog);
+                
+                // === 사용자에게 오류 메시지 전달 ===
+                var userErrorMessage = $"❌ 톡딜불가 처리 실패: {ex.Message}";
+                WriteLogWithFlush(logPath, userErrorMessage);
+                
+                // === 예외 재발생 ===
+                throw new Exception($"톡딜불가 처리 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+
+        // 송장출력관리 처리
+        private async Task ProcessInvoiceManagement()
+        {
+            const string METHOD_NAME = "ProcessInvoiceManagement";
+            const string TABLE_NAME = "별표송장";
+            const string PROCEDURE_NAME = "sp_ProcessStarInvoice";
+            const string CONFIG_KEY = "DropboxFolderPath6";
+            
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            var startTime = DateTime.Now;
+            
+            try
+            {
+                // === 1단계: 처리 시작 로깅 ===
+                var startLog = $"[{METHOD_NAME}] 송장출력관리 처리 시작 - {startTime:yyyy-MM-dd HH:mm:ss}";
+                WriteLogWithFlush(logPath, startLog);
+                _progress?.Report($"📦 {startLog}");
+                
+                // 로그 파일 상태 진단 및 콘솔 출력
+                var logStatus = DiagnoseLogFileStatus(logPath);
+                Console.WriteLine(logStatus);
+                
+                // === 2단계: DropboxFolderPath3 설정 확인 ===
+                var dropboxPath = System.Configuration.ConfigurationManager.AppSettings[CONFIG_KEY];
+                if (string.IsNullOrEmpty(dropboxPath))
+                {
+                    var configError = $"[{METHOD_NAME}] ❌ {CONFIG_KEY} 설정이 없습니다.";
+                    WriteLogWithFlush(logPath, configError);
+                    throw new InvalidOperationException(configError);
+                }
+                
+                var configLog = $"[{METHOD_NAME}] ✅ {CONFIG_KEY} 설정 확인: {dropboxPath}";
+                WriteLogWithFlush(logPath, configLog);
+                _progress?.Report(configLog);
+                
+                // === 3단계: 엑셀 파일 다운로드 및 읽기 ===
+                var downloadLog = $"[{METHOD_NAME}] 📥 Dropbox에서 엑셀 파일 다운로드 시작: {dropboxPath}";
+                WriteLogWithFlush(logPath, downloadLog);
+                _progress?.Report(downloadLog);
+                
+                // Dropbox API를 사용하여 파일 다운로드
+                string localFilePath;
+                try
+                {
+                    // 임시 파일 경로 생성
+                    var tempDir = Path.GetTempPath();
+                    var fileName = Path.GetFileName(dropboxPath);
+                    if (string.IsNullOrEmpty(fileName))
+                    {
+                        fileName = "별표송장.xlsx";
+                    }
+                    localFilePath = Path.Combine(tempDir, $"temp_{DateTime.Now:yyyyMMdd_HHmmss}_{fileName}");
+                    
+                    // Dropbox에서 파일 다운로드
+                    var dropboxService = DropboxService.Instance;
+                    var downloadSuccess = await dropboxService.DownloadFileAsync(dropboxPath, localFilePath);
+                    if (!downloadSuccess)
+                    {
+                        var downloadError = $"[{METHOD_NAME}] ❌ Dropbox 파일 다운로드 실패: {dropboxPath}";
+                        WriteLogWithFlush(logPath, downloadError);
+                        throw new InvalidOperationException(downloadError);
+                    }
+                    
+                    var downloadCompleteLog = $"[{METHOD_NAME}] ✅ Dropbox 파일 다운로드 완료: {localFilePath}";
+                    WriteLogWithFlush(logPath, downloadCompleteLog);
+                }
+                catch (Exception ex)
+                {
+                    var downloadExceptionError = $"[{METHOD_NAME}] ❌ Dropbox 파일 다운로드 중 예외 발생: {ex.Message}";
+                    WriteLogWithFlush(logPath, downloadExceptionError);
+                    throw new InvalidOperationException($"Dropbox 파일 다운로드 실패: {ex.Message}", ex);
+                }
+                
+                // FileService를 사용하여 엑셀 파일 읽기 (로컬 파일 경로 사용)
+                var excelData = _fileService.ReadExcelToDataTable(localFilePath, "star_invoice_table");
+                if (excelData?.Rows == null || excelData.Rows.Count == 0)
+                {
+                    var noDataError = $"[{METHOD_NAME}] ❌ 엑셀 파일에서 데이터를 읽을 수 없습니다.";
+                    WriteLogWithFlush(logPath, noDataError);
+                    throw new InvalidOperationException(noDataError);
+                }
+                
+                var originalDataCount = excelData.Rows.Count;
+                var dataLoadLog = $"[{METHOD_NAME}] ✅ 엑셀 데이터 로드 완료: {originalDataCount:N0}건";
+                WriteLogWithFlush(logPath, dataLoadLog);
+                _progress?.Report(dataLoadLog);
+                
+                // === 3-1단계: 엑셀 데이터 전처리 ===
+                var preprocessLog = $"[{METHOD_NAME}] 🔧 엑셀 데이터 전처리 시작";
+                WriteLogWithFlush(logPath, preprocessLog);
+                _progress?.Report(preprocessLog);
+                
+                // 전처리: 빈 행 제거 및 null 값 처리
+                var processedData = PreprocessExcelData(excelData);
+                
+                var preprocessCompleteLog = $"[{METHOD_NAME}] ✅ 엑셀 데이터 전처리 완료: {originalDataCount:N0}건 → {processedData.Rows.Count:N0}건";
+                WriteLogWithFlush(logPath, preprocessCompleteLog);
+                _progress?.Report(preprocessCompleteLog);
+                
+                // 전처리된 데이터를 이후 로직에서 사용
+                excelData = processedData;
+                
+                // 임시 파일 정리
+                try
+                {
+                    if (File.Exists(localFilePath))
+                    {
+                        File.Delete(localFilePath);
+                        var cleanupLog = $"[{METHOD_NAME}] 🗑️ 임시 파일 정리 완료: {localFilePath}";
+                        WriteLogWithFlush(logPath, cleanupLog);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var cleanupWarningLog = $"[{METHOD_NAME}] ⚠️ 임시 파일 정리 실패: {ex.Message}";
+                    WriteLogWithFlush(logPath, cleanupWarningLog);
+                    // 임시 파일 정리 실패는 무시하고 계속 진행
+                }
+                
+                // === 4단계: 테이블 존재여부 확인 ===
+                var tableCheckLog = $"[{METHOD_NAME}] 🔍 테이블 존재여부 확인: {TABLE_NAME}";
+                WriteLogWithFlush(logPath, tableCheckLog);
+                _progress?.Report(tableCheckLog);
+                
+                var tableExists = await CheckTableExistsAsync(TABLE_NAME);
+                if (!tableExists)
+                {
+                    var tableNotFoundError = $"[{METHOD_NAME}] ❌ 테이블이 존재하지 않습니다: {TABLE_NAME}";
+                    WriteLogWithFlush(logPath, tableNotFoundError);
+                    throw new InvalidOperationException(tableNotFoundError);
+                }
+                
+                var tableExistsLog = $"[{METHOD_NAME}] ✅ 테이블 존재 확인: {TABLE_NAME}";
+                WriteLogWithFlush(logPath, tableExistsLog);
+                
+                // === 5단계: 테이블 TRUNCATE ===
+                var truncateLog = $"[{METHOD_NAME}] 🗑️ 테이블 TRUNCATE 시작: {TABLE_NAME}";
+                WriteLogWithFlush(logPath, truncateLog);
+                _progress?.Report(truncateLog);
+                
+                var truncateQuery = $"TRUNCATE TABLE {TABLE_NAME}";
+                await _invoiceRepository.ExecuteNonQueryAsync(truncateQuery);
+                
+                var truncateCompleteLog = $"[{METHOD_NAME}] ✅ 테이블 TRUNCATE 완료: {TABLE_NAME}";
+                WriteLogWithFlush(logPath, truncateCompleteLog);
+                
+                // === 6단계: 컬럼 매핑 검증 ===
+                var mappingLog = $"[{METHOD_NAME}] 🔗 컬럼 매핑 검증 시작";
+                WriteLogWithFlush(logPath, mappingLog);
+                _progress?.Report(mappingLog);
+                
+                var columnMapping = ValidateColumnMappingAsync(TABLE_NAME, excelData);
+                if (columnMapping == null || !columnMapping.Any())
+                {
+                    var mappingError = $"[{METHOD_NAME}] ❌ 컬럼 매핑 검증 실패";
+                    WriteLogWithFlush(logPath, mappingError);
+                    throw new InvalidOperationException(mappingError);
+                }
+                
+                var mappingCompleteLog = $"[{METHOD_NAME}] ✅ 컬럼 매핑 검증 완료: {columnMapping.Count}개 컬럼";
+                WriteLogWithFlush(logPath, mappingCompleteLog);
+                
+                // === 7단계: 엑셀 데이터를 테이블에 INSERT ===
+                var insertLog = $"[{METHOD_NAME}] 📝 데이터 INSERT 시작: {excelData.Rows.Count:N0}건";
+                WriteLogWithFlush(logPath, insertLog);
+                _progress?.Report(insertLog);
+                
+                var insertCount = await InsertDataWithMappingAsync(TABLE_NAME, excelData, columnMapping);
+                
+                var insertCompleteLog = $"[{METHOD_NAME}] ✅ 데이터 INSERT 완료: {insertCount:N0}건";
+                WriteLogWithFlush(logPath, insertCompleteLog);
+                
+                // === 8단계: sp_InvoiceSplit 프로시저 호출 ===
+                string procedureResult = "";
+
+                // 프로시저명이 지정된 경우에만 실행 (값이 없으면 건너뜀)
+                if (!string.IsNullOrWhiteSpace(PROCEDURE_NAME))
+                {
+                    var procedureLog = $"[{METHOD_NAME}] 🚀 {PROCEDURE_NAME} 프로시저 호출 시작";
+                    WriteLogWithFlush(logPath, procedureLog);
+                    _progress?.Report(procedureLog);
+                    //finalProgressReporter?.Report(55);
+
+                    try
+                    {
+                        // 프로시저 실행 전 로그 파일 상태 재확인
+                        var preProcedureLog = $"[{METHOD_NAME}] 🔍 프로시저 실행 전 로그 파일 상태 확인";
+                        WriteLogWithFlush(logPath, preProcedureLog);
+
+                        // 프로시저 실행
+                        procedureResult = await ExecuteStoredProcedureAsync(PROCEDURE_NAME);
+
+                        // 프로시저 실행 결과 상세 검증
+                        if (string.IsNullOrEmpty(procedureResult))
+                        {
+                            var nullResultLog = $"[{METHOD_NAME}] ⚠️ 프로시저 실행 결과가 null 또는 빈 문자열입니다.";
+                            WriteLogWithFlush(logPath, nullResultLog);
+                            Console.WriteLine($"⚠️ {nullResultLog}");
+
+                            throw new InvalidOperationException("프로시저 실행 결과가 비어있습니다.");
+                        }
+
+                        // 결과에 오류 키워드가 포함되어 있는지 확인
+                        var errorKeywords = new[] { "Error", "오류", "실패", "Exception", "SQLSTATE", "ROLLBACK" };
+                        var hasError = errorKeywords.Any(keyword =>
+                            procedureResult.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+
+                        if (hasError)
+                        {
+                            var validationErrorLog = $"[{METHOD_NAME}] ⚠️ 프로시저 실행 결과에 오류 키워드 발견: {procedureResult}";
+                            WriteLogWithFlush(logPath, validationErrorLog);
+                            Console.WriteLine($"⚠️ {validationErrorLog}");
+
+                            throw new InvalidOperationException($"프로시저 실행 결과에 오류가 포함되어 있습니다: {procedureResult}");
+                        }
+
+                        // 성공 키워드 확인
+                        var successKeywords = new[] { "Success", "성공", "완료", "완료되었습니다" };
+                        var hasSuccess = successKeywords.Any(keyword =>
+                            procedureResult.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+
+                        if (hasSuccess)
+                        {
+                            var procedureCompleteLog = $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 성공: {procedureResult}";
+                            WriteLogWithFlush(logPath, procedureCompleteLog);
+                            _progress?.Report(procedureCompleteLog);
+                        }
+                        else
+                        {
+                            var procedureCompleteLog = $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 완료: {procedureResult}";
+                            WriteLogWithFlush(logPath, procedureCompleteLog);
+                            _progress?.Report(procedureCompleteLog);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // 프로시저 실행 중 예외 처리
+                        var procedureErrorLog = $"[{METHOD_NAME}] ❌ {PROCEDURE_NAME} 프로시저 실행 오류: {ex.Message}";
+                        WriteLogWithFlush(logPath, procedureErrorLog);
+                        Console.WriteLine($"❌ {procedureErrorLog}");
+
+                        var procedureDetailLog = $"[{METHOD_NAME}] ❌ {PROCEDURE_NAME} 프로시저 상세 오류: {ex}";
+                        WriteLogWithFlush(logPath, procedureDetailLog);
+                        Console.WriteLine($"❌ {procedureDetailLog}");
+
+                        // 프로시저 실행 실패 시 로그 파일 상태 재확인
+                        var postErrorLog = $"[{METHOD_NAME}] 🔍 프로시저 실행 실패 후 로그 파일 상태 확인";
+                        WriteLogWithFlush(logPath, postErrorLog);
+
+                        throw; // 상위로 오류 전파
+                    }
+                }
+                else
+                {
+                    // 프로시저명이 지정되지 않은 경우 로그 기록
+                    var noProcedureLog = $"[{METHOD_NAME}] ℹ️ 프로시저명이 지정되지 않아 프로시저 실행 단계를 건너뜁니다.";
+                    WriteLogWithFlush(logPath, noProcedureLog);
+                    _progress?.Report(noProcedureLog);
+                }
+                
+                // === 9단계: 처리 완료 ===
+                var endTime = DateTime.Now;
+                var duration = endTime - startTime;
+                var completionLog = $"[{METHOD_NAME}] 🎉 송장출력관리 처리 완료 - 소요시간: {duration.TotalSeconds:F1}초";
+                WriteLogWithFlush(logPath, completionLog);
+                _progress?.Report(completionLog);
+                
+                // === 10단계: 성공 통계 로깅 ===
+                var successStats = $"[{METHOD_NAME}] 📊 처리 통계 - 데이터: {insertCount:N0}건, 프로시저결과: {procedureResult}, 소요시간: {duration.TotalSeconds:F1}초";
+                WriteLogWithFlush(logPath, successStats);
+            }
+            catch (Exception ex)
+            {
+                // === 오류 처리 및 로깅 ===
+                var errorTime = DateTime.Now;
+                var errorDuration = errorTime - startTime;
+                
+                var errorLog = $"[{METHOD_NAME}] ❌ 오류 발생 - {errorTime:yyyy-MM-dd HH:mm:ss} (소요시간: {errorDuration.TotalSeconds:F1}초)";
+                WriteLogWithFlush(logPath, errorLog);
+                
+                var errorDetailLog = $"[{METHOD_NAME}] ❌ 오류 상세: {ex.Message}";
+                WriteLogWithFlush(logPath, errorDetailLog);
+                
+                var errorStackTraceLog = $"[{METHOD_NAME}] ❌ 스택 트레이스: {ex.StackTrace}";
+                WriteLogWithFlush(logPath, errorStackTraceLog);
+                
+                // === 사용자에게 오류 메시지 전달 ===
+                var userErrorMessage = $"❌ 송장출력관리 처리 실패: {ex.Message}";
+                WriteLogWithFlush(logPath, userErrorMessage);
+                
+                // === 예외 재발생 ===
+                throw new Exception($"송장출력관리 처리 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 범용 엑셀 데이터 전처리 - 빈 행 제거 및 null 값 처리
+        /// 
+        /// 📋 주요 기능:
+        /// - 빈 행 자동 제거 (모든 컬럼이 null/빈 값인 행)
+        /// - null 값을 빈 문자열("")로 안전하게 변환
+        /// - 데이터 타입 안전성 보장 (문자열 변환)
+        /// - 오류 발생 시 원본 데이터 반환으로 안전성 확보
+        /// 
+        /// 🎯 사용 대상:
+        /// - 톡딜불가 데이터 (talkdeal_unavailable_table)
+        /// - 별표송장 데이터 (star_invoice_table)
+        /// - 기타 모든 엑셀 데이터 전처리
+        /// 
+        /// 🔧 처리 과정:
+        /// 1. 원본 데이터 복사본 생성
+        /// 2. 빈 행 식별 및 제거
+        /// 3. null 값 → 빈 문자열 변환
+        /// 4. 데이터 타입 안전성 검증
+        /// 
+        /// ⚠️ 주의사항:
+        /// - 원본 데이터는 변경되지 않음 (복사본 반환)
+        /// - 전처리 실패 시 원본 데이터 반환
+        /// - 메모리 효율적인 처리 방식 사용
+        /// </summary>
+        /// <param name="excelData">원본 엑셀 데이터</param>
+        /// <returns>전처리된 데이터 (실패 시 원본 데이터)</returns>
+        private DataTable PreprocessExcelData(DataTable excelData)
+        {
+            // 입력 데이터 유효성 검사
+            if (excelData == null)
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                var errorLog = $"[PreprocessExcelData] ❌ 입력 데이터가 null입니다 - 빈 DataTable 반환";
+                WriteLogWithFlush(logPath, errorLog);
+                return new DataTable();
+            }
+
+            if (excelData.Rows.Count == 0)
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                var warningLog = $"[PreprocessExcelData] ⚠️ 입력 데이터에 행이 없습니다 - 원본 데이터 반환";
+                WriteLogWithFlush(logPath, warningLog);
+                return excelData;
+            }
+
+            try
+            {
+                // 원본 데이터 복사본 생성 (원본 데이터 보호)
+                var processedData = excelData.Copy();
+                
+                // === 1단계: 빈 행 제거 (모든 컬럼이 null/빈 값인 행) ===
+                var rowsToRemove = new List<DataRow>();
+                var emptyRowCount = 0;
+                
+                foreach (DataRow row in processedData.Rows)
+                {
+                    bool isEmptyRow = true;
+                    foreach (DataColumn column in processedData.Columns)
+                    {
+                        var value = row[column];
+                        if (value != null && value != DBNull.Value && !string.IsNullOrWhiteSpace(value.ToString()))
+                        {
+                            isEmptyRow = false;
+                            break;
+                        }
+                    }
+                    
+                    if (isEmptyRow)
+                    {
+                        rowsToRemove.Add(row);
+                        emptyRowCount++;
+                    }
+                }
+                
+                // 빈 행 제거 (역순으로 제거하여 인덱스 문제 방지)
+                for (int i = rowsToRemove.Count - 1; i >= 0; i--)
+                {
+                    processedData.Rows.Remove(rowsToRemove[i]);
+                }
+                
+                // === 2단계: null 값 및 데이터 타입 정규화 ===
+                var nullValueCount = 0;
+                var convertedValueCount = 0;
+                
+                foreach (DataRow row in processedData.Rows)
+                {
+                    foreach (DataColumn column in processedData.Columns)
+                    {
+                        var value = row[column];
+                        if (value == null || value == DBNull.Value)
+                        {
+                            row[column] = "";
+                            nullValueCount++;
+                        }
+                        else
+                        {
+                            // 문자열로 변환하여 안전성 확보
+                            var stringValue = value.ToString();
+                            if (stringValue != null)
+                            {
+                                row[column] = stringValue;
+                                convertedValueCount++;
+                            }
+                            else
+                            {
+                                row[column] = "";
+                                nullValueCount++;
+                            }
+                        }
+                    }
+                }
+                
+                // 처리 결과 로깅
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                var successLog = $"[PreprocessExcelData] ✅ 데이터 전처리 완료 - 제거된 빈 행: {emptyRowCount}개, null 값 변환: {nullValueCount}개, 변환된 값: {convertedValueCount}개";
+                WriteLogWithFlush(logPath, successLog);
+                
+                return processedData;
+            }
+            catch (Exception ex)
+            {
+                // 전처리 실패 시 원본 데이터 반환 (안전성 보장)
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                var errorLog = $"[PreprocessExcelData] ❌ 데이터 전처리 실패: {ex.Message} - 원본 데이터 반환";
+                WriteLogWithFlush(logPath, errorLog);
+                
+                var stackTraceLog = $"[PreprocessExcelData] ❌ 스택 트레이스: {ex.StackTrace}";
+                WriteLogWithFlush(logPath, stackTraceLog);
+                
+                return excelData;
+            }
+        }
+
+        /// <summary>
+        /// 컬럼 매핑 검증 - column_mapping.json 파일을 활용하여 엑셀 컬럼과 DB 컬럼 간의 매핑을 검증
+        /// </summary>
+        /// <param name="tableName">테이블명</param>
+        /// <param name="excelData">엑셀 데이터</param>
+        /// <returns>검증된 컬럼 매핑 정보</returns>
+        private Dictionary<string, string>? ValidateColumnMappingAsync(string tableName, DataTable excelData)
+        {
+            try
+            {
+                // column_mapping.json 파일 읽기
+                var mappingJson = ConfigurationService.ReadColumnMappingJson();
+                if (string.IsNullOrEmpty(mappingJson))
+                {
+                    throw new InvalidOperationException("column_mapping.json 파일을 읽을 수 없습니다.");
+                }
+                
+                // JSON 파싱
+                var mappingData = JsonSerializer.Deserialize<JsonElement>(mappingJson);
+                
+                // 해당 테이블의 매핑 정보 찾기
+                if (!mappingData.TryGetProperty("mappings", out var mappings))
+                {
+                    throw new InvalidOperationException("mappings 속성을 찾을 수 없습니다.");
+                }
+                
+                // 테이블명에 따라 적절한 매핑 키 찾기
+                string mappingKey = "";
+                JsonElement tableMapping;
+                
+                if (tableName == "송장출력_메세지")
+                {
+                    mappingKey = "message_table";
+                }
+                else if (tableName == "송장출력_특수출력_합포장변경")
+                {
+                    mappingKey = "merge_packing_table";
+                }
+                else if (tableName == "송장출력_특수출력_감천분리출고")
+                {
+                    mappingKey = "gamcheon_separation_table";
+                }
+                else if (tableName == "송장출력_톡딜불가")
+                {
+                    mappingKey = "talkdeal_unavailable_table";
+                }
+                else
+                {
+                    // 기본값으로 order_table 사용
+                    mappingKey = "order_table";
+                }
+                
+                if (!mappings.TryGetProperty(mappingKey, out tableMapping))
+                {
+                    throw new InvalidOperationException($"매핑 키 '{mappingKey}'에 대한 매핑 정보를 찾을 수 없습니다. (테이블: {tableName})");
+                }
+                
+                if (!tableMapping.TryGetProperty("columns", out var columns))
+                {
+                    throw new InvalidOperationException("컬럼 매핑 정보를 찾을 수 없습니다.");
+                }
+                
+                // 컬럼 매핑 생성
+                var columnMapping = new Dictionary<string, string>();
+                var excelColumns = excelData.Columns.Cast<DataColumn>().Select(c => c.ColumnName).ToList();
+                
+                foreach (var column in columns.EnumerateObject())
+                {
+                    var excelColumnName = column.Name;
+                    if (column.Value.TryGetProperty("db_column", out var dbColumnProp))
+                    {
+                        var dbColumnName = dbColumnProp.GetString();
+                        if (!string.IsNullOrEmpty(dbColumnName) && excelColumns.Contains(excelColumnName))
+                        {
+                            columnMapping[excelColumnName] = dbColumnName;
+                        }
+                    }
+                }
+                
+                // 매핑 검증 결과 로깅
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                var mappingLog = $"[ValidateColumnMapping] 컬럼 매핑 검증 완료 - 테이블: {tableName}, 매핑키: {mappingKey}, 엑셀: {excelColumns.Count}개, 매핑: {columnMapping.Count}개";
+                WriteLogWithFlush(logPath, mappingLog);
+                
+                return columnMapping;
+            }
+            catch (Exception ex)
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                var errorLog = $"[ValidateColumnMapping] ❌ 컬럼 매핑 검증 실패: {ex.Message}";
+                WriteLogWithFlush(logPath, errorLog);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 매핑 정보를 활용하여 데이터를 테이블에 INSERT
+        /// </summary>
+        /// <param name="tableName">테이블명</param>
+        /// <param name="excelData">엑셀 데이터</param>
+        /// <param name="columnMapping">컬럼 매핑 정보</param>
+        /// <returns>INSERT된 행 수</returns>
+        private async Task<int> InsertDataWithMappingAsync(string tableName, DataTable excelData, Dictionary<string, string> columnMapping)
+        {
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                var insertLog = $"[InsertDataWithMapping] 데이터 INSERT 시작 - 테이블: {tableName}, 행수: {excelData.Rows.Count:N0}";
+                WriteLogWithFlush(logPath, insertLog);
+                
+                var insertCount = 0;
+                var batchSize = 100; // 배치 크기
+                
+                for (int i = 0; i < excelData.Rows.Count; i += batchSize)
+                {
+                    var batch = excelData.Rows.Cast<DataRow>().Skip(i).Take(batchSize);
+                    var batchCount = batch.Count();
+                    
+                    var batchLog = $"[InsertDataWithMapping] 배치 처리 중: {i + 1}~{i + batchCount} / {excelData.Rows.Count}";
+                    WriteLogWithFlush(logPath, batchLog);
+                    
+                    foreach (var row in batch)
+                    {
+                        try
+                        {
+                            var insertQuery = BuildInsertQuery(tableName, columnMapping, row);
+                            await _invoiceRepository.ExecuteNonQueryAsync(insertQuery);
+                            insertCount++;
+                        }
+                        catch (Exception ex)
+                        {
+                            var rowErrorLog = $"[InsertDataWithMapping] 행 {i + 1} INSERT 실패: {ex.Message}";
+                            WriteLogWithFlush(logPath, rowErrorLog);
+                            // 개별 행 오류는 계속 진행
+                        }
+                    }
+                    
+                    // 진행률 로깅
+                    var progressLog = $"[InsertDataWithMapping] 진행률: {Math.Min(i + batchSize, excelData.Rows.Count)}/{excelData.Rows.Count} ({((i + batchSize) * 100.0 / excelData.Rows.Count):F1}%)";
+                    WriteLogWithFlush(logPath, progressLog);
+                }
+                
+                var completeLog = $"[InsertDataWithMapping] 데이터 INSERT 완료: {insertCount:N0}건";
+                WriteLogWithFlush(logPath, completeLog);
+                
+                return insertCount;
+            }
+            catch (Exception ex)
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                var errorLog = $"[InsertDataWithMapping] ❌ 데이터 INSERT 실패: {ex.Message}";
+                WriteLogWithFlush(logPath, errorLog);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// INSERT 쿼리 생성
+        /// </summary>
+        /// <param name="tableName">테이블명</param>
+        /// <param name="columnMapping">컬럼 매핑 정보</param>
+        /// <param name="row">데이터 행</param>
+        /// <returns>INSERT 쿼리</returns>
+        private string BuildInsertQuery(string tableName, Dictionary<string, string> columnMapping, DataRow row)
+        {
+            var columns = columnMapping.Values.ToList();
+            var values = new List<string>();
+            
+            foreach (var excelColumn in columnMapping.Keys)
+            {
+                var value = row[excelColumn];
+                if (value == DBNull.Value || value == null)
+                {
+                    values.Add("NULL");
+                }
+                else
+                {
+                    // SQL 인젝션 방지를 위한 이스케이프 처리
+                    var stringValue = value.ToString();
+                    if (stringValue != null)
+                    {
+                        stringValue = stringValue.Replace("'", "''");
+                        values.Add($"'{stringValue}'");
+                    }
+                    else
+                    {
+                        values.Add("NULL");
+                    }
+                }
+            }
+            
+            return $"INSERT INTO {tableName} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", values)})";
+        }
+
+        /// <summary>
+        /// MergePacking 프로시저 실행
+        /// </summary>
+        /// <param name="procedureName">프로시저명</param>
+        /// <returns>프로시저 실행 결과</returns>
+        private async Task<string> ExecuteMergePackingProcedureAsync(string procedureName)
+        {
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                var procedureLog = $"[ExecuteMergePackingProcedure] {procedureName} 프로시저 실행 시작";
+                WriteLogWithFlush(logPath, procedureLog);
+                
+                // 프로시저 실행
+                var procedureQuery = $"CALL {procedureName}()";
+                var result = await _invoiceRepository.ExecuteNonQueryAsync(procedureQuery);
+                
+                var resultLog = $"[ExecuteMergePackingProcedure] {procedureName} 프로시저 실행 완료 - 결과: {result}";
+                WriteLogWithFlush(logPath, resultLog);
+                
+                return result.ToString();
+            }
+            catch (Exception ex)
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                var errorLog = $"[ExecuteMergePackingProcedure] ❌ {procedureName} 프로시저 실행 실패: {ex.Message}";
+                WriteLogWithFlush(logPath, errorLog);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 일반적인 저장 프로시저 실행 (모든 프로시저에서 공통 사용)
+        /// </summary>
+        /// <param name="procedureName">프로시저명</param>
+        /// <returns>프로시저 실행 결과</returns>
+        private async Task<string> ExecuteStoredProcedureAsync(string procedureName)
+        {
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            
+            try
+            {
+                // 로그 파일 상태 진단 및 콘솔 출력
+                var logStatus = DiagnoseLogFileStatus(logPath);
+                Console.WriteLine(logStatus);
+                
+                var procedureLog = $"[ExecuteStoredProcedure] {procedureName} 프로시저 실행 시작";
+                WriteLogWithFlush(logPath, procedureLog);
+                
+                // 프로시저 실행
+                var procedureQuery = $"CALL {procedureName}()";
+                Console.WriteLine($"🔍 실행할 SQL: {procedureQuery}");
+                
+                var result = await _invoiceRepository.ExecuteNonQueryAsync(procedureQuery);
+                
+                // 프로시저 실행 결과를 문자열로 변환 (int 타입 처리)
+                var resultString = result.ToString();
+                
+                // 결과에 오류 키워드가 포함되어 있는지 확인
+                var errorKeywords = new[] { "Error", "오류", "실패", "Exception", "SQLSTATE", "ROLLBACK" };
+                var hasError = errorKeywords.Any(keyword => 
+                    resultString.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+                
+                if (hasError)
+                {
+                    var errorResultLog = $"[ExecuteStoredProcedure] ⚠️ {procedureName} 프로시저 실행 결과에 오류 발견: {resultString}";
+                    WriteLogWithFlush(logPath, errorResultLog);
+                    Console.WriteLine($"⚠️ {errorResultLog}");
+                    
+                    // 오류가 포함된 결과를 예외로 던져서 C#에서 감지할 수 있도록 함
+                    throw new InvalidOperationException($"프로시저 실행 결과에 오류가 포함되어 있습니다: {resultString}");
+                }
+                
+                // 성공 키워드 확인
+                var successKeywords = new[] { "Success", "성공", "완료", "완료되었습니다", "작업완료" };
+                var hasSuccess = successKeywords.Any(keyword => 
+                    resultString.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+                
+                if (hasSuccess)
+                {
+                    var successResultLog = $"[ExecuteStoredProcedure] ✅ {procedureName} 프로시저 실행 성공: {resultString}";
+                    WriteLogWithFlush(logPath, successResultLog);
+                    Console.WriteLine($"✅ {successResultLog}");
+                }
+                else
+                {
+                    var resultLog = $"[ExecuteStoredProcedure] {procedureName} 프로시저 실행 완료 - 결과: {resultString}";
+                    WriteLogWithFlush(logPath, resultLog);
+                    Console.WriteLine($"✅ 프로시저 실행 완료: {resultString}");
+                }
+                
+                return resultString;
+            }
+            catch (Exception ex)
+            {
+                var errorLog = $"[ExecuteStoredProcedure] ❌ {procedureName} 프로시저 실행 실패: {ex.Message}";
+                WriteLogWithFlush(logPath, errorLog);
+                Console.WriteLine($"❌ 프로시저 실행 실패: {ex.Message}");
+                
+                var errorDetailLog = $"[ExecuteStoredProcedure] ❌ {procedureName} 프로시저 상세 오류: {ex}";
+                WriteLogWithFlush(logPath, errorDetailLog);
+                Console.WriteLine($"❌ 프로시저 상세 오류: {ex}");
+                
+                // 스택 트레이스도 로그에 기록
+                var stackTraceLog = $"[ExecuteStoredProcedure] ❌ {procedureName} 스택 트레이스: {ex.StackTrace}";
+                WriteLogWithFlush(logPath, stackTraceLog);
+                
+                throw;
+            }
+        }
 
         /// <summary>
         /// DataTable을 Order 객체 컬렉션으로 변환
@@ -1163,7 +2700,7 @@ namespace LogisticManager.Processors
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
             
             var conversionStartLog = $"[데이터변환] DataTable → Order 변환 시작 - 총 {totalRows:N0}건";
-            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {conversionStartLog}\n");
+            WriteLogWithFlush(logPath, conversionStartLog);
             
             // === 각 행을 Order 객체로 변환 ===
             for (int i = 0; i < totalRows; i++)
@@ -1182,14 +2719,14 @@ namespace LogisticManager.Processors
                         if (convertedRows % 100 == 0)
                         {
                             var progressLog = $"[데이터변환] 변환 진행률: {convertedRows:N0}/{totalRows:N0}건 ({convertedRows * 100.0 / totalRows:F1}%)";
-                            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {progressLog}\n");
+                            WriteLogWithFlush(logPath, progressLog);
                         }
                     }
                     else
                     {
                         failedRows++;
                         var nullOrderLog = $"[데이터변환] 행 {i + 1}: Order.FromDataRow()가 null 반환";
-                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {nullOrderLog}\n");
+                        WriteLogWithFlush(logPath, nullOrderLog);
                         errorDetails.Add($"행 {i + 1}: null 반환");
                     }
                 }
@@ -1197,39 +2734,39 @@ namespace LogisticManager.Processors
                 {
                     failedRows++;
                     var conversionErrorLog = $"[데이터변환] 행 {i + 1} 변환 실패: {ex.Message}";
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {conversionErrorLog}\n");
+                    WriteLogWithFlush(logPath, conversionErrorLog);
                     errorDetails.Add($"행 {i + 1}: {ex.Message}");
                     
                     // 처음 10개의 오류만 상세 로그
                     if (failedRows <= 10)
                     {
                         var errorDetailLog = $"[데이터변환]   - 행 {i + 1} 상세 오류: {ex}";
-                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorDetailLog}\n");
+                        WriteLogWithFlush(logPath, errorDetailLog);
                     }
                 }
             }
             
             // === 변환 결과 통계 ===
             var conversionResultLog = $"[데이터변환] 변환 완료 - 성공: {convertedRows:N0}건, 실패: {failedRows:N0}건, 성공률: {convertedRows * 100.0 / totalRows:F1}%";
-            File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {conversionResultLog}\n");
+            WriteLogWithFlush(logPath, conversionResultLog);
             
             if (failedRows > 0)
             {
                 var failureSummaryLog = $"[데이터변환] 실패 요약 - 총 실패: {failedRows:N0}건 ({failedRows * 100.0 / totalRows:F1}%)";
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {failureSummaryLog}\n");
+                WriteLogWithFlush(logPath, failureSummaryLog);
                 
                 // 실패율이 높은 경우 경고
                 if (failedRows * 100.0 / totalRows > 10.0)
                 {
                     var highFailureRateLog = $"[데이터변환] ⚠️ 높은 실패율 경고 - 실패율이 10%를 초과합니다. ({failedRows * 100.0 / totalRows:F1}%)";
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {highFailureRateLog}\n");
+                    WriteLogWithFlush(logPath, highFailureRateLog);
                 }
                 
                 // 처음 5개의 오류 상세 정보
                 foreach (var errorDetail in errorDetails.Take(5))
                 {
                     var errorDetailLog = $"[데이터변환]   - {errorDetail}";
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorDetailLog}\n");
+                    WriteLogWithFlush(logPath, errorDetailLog);
                 }
             }
             
@@ -1304,7 +2841,7 @@ namespace LogisticManager.Processors
                 Console.WriteLine($"[빌드정보] Repository를 통한 수취인명 정리 완료: {recipientUpdatedCount}건");
                 
                 // ==================== 4단계: 주소 데이터 정리 (특수문자 제거) ====================
-                // 주소 필드에서 중점(·) 문자 제거
+                // 주소 필드에서 중점("·") 문자 제거
                 // 주소 표기 통일 및 배송 시스템 호환성 향상을 위한 정제 작업
                 // RemoveCharacterAsync: REPLACE 함수를 사용한 문자열 치환으로 성능 최적화
                 var addressCleanedCount = await _invoiceRepository.RemoveCharacterAsync("주소", "·");
@@ -2185,8 +3722,6 @@ namespace LogisticManager.Processors
             return (c >= 0x1100 && c <= 0x11FF) || (c >= 0xAC00 && c <= 0xD7AF);
         }
 
-        #endregion
-
         /// <summary>
         /// 데이터베이스 연결 상태를 확인하는 메서드
         /// </summary>
@@ -2245,13 +3780,13 @@ namespace LogisticManager.Processors
             
             // 로그 파일에 시작 메시지 기록
             var startLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 🚀 ProcessInvoiceMessageData 메서드 시작됨";
-            File.AppendAllText(logService.LogFilePath, startLog + Environment.NewLine);
+            WriteLogWithFlush(logService.LogFilePath, startLog + Environment.NewLine);
             
             try
             {
                 // 로그 파일에 시작 메시지 기록
                 var logMessage = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 📝 [4-1단계] 송장출력 메세지 데이터 처리 시작...";
-                File.AppendAllText(logService.LogFilePath, logMessage + Environment.NewLine);
+                WriteLogWithFlush(logService.LogFilePath, logMessage + Environment.NewLine);
                 
                 _progress?.Report("📝 [4-1단계] 송장출력 메세지 데이터 처리 시작...");
                 Console.WriteLine("📝 [4-1단계] 송장출력 메세지 데이터 처리 시작...");
@@ -2262,7 +3797,7 @@ namespace LogisticManager.Processors
                 
                 // 로그 파일에 설정값 기록
                 var configLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 🔍 DropboxFolderPath1 설정값: '{dropboxPath}'";
-                File.AppendAllText(logService.LogFilePath, configLog + Environment.NewLine);
+                WriteLogWithFlush(logService.LogFilePath, configLog + Environment.NewLine);
                 
                 if (string.IsNullOrEmpty(dropboxPath))
                 {
@@ -2272,13 +3807,13 @@ namespace LogisticManager.Processors
                     
                     // 로그 파일에 오류 메시지 기록
                     var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                    File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, errorLog + Environment.NewLine);
                     return;
                 }
 
                 Console.WriteLine($"📁 Dropbox 경로: {dropboxPath}");
                 var dropboxPathLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 📁 Dropbox 경로: {dropboxPath}";
-                File.AppendAllText(logService.LogFilePath, dropboxPathLog + Environment.NewLine);
+                WriteLogWithFlush(logService.LogFilePath, dropboxPathLog + Environment.NewLine);
 
                 // 2. DropboxService를 통해 엑셀 파일 다운로드
                 var dropboxService = DropboxService.Instance;
@@ -2286,7 +3821,7 @@ namespace LogisticManager.Processors
                 Console.WriteLine($"📁 임시 파일 경로: {tempFilePath}");
                 
                 var tempFilePathLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 📁 임시 파일 경로: {tempFilePath}";
-                File.AppendAllText(logService.LogFilePath, tempFilePathLog + Environment.NewLine);
+                WriteLogWithFlush(logService.LogFilePath, tempFilePathLog + Environment.NewLine);
 
                 try
                 {
@@ -2294,7 +3829,7 @@ namespace LogisticManager.Processors
                     Console.WriteLine("📥 Dropbox에서 엑셀 파일 다운로드 중...");
                     
                     var downloadStartLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 📥 Dropbox에서 엑셀 파일 다운로드 중...";
-                    File.AppendAllText(logService.LogFilePath, downloadStartLog + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, downloadStartLog + Environment.NewLine);
 
                     // Dropbox에서 파일 다운로드
                     await dropboxService.DownloadFileAsync(dropboxPath, tempFilePath);
@@ -2303,7 +3838,7 @@ namespace LogisticManager.Processors
                     _progress?.Report("✅ 엑셀 파일 다운로드 완료");
                     
                     var downloadCompleteLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ✅ 엑셀 파일 다운로드 완료: {tempFilePath}";
-                    File.AppendAllText(logService.LogFilePath, downloadCompleteLog + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, downloadCompleteLog + Environment.NewLine);
                     
                     // 파일 존재 여부 확인
                     if (!File.Exists(tempFilePath))
@@ -2314,7 +3849,7 @@ namespace LogisticManager.Processors
                         
                         // 로그 파일에 오류 메시지 기록
                         var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                        File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
+                        WriteLogWithFlush(logService.LogFilePath, errorLog + Environment.NewLine);
                         return;
                     }
                     
@@ -2322,7 +3857,7 @@ namespace LogisticManager.Processors
                     Console.WriteLine($"📊 다운로드된 파일 크기: {fileInfo.Length} bytes");
                     
                     var fileSizeLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 📊 다운로드된 파일 크기: {fileInfo.Length} bytes";
-                    File.AppendAllText(logService.LogFilePath, fileSizeLog + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, fileSizeLog + Environment.NewLine);
                     
                     // 파일 크기가 0인지 확인
                     if (fileInfo.Length == 0)
@@ -2333,7 +3868,7 @@ namespace LogisticManager.Processors
                         
                         // 로그 파일에 오류 메시지 기록
                         var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                        File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
+                        WriteLogWithFlush(logService.LogFilePath, errorLog + Environment.NewLine);
                         return;
                     }
                 }
@@ -2346,10 +3881,10 @@ namespace LogisticManager.Processors
                     
                     // 로그 파일에 오류 메시지 기록
                     var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                    File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, errorLog + Environment.NewLine);
                     
                     var detailErrorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ❌ 상세 오류: {ex}";
-                    File.AppendAllText(logService.LogFilePath, detailErrorLog + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, detailErrorLog + Environment.NewLine);
                     return;
                 }
 
@@ -2361,7 +3896,7 @@ namespace LogisticManager.Processors
                     Console.WriteLine("📊 엑셀 파일 읽기 중...");
                     
                     var excelReadStartLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 📊 엑셀 파일 읽기 중...";
-                    File.AppendAllText(logService.LogFilePath, excelReadStartLog + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, excelReadStartLog + Environment.NewLine);
 
                     // 엑셀 파일의 기본 정보 확인
                     Console.WriteLine($"🔍 엑셀 파일 정보:");
@@ -2370,10 +3905,10 @@ namespace LogisticManager.Processors
                     Console.WriteLine($"  - 파일 수정 시간: {File.GetLastWriteTime(tempFilePath)}");
 
                     var excelInfoLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 🔍 엑셀 파일 정보:";
-                    File.AppendAllText(logService.LogFilePath, excelInfoLog + Environment.NewLine);
-                    File.AppendAllText(logService.LogFilePath, $"  - 파일 경로: {tempFilePath}" + Environment.NewLine);
-                    File.AppendAllText(logService.LogFilePath, $"  - 파일 크기: {new FileInfo(tempFilePath).Length} bytes" + Environment.NewLine);
-                    File.AppendAllText(logService.LogFilePath, $"  - 파일 수정 시간: {File.GetLastWriteTime(tempFilePath)}" + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, excelInfoLog + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, $"  - 파일 경로: {tempFilePath}" + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, $"  - 파일 크기: {new FileInfo(tempFilePath).Length} bytes" + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, $"  - 파일 수정 시간: {File.GetLastWriteTime(tempFilePath)}" + Environment.NewLine);
 
                     // FileService를 사용하여 엑셀 파일 읽기 (column_mapping.json의 message_table 매핑 적용)
                     Console.WriteLine("🔍 FileService.ReadExcelToDataTable 호출 시작...");
@@ -2381,7 +3916,7 @@ namespace LogisticManager.Processors
                     Console.WriteLine("✅ FileService.ReadExcelToDataTable 호출 완료");
                     
                     var fileServiceCallLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 🔍 FileService.ReadExcelToDataTable 호출 시작...";
-                    File.AppendAllText(logService.LogFilePath, fileServiceCallLog + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, fileServiceCallLog + Environment.NewLine);
                     
                     if (messageData == null)
                     {
@@ -2391,7 +3926,7 @@ namespace LogisticManager.Processors
                         
                         // 로그 파일에 오류 메시지 기록
                         var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                        File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
+                        WriteLogWithFlush(logService.LogFilePath, errorLog + Environment.NewLine);
                         return;
                     }
                     
@@ -2403,87 +3938,24 @@ namespace LogisticManager.Processors
                         
                         // 로그 파일에 경고 메시지 기록
                         var warningLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {warningMessage}";
-                        File.AppendAllText(logService.LogFilePath, warningLog + Environment.NewLine);
+                        WriteLogWithFlush(logService.LogFilePath, warningLog + Environment.NewLine);
                         return;
                     }
 
                     // 엑셀 파일의 컬럼명을 로깅 (매핑 적용 후)
                     Console.WriteLine("📋 엑셀 파일 컬럼명 (매핑 적용 후):");
                     var columnLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 📋 엑셀 파일 컬럼명 (매핑 적용 후):";
-                    File.AppendAllText(logService.LogFilePath, columnLog + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, columnLog + Environment.NewLine);
                     
                     foreach (DataColumn column in messageData.Columns)
                     {
-                        Console.WriteLine($"  - {column.ColumnName} ({column.DataType.Name})");
-                        File.AppendAllText(logService.LogFilePath, $"  - {column.ColumnName} ({column.DataType.Name})" + Environment.NewLine);
+                        Console.WriteLine($"  - {column.ColumnName}");
+                        WriteLogWithFlush(logService.LogFilePath, $"  - {column.ColumnName}" + Environment.NewLine);
                     }
 
-                    // 첫 번째 행의 데이터 샘플 로깅 (모든 컬럼)
-                    Console.WriteLine("📊 첫 번째 행 데이터 샘플 (모든 컬럼):");
-                    var sampleLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 📊 첫 번째 행 데이터 샘플 (모든 컬럼):";
-                    File.AppendAllText(logService.LogFilePath, sampleLog + Environment.NewLine);
-                    
-                    if (messageData.Rows.Count > 0)
-                    {
-                        var firstRow = messageData.Rows[0];
-                        for (int i = 0; i < messageData.Columns.Count; i++)
-                        {
-                            var columnName = messageData.Columns[i].ColumnName;
-                            var value = firstRow[i]?.ToString() ?? "NULL";
-                            Console.WriteLine($"  - {columnName}: '{value}' (타입: {firstRow[i]?.GetType().Name ?? "null"})");
-                            File.AppendAllText(logService.LogFilePath, $"  - {columnName}: '{value}' (타입: {firstRow[i]?.GetType().Name ?? "null"})" + Environment.NewLine);
-                        }
-                    }
-
-                    // 쇼핑몰 컬럼이 있는지 확인
-                    if (messageData.Columns.Contains("쇼핑몰"))
-                    {
-                        Console.WriteLine("✅ 쇼핑몰 컬럼이 존재합니다.");
-                        var shoppingMallColumn = messageData.Columns["쇼핑몰"];
-                        if (shoppingMallColumn != null)
-                        {
-                            Console.WriteLine($"  - 컬럼 타입: {shoppingMallColumn.DataType.Name}");
-                            Console.WriteLine($"  - 컬럼 인덱스: {shoppingMallColumn.Ordinal}");
-                            
-                            var shoppingMallLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ✅ 쇼핑몰 컬럼이 존재합니다.";
-                            File.AppendAllText(logService.LogFilePath, shoppingMallLog + Environment.NewLine);
-                            File.AppendAllText(logService.LogFilePath, $"  - 컬럼 타입: {shoppingMallColumn.DataType.Name}" + Environment.NewLine);
-                            File.AppendAllText(logService.LogFilePath, $"  - 컬럼 인덱스: {shoppingMallColumn.Ordinal}" + Environment.NewLine);
-                        }
-                        
-                        // 쇼핑몰 컬럼의 첫 번째 행 값 확인
-                        if (messageData.Rows.Count > 0)
-                        {
-                            var firstRow = messageData.Rows[0];
-                            var firstRowShoppingMall = firstRow["쇼핑몰"];
-                            var shoppingMallValue = firstRowShoppingMall?.ToString() ?? "NULL";
-                            var shoppingMallType = firstRowShoppingMall?.GetType().Name ?? "null";
-                            
-                            Console.WriteLine($"  - 첫 번째 행 쇼핑몰 값: '{shoppingMallValue}' (타입: {shoppingMallType})");
-                            File.AppendAllText(logService.LogFilePath, $"  - 첫 번째 행 쇼핑몰 값: '{shoppingMallValue}' (타입: {shoppingMallType})" + Environment.NewLine);
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("❌ 쇼핑몰 컬럼이 존재하지 않습니다.");
-                        Console.WriteLine("🔍 사용 가능한 컬럼들:");
-                        
-                        var shoppingMallNotFoundLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ❌ 쇼핑몰 컬럼이 존재하지 않습니다.";
-                        File.AppendAllText(logService.LogFilePath, shoppingMallNotFoundLog + Environment.NewLine);
-                        File.AppendAllText(logService.LogFilePath, "🔍 사용 가능한 컬럼들:" + Environment.NewLine);
-                        
-                        foreach (DataColumn column in messageData.Columns)
-                        {
-                            Console.WriteLine($"  - {column.ColumnName}");
-                            File.AppendAllText(logService.LogFilePath, $"  - {column.ColumnName}" + Environment.NewLine);
-                        }
-                    }
-
-                    Console.WriteLine($"✅ 엑셀 파일 읽기 완료: {messageData.Rows.Count}행, {messageData.Columns.Count}열");
-                    _progress?.Report($"✅ 엑셀 파일 읽기 완료: {messageData.Rows.Count}행");
-                    
-                    var excelReadCompleteLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ✅ 엑셀 파일 읽기 완료: {messageData.Rows.Count}행, {messageData.Columns.Count}열";
-                    File.AppendAllText(logService.LogFilePath, excelReadCompleteLog + Environment.NewLine);
+                    Console.WriteLine($"📊 엑셀 파일 읽기 완료: {messageData.Rows.Count}행, {messageData.Columns.Count}열");
+                    var excelReadCompleteLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 📊 엑셀 파일 읽기 완료: {messageData.Rows.Count}행, {messageData.Columns.Count}열";
+                    WriteLogWithFlush(logService.LogFilePath, excelReadCompleteLog + Environment.NewLine);
                 }
                 catch (Exception ex)
                 {
@@ -2494,544 +3966,573 @@ namespace LogisticManager.Processors
                     
                     // 로그 파일에 오류 메시지 기록
                     var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                    File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
-                    return;
-                }
-
-                // 4. 컬럼 매핑 검증
-                try
-                {
-                    _progress?.Report("🔍 컬럼 매핑 검증 중...");
-                    Console.WriteLine("🔍 컬럼 매핑 검증 중...");
-
-                    // MappingService를 통해 매핑 설정 확인
-                    var mappingService = new MappingService();
-                    var mappingConfig = mappingService.GetConfiguration();
-                    
-                    if (mappingConfig?.Mappings.TryGetValue("message_table", out var messageTableMapping) == true)
-                    {
-                        Console.WriteLine($"📋 message_table 매핑 정보:");
-                        Console.WriteLine($"  - 매핑 ID: {messageTableMapping.MappingId}");
-                        Console.WriteLine($"  - 테이블명: {messageTableMapping.TableName}");
-                        Console.WriteLine($"  - 활성화 여부: {messageTableMapping.IsActive}");
-                        Console.WriteLine($"  - 컬럼 수: {messageTableMapping.Columns.Count}");
-
-                        // 매핑된 컬럼들과 실제 엑셀 컬럼들을 비교
-                        var mappedColumns = messageTableMapping.Columns.Keys.ToList();
-                        var excelColumns = messageData.Columns.Cast<DataColumn>().Select(c => c.ColumnName).ToList();
-
-                        Console.WriteLine("🔍 컬럼 매핑 검증 결과:");
-                        Console.WriteLine($"  - 매핑 설정된 컬럼: {string.Join(", ", mappedColumns)}");
-                        Console.WriteLine($"  - 엑셀 파일 컬럼: {string.Join(", ", excelColumns)}");
-
-                        // 매핑되지 않은 컬럼 확인
-                        var unmappedColumns = excelColumns.Except(mappedColumns).ToList();
-                        if (unmappedColumns.Any())
-                        {
-                            Console.WriteLine($"⚠️ 매핑되지 않은 컬럼 발견: {string.Join(", ", unmappedColumns)}");
-                        }
-
-                        // 누락된 컬럼 확인
-                        var missingColumns = mappedColumns.Except(excelColumns).ToList();
-                        if (missingColumns.Any())
-                        {
-                            Console.WriteLine($"⚠️ 엑셀에 누락된 컬럼: {string.Join(", ", missingColumns)}");
-                        }
-
-                        Console.WriteLine("✅ 컬럼 매핑 검증 완료");
-                        _progress?.Report("✅ 컬럼 매핑 검증 완료");
-                    }
-                    else
-                    {
-                        var warningMessage = "⚠️ message_table 매핑 설정을 찾을 수 없습니다.";
-                        Console.WriteLine(warningMessage);
-                        _progress?.Report(warningMessage);
-                        
-                        // 로그 파일에 경고 메시지 기록
-                        var warningLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {warningMessage}";
-                        File.AppendAllText(logService.LogFilePath, warningLog + Environment.NewLine);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    var warningMessage = $"⚠️ 컬럼 매핑 검증 중 오류 발생: {ex.Message}";
-                    Console.WriteLine(warningMessage);
-                    _progress?.Report(warningMessage);
-                    
-                    // 로그 파일에 경고 메시지 기록
-                    var warningLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {warningMessage}";
-                    File.AppendAllText(logService.LogFilePath, warningLog + Environment.NewLine);
-                }
-
-                // 5. '송장출력_메세지' 테이블 존재 여부 확인 및 구조 조회
-                try
-                {
-                    _progress?.Report("🔍 송장출력_메세지 테이블 존재 여부 확인 중...");
-                    Console.WriteLine("🔍 송장출력_메세지 테이블 존재 여부 확인 중...");
-
-                    var tableExists = await CheckTableExistsAsync("송장출력_메세지");
-                    if (!tableExists)
-                    {
-                        var errorMessage = "❌ 송장출력_메세지 테이블이 존재하지 않습니다.";
-                        Console.WriteLine(errorMessage);
-                        _progress?.Report(errorMessage);
-                        
-                        // 로그 파일에 오류 메시지 기록
-                        var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                        File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
-                        return;
-                    }
-
-                    Console.WriteLine("✅ 송장출력_메세지 테이블 존재 확인 완료");
-                    _progress?.Report("✅ 송장출력_메세지 테이블 존재 확인 완료");
-
-                    // 테이블 구조 조회
-                    _progress?.Report("🔍 송장출력_메세지 테이블 구조 조회 중...");
-                    Console.WriteLine("🔍 송장출력_메세지 테이블 구조 조회 중...");
-
-                    var tableStructureQuery = @"
-                        SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
-                        FROM INFORMATION_SCHEMA.COLUMNS 
-                        WHERE TABLE_SCHEMA = DATABASE() 
-                        AND TABLE_NAME = '송장출력_메세지'
-                        ORDER BY ORDINAL_POSITION";
-
-                    var tableStructure = await _invoiceRepository.ExecuteQueryAsync(tableStructureQuery);
-                    var dbColumns = new List<string>();
-                    var nullableColumns = new HashSet<string>();
-                    
-                    if (tableStructure != null && tableStructure.Rows.Count > 0)
-                    {
-                        Console.WriteLine("📋 송장출력_메세지 테이블 구조:");
-                        foreach (DataRow row in tableStructure.Rows)
-                        {
-                            var columnName = row["COLUMN_NAME"]?.ToString();
-                            var dataType = row["DATA_TYPE"]?.ToString();
-                            var isNullable = row["IS_NULLABLE"]?.ToString();
-                            
-                            if (!string.IsNullOrEmpty(columnName))
-                            {
-                                dbColumns.Add(columnName);
-                                
-                                // NULL을 허용하는 컬럼인지 확인
-                                if (isNullable == "YES")
-                                {
-                                    nullableColumns.Add(columnName);
-                                }
-                                
-                                Console.WriteLine($"  - {columnName} ({dataType}) {(isNullable == "YES" ? "NULL" : "NOT NULL")}");
-                            }
-                        }
-
-                        // 엑셀 파일의 컬럼과 데이터베이스 컬럼을 비교
-                        var excelColumns = messageData.Columns.Cast<DataColumn>().Select(c => c.ColumnName).ToList();
-                        Console.WriteLine($"📊 엑셀 파일 컬럼: {string.Join(", ", excelColumns)}");
-                        Console.WriteLine($"📊 데이터베이스 컬럼: {string.Join(", ", dbColumns)}");
-
-                        // 매핑 가능한 컬럼만 필터링
-                        var mappableColumns = excelColumns.Intersect(dbColumns).ToList();
-                        var unmappableColumns = excelColumns.Except(dbColumns).ToList();
-
-                        if (unmappableColumns.Any())
-                        {
-                            Console.WriteLine($"⚠️ 매핑할 수 없는 컬럼: {string.Join(", ", unmappableColumns)}");
-                        }
-
-                        if (mappableColumns.Any())
-                        {
-                            Console.WriteLine($"✅ 매핑 가능한 컬럼: {string.Join(", ", mappableColumns)}");
-                        }
-                        else
-                        {
-                            var errorMessage = "❌ 매핑 가능한 컬럼이 없습니다.";
-                            Console.WriteLine(errorMessage);
-                            _progress?.Report(errorMessage);
-                            
-                            // 로그 파일에 오류 메시지 기록
-                            var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                            File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        var errorMessage = "❌ 테이블 구조를 조회할 수 없습니다.";
-                        Console.WriteLine(errorMessage);
-                        _progress?.Report(errorMessage);
-                        
-                        // 로그 파일에 오류 메시지 기록
-                        var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                        File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
-                        return;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    var errorMessage = $"❌ 테이블 존재 여부 확인 실패: {ex.Message}";
-                    Console.WriteLine(errorMessage);
-                    _progress?.Report(errorMessage);
-                    
-                    // 로그 파일에 오류 메시지 기록
-                    var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                    File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
-                    return;
-                }
-
-                // 6. '송장출력_메세지' 테이블 TRUNCATE
-                try
-                {
-                    _progress?.Report("🗑️ 송장출력_메세지 테이블 초기화 중...");
-                    Console.WriteLine("🗑️ 송장출력_메세지 테이블 초기화 중...");
-
-                    var truncateSql = "TRUNCATE TABLE 송장출력_메세지";
-                    Console.WriteLine($"🔍 실행할 SQL: {truncateSql}");
-                    
-                    await _invoiceRepository.ExecuteNonQueryAsync(truncateSql);
-
-                    Console.WriteLine("✅ 송장출력_메세지 테이블 초기화 완료");
-                    _progress?.Report("✅ 송장출력_메세지 테이블 초기화 완료");
-                }
-                catch (Exception ex)
-                {
-                    var errorMessage = $"❌ 테이블 초기화 실패: {ex.Message}";
-                    Console.WriteLine(errorMessage);
-                    Console.WriteLine($"❌ 상세 오류: {ex}");
-                    _progress?.Report(errorMessage);
-                    
-                    // 로그 파일에 오류 메시지 기록
-                    var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                    File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
-                    return;
-                }
-
-                // 7. DataTable 데이터를 '송장출력_메세지' 테이블에 INSERT
-                try
-                {
-                    _progress?.Report("💾 송장출력_메세지 테이블에 데이터 삽입 중...");
-                    Console.WriteLine("💾 송장출력_메세지 테이블에 데이터 삽입 중...");
-                    
-                    var insertStartLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 💾 송장출력_메세지 테이블에 데이터 삽입 중...";
-                    File.AppendAllText(logService.LogFilePath, insertStartLog + Environment.NewLine);
-
-                    // 테이블 구조 다시 조회하여 매핑 가능한 컬럼 확인
-                    var tableStructureQuery = @"
-                        SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
-                        FROM INFORMATION_SCHEMA.COLUMNS 
-                        WHERE TABLE_SCHEMA = DATABASE() 
-                        AND TABLE_NAME = '송장출력_메세지'
-                        ORDER BY ORDINAL_POSITION";
-
-                    var tableStructure = await _invoiceRepository.ExecuteQueryAsync(tableStructureQuery);
-                    var dbColumns = new List<string>();
-                    var nullableColumns = new HashSet<string>();
-                    
-                    if (tableStructure != null && tableStructure.Rows.Count > 0)
-                    {
-                        foreach (DataRow row in tableStructure.Rows)
-                        {
-                            var columnName = row["COLUMN_NAME"]?.ToString();
-                            var isNullable = row["IS_NULLABLE"]?.ToString();
-                            
-                            if (!string.IsNullOrEmpty(columnName))
-                            {
-                                dbColumns.Add(columnName);
-                                
-                                // NULL을 허용하는 컬럼인지 확인
-                                if (isNullable == "YES")
-                                {
-                                    nullableColumns.Add(columnName);
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        var errorMessage = "❌ 테이블 구조를 조회할 수 없습니다.";
-                        Console.WriteLine(errorMessage);
-                        _progress?.Report(errorMessage);
-                        
-                        var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                        File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
-                        return;
-                    }
-
-                    // 매핑 가능한 컬럼만 필터링
-                    var excelColumns = messageData.Columns.Cast<DataColumn>().Select(c => c.ColumnName).ToList();
-                    var mappableColumns = excelColumns.Intersect(dbColumns).ToList();
-
-                    if (!mappableColumns.Any())
-                    {
-                        var errorMessage = "❌ 매핑 가능한 컬럼이 없습니다.";
-                        Console.WriteLine(errorMessage);
-                        _progress?.Report(errorMessage);
-                        
-                        var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                        File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
-                        return;
-                    }
-
-                    int insertedCount = 0;
-                    int totalRows = messageData.Rows.Count;
-                    Console.WriteLine($"📊 총 삽입할 행 수: {totalRows}");
-                    Console.WriteLine($"📊 매핑 가능한 컬럼: {string.Join(", ", mappableColumns)}");
-                    Console.WriteLine($"📊 NULL 허용 컬럼: {string.Join(", ", nullableColumns)}");
-                    
-                    var insertStatsLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 📊 총 삽입할 행 수: {totalRows}";
-                    File.AppendAllText(logService.LogFilePath, insertStatsLog + Environment.NewLine);
-                    File.AppendAllText(logService.LogFilePath, $"📊 매핑 가능한 컬럼: {string.Join(", ", mappableColumns)}" + Environment.NewLine);
-                    File.AppendAllText(logService.LogFilePath, $"📊 NULL 허용 컬럼: {string.Join(", ", nullableColumns)}" + Environment.NewLine);
-
-                    // 배치 처리를 위한 SQL 쿼리 생성 (매핑 가능한 컬럼만 사용)
-                    var columnList = string.Join(", ", mappableColumns);
-                    var parameterList = string.Join(", ", mappableColumns.Select(c => $"@{c}"));
-                    
-                    var insertSql = $@"
-                        INSERT INTO 송장출력_메세지 ({columnList}) 
-                        VALUES ({parameterList})";
-
-                    Console.WriteLine($"🔍 INSERT SQL: {insertSql}");
-                    var insertSqlLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 🔍 INSERT SQL: {insertSql}";
-                    File.AppendAllText(logService.LogFilePath, insertSqlLog + Environment.NewLine);
-
-                    foreach (DataRow row in messageData.Rows)
-                    {
-                        try
-                        {
-                            // 매핑 가능한 컬럼만 사용하여 데이터 추출
-                            var parameters = new Dictionary<string, object>();
-                            
-                            foreach (var columnName in mappableColumns)
-                            {
-                                if (messageData.Columns.Contains(columnName))
-                                {
-                                    var value = row[columnName];
-                                    
-                                    // null 값 처리
-                                    if (value == DBNull.Value || value == null)
-                                    {
-                                        // NULL을 허용하는 컬럼인지 확인
-                                        if (nullableColumns.Contains(columnName))
-                                        {
-                                            parameters[$"@{columnName}"] = DBNull.Value;
-                                            Console.WriteLine($"🔧 행 {insertedCount + 1} 컬럼 '{columnName}' NULL 설정 (허용됨)");
-                                        }
-                                        else
-                                        {
-                                            // NULL을 허용하지 않는 컬럼의 경우 기본값 설정
-                                            var defaultValue = GetDefaultValueForColumn(columnName);
-                                            parameters[$"@{columnName}"] = defaultValue;
-                                            Console.WriteLine($"🔧 행 {insertedCount + 1} 컬럼 '{columnName}' 기본값 설정: '{defaultValue}' (원본값: null)");
-                                        }
-                                    }
-                                    else
-                                    {
-                                        var stringValue = value.ToString() ?? string.Empty;
-                                        
-                                        // 쇼핑몰 컬럼이 빈 문자열이거나 null인 경우 기본값 설정
-                                        if (columnName == "쇼핑몰" && (string.IsNullOrWhiteSpace(stringValue) || stringValue.ToLower() == "null"))
-                                        {
-                                            parameters[$"@{columnName}"] = "기타";
-                                            Console.WriteLine($"🔧 행 {insertedCount + 1} 쇼핑몰 컬럼 기본값 설정: '기타' (원본값: '{stringValue}')");
-                                        }
-                                        else
-                                        {
-                                            parameters[$"@{columnName}"] = stringValue;
-                                            Console.WriteLine($"🔧 행 {insertedCount + 1} 컬럼 '{columnName}' 값 설정: '{stringValue}'");
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    // 엑셀에 없는 컬럼은 NULL 허용 여부에 따라 처리
-                                    if (nullableColumns.Contains(columnName))
-                                    {
-                                        parameters[$"@{columnName}"] = DBNull.Value;
-                                        Console.WriteLine($"🔧 행 {insertedCount + 1} 컬럼 '{columnName}' NULL 설정 (엑셀에 없음, 허용됨)");
-                                    }
-                                    else
-                                    {
-                                        var defaultValue = GetDefaultValueForColumn(columnName);
-                                        parameters[$"@{columnName}"] = defaultValue;
-                                        Console.WriteLine($"🔧 행 {insertedCount + 1} 컬럼 '{columnName}' 기본값 설정: '{defaultValue}' (엑셀에 없음)");
-                                    }
-                                }
-                            }
-
-                            // 첫 번째 행의 경우 매개변수 로깅
-                            if (insertedCount == 0)
-                            {
-                                Console.WriteLine($"🔍 첫 번째 행 매개변수: {string.Join(", ", parameters.Select(p => $"{p.Key}={p.Value}"))}");
-                                var firstRowParamsLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 🔍 첫 번째 행 매개변수: {string.Join(", ", parameters.Select(p => $"{p.Key}={p.Value}"))}";
-                                File.AppendAllText(logService.LogFilePath, firstRowParamsLog + Environment.NewLine);
-                            }
-
-                            await _invoiceRepository.ExecuteNonQueryAsync(insertSql, parameters);
-                            insertedCount++;
-
-                            // 진행률 보고 (10행마다)
-                            if (insertedCount % 10 == 0)
-                            {
-                                var progressPercent = (int)((double)insertedCount / totalRows * 100);
-                                _progress?.Report($"💾 데이터 삽입 진행 중... ({insertedCount}/{totalRows}) - {progressPercent}%");
-                                Console.WriteLine($"💾 데이터 삽입 진행 중... ({insertedCount}/{totalRows}) - {progressPercent}%");
-                                
-                                var progressLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 💾 데이터 삽입 진행 중... ({insertedCount}/{totalRows}) - {progressPercent}%";
-                                File.AppendAllText(logService.LogFilePath, progressLog + Environment.NewLine);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            var warningMessage = $"⚠️ 행 {insertedCount + 1} 삽입 실패: {ex.Message}";
-                            Console.WriteLine(warningMessage);
-                            Console.WriteLine($"⚠️ 상세 오류: {ex}");
-                            
-                            // 로그 파일에 경고 메시지 기록
-                            var warningLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {warningMessage}";
-                            File.AppendAllText(logService.LogFilePath, warningLog + Environment.NewLine);
-                            
-                            var detailWarningLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ⚠️ 상세 오류: {ex}";
-                            File.AppendAllText(logService.LogFilePath, detailWarningLog + Environment.NewLine);
-                            // 개별 행 삽입 실패는 로그만 기록하고 계속 진행
-                        }
-                    }
-
-                    var successMessage = $"✅ 송장출력_메세지 테이블 데이터 삽입 완료: {insertedCount}행";
-                    Console.WriteLine(successMessage);
-                    _progress?.Report(successMessage);
-                    
-                    // 로그 파일에 성공 메시지 기록
-                    var successLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {successMessage}";
-                    File.AppendAllText(logService.LogFilePath, successLog + Environment.NewLine);
-                }
-                catch (Exception ex)
-                {
-                    var errorMessage = $"❌ 데이터 삽입 실패: {ex.Message}";
-                    Console.WriteLine(errorMessage);
-                    Console.WriteLine($"❌ 상세 오류: {ex}");
-                    _progress?.Report(errorMessage);
-                    
-                    // 로그 파일에 오류 메시지 기록
-                    var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                    File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
+                    WriteLogWithFlush(logService.LogFilePath, errorLog + Environment.NewLine);
                     
                     var detailErrorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ❌ 상세 오류: {ex}";
-                    File.AppendAllText(logService.LogFilePath, detailErrorLog + Environment.NewLine);
-                }
-                finally
-                {
-                    // 임시 파일 정리
-                    try
-                    {
-                        if (File.Exists(tempFilePath))
-                        {
-                            File.Delete(tempFilePath);
-                            Console.WriteLine($"🗑️ 임시 파일 정리 완료: {tempFilePath}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        var warningMessage = $"⚠️ 임시 파일 정리 실패: {ex.Message}";
-                        Console.WriteLine(warningMessage);
-                        
-                        // 로그 파일에 경고 메시지 기록
-                        var warningLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {warningMessage}";
-                        File.AppendAllText(logService.LogFilePath, warningLog + Environment.NewLine);
-                    }
+                    WriteLogWithFlush(logService.LogFilePath, detailErrorLog + Environment.NewLine);
+                    return;
                 }
 
-                var completionMessage = "📝 [4-1단계] 송장출력 메세지 데이터 처리 완료";
-                Console.WriteLine(completionMessage);
-                _progress?.Report(completionMessage);
+                // 4. 데이터베이스에 데이터 삽입
+                try
+                {
+                    _progress?.Report("💾 데이터베이스에 데이터 삽입 중...");
+                    Console.WriteLine("💾 데이터베이스에 데이터 삽입 중...");
+                    
+                    var dbInsertStartLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 💾 데이터베이스에 데이터 삽입 중...";
+                    WriteLogWithFlush(logService.LogFilePath, dbInsertStartLog + Environment.NewLine);
+
+                    // 송장출력_메세지 테이블에 직접 삽입
+                    var columnMapping = ValidateColumnMappingAsync("송장출력_메세지", messageData);
+                    if (columnMapping == null || !columnMapping.Any())
+                    {
+                        var mappingError = "❌ 컬럼 매핑 검증 실패";
+                        Console.WriteLine(mappingError);
+                        _progress?.Report(mappingError);
+                        
+                        var mappingErrorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {mappingError}";
+                        WriteLogWithFlush(logService.LogFilePath, mappingErrorLog + Environment.NewLine);
+                        return;
+                    }
+                    
+                    var mappingLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ✅ 컬럼 매핑 검증 완료: {columnMapping.Count}개 컬럼";
+                    WriteLogWithFlush(logService.LogFilePath, mappingLog + Environment.NewLine);
+                    Console.WriteLine($"✅ 컬럼 매핑 검증 완료: {columnMapping.Count}개 컬럼");
+                    
+                    // 송장출력_메세지 테이블 TRUNCATE
+                    var truncateQuery = "TRUNCATE TABLE 송장출력_메세지";
+                    await _invoiceRepository.ExecuteNonQueryAsync(truncateQuery);
+                    
+                    var truncateLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ✅ 송장출력_메세지 테이블 TRUNCATE 완료";
+                    WriteLogWithFlush(logService.LogFilePath, truncateLog + Environment.NewLine);
+                    Console.WriteLine("✅ 송장출력_메세지 테이블 TRUNCATE 완료");
+                    
+                    // 데이터 삽입
+                    var insertCount = await InsertDataWithMappingAsync("송장출력_메세지", messageData, columnMapping);
+                    
+                    var insertCompleteLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ✅ 송장출력_메세지 테이블 데이터 삽입 완료: {insertCount:N0}건";
+                    WriteLogWithFlush(logService.LogFilePath, insertCompleteLog + Environment.NewLine);
+                    Console.WriteLine($"✅ 송장출력_메세지 테이블 데이터 삽입 완료: {insertCount:N0}건");
+                    
+                    Console.WriteLine("✅ 데이터베이스 데이터 삽입 완료");
+                    var dbInsertCompleteLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ✅ 데이터베이스 데이터 삽입 완료";
+                    WriteLogWithFlush(logService.LogFilePath, dbInsertCompleteLog + Environment.NewLine);
+                }
+                catch (Exception ex)
+                {
+                    var errorMessage = $"❌ 데이터베이스 데이터 삽입 실패: {ex.Message}";
+                    Console.WriteLine(errorMessage);
+                    Console.WriteLine($"❌ 상세 오류: {ex}");
+                    _progress?.Report(errorMessage);
+                    
+                    // 로그 파일에 오류 메시지 기록
+                    var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
+                    WriteLogWithFlush(logService.LogFilePath, errorLog + Environment.NewLine);
+                    
+                    var detailErrorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ❌ 상세 오류: {ex}";
+                    WriteLogWithFlush(logService.LogFilePath, detailErrorLog + Environment.NewLine);
+                    return;
+                }
+
+                // 5. 임시 파일 정리 (현재는 사용하지 않음)
+                // try
+                // {
+                //     if (File.Exists(tempFilePath))
+                //     {
+                //         File.Delete(tempFilePath);
+                //         Console.WriteLine("🗑️ 임시 파일 정리 완료");
+                //         var tempFileCleanupLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 🗑️ 임시 파일 정리 완료";
+                //         WriteLogWithFlush(logService.LogFilePath, tempFileCleanupLog + Environment.NewLine);
+                //     }
+                // }
+                // catch (Exception ex)
+                // {
+                //     Console.WriteLine($"⚠️ 임시 파일 정리 실패: {ex.Message}");
+                //     var tempFileCleanupWarningLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ⚠️ 임시 파일 정리 실패: {ex.Message}";
+                //     WriteLogWithFlush(logService.LogFilePath, tempFileCleanupWarningLog + Environment.NewLine);
+                // }
+
+                // 6. 완료 메시지
+                var successMessage = "✅ Dropbox 파일 처리 완료";
+                Console.WriteLine(successMessage);
+                _progress?.Report(successMessage);
                 
-                // 로그 파일에 완료 메시지 기록
-                var completionLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {completionMessage}";
-                File.AppendAllText(logService.LogFilePath, completionLog + Environment.NewLine);
+                var successLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {successMessage}";
+                WriteLogWithFlush(logService.LogFilePath, successLog + Environment.NewLine);
             }
             catch (Exception ex)
             {
-                var errorMessage = $"❌ 송장출력 메세지 데이터 처리 중 오류 발생: {ex.Message}";
+                var errorMessage = $"❌ Dropbox 파일 처리 중 예외 발생: {ex.Message}";
                 Console.WriteLine(errorMessage);
                 Console.WriteLine($"❌ 상세 오류: {ex}");
                 _progress?.Report(errorMessage);
                 
                 // 로그 파일에 오류 메시지 기록
                 var errorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {errorMessage}";
-                File.AppendAllText(logService.LogFilePath, errorLog + Environment.NewLine);
+                WriteLogWithFlush(logService.LogFilePath, errorLog + Environment.NewLine);
                 
                 var detailErrorLog = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] ❌ 상세 오류: {ex}";
-                File.AppendAllText(logService.LogFilePath, detailErrorLog + Environment.NewLine);
+                WriteLogWithFlush(logService.LogFilePath, detailErrorLog + Environment.NewLine);
+                
+                // 임시 파일 정리 시도 (현재는 사용하지 않음)
+                // try
+                // {
+                //     if (File.Exists(tempFilePath))
+                //     {
+                //         File.Delete(tempFilePath);
+                //         Console.WriteLine("��️ 오류 발생 후 임시 파일 정리 완료");
+                //     }
+                // }
+                // catch
+                // {
+                //     // 임시 파일 정리 실패는 무시
+                // }
+                
+                throw;
+            }
+        }
+
+        #endregion
+
+        /// <summary>
+        /// 로그 파일에 대한 쓰기 권한 확인
+        /// </summary>
+        /// <param name="filePath">확인할 파일 경로</param>
+        /// <returns>쓰기 가능 여부</returns>
+        private bool CanWriteToFile(string filePath)
+        {
+            try
+            {
+                // 파일이 존재하지 않으면 생성 시도
+                if (!File.Exists(filePath))
+                {
+                    File.WriteAllText(filePath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 로그 파일 초기화\n");
+                    return true;
+                }
+
+                // 기존 파일에 테스트 쓰기
+                var testMessage = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 쓰기 권한 테스트\n";
+                File.AppendAllText(filePath, testMessage);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ 로그 파일 쓰기 권한 확인 실패: {ex.Message}");
+                return false;
             }
         }
 
         /// <summary>
-        /// 컬럼명에 따라 적절한 기본값을 반환하는 헬퍼 메서드
-        /// 
-        /// 📋 주요 기능:
-        /// - NULL을 허용하지 않는 컬럼에 대한 기본값 제공
-        /// - 컬럼별로 적절한 기본값 설정
-        /// - 데이터 무결성 보장
-        /// 
-        /// 🔄 처리 과정:
-        /// 1. 컬럼명에 따른 기본값 매핑
-        /// 2. 알 수 없는 컬럼의 경우 빈 문자열 반환
-        /// 3. 데이터 타입에 따른 적절한 기본값 제공
-        /// 
-        /// 💡 사용 예시:
-        /// - GetDefaultValueForColumn("쇼핑몰") → "기타"
-        /// - GetDefaultValueForColumn("수취인명") → "미상"
-        /// - GetDefaultValueForColumn("주소") → ""
-        /// 
-        /// @param columnName 컬럼명
-        /// @return 해당 컬럼의 기본값
+        /// 강화된 로그 파일 쓰기 (즉시 플러시 및 오류 처리)
         /// </summary>
-        private string GetDefaultValueForColumn(string columnName)
+        /// <param name="logPath">로그 파일 경로</param>
+        /// <param name="message">로그 메시지</param>
+        private void WriteLogWithFlush(string logPath, string message)
         {
-            return columnName switch
+            try
             {
-                // === 쇼핑몰 관련 컬럼 ===
-                "쇼핑몰" => "기타",
-                "쇼핑몰명" => "기타",
-                "쇼핑몰_명" => "기타",
-                "쇼핑몰명칭" => "기타",
+                // 로그 파일 경로 확인 및 디버깅 정보 출력
+                Console.WriteLine($"📝 로그 파일 경로: {logPath}");
+                Console.WriteLine($"🔍 로그 파일 존재: {File.Exists(logPath)}");
                 
-                // === 수취인 관련 컬럼 ===
-                "수취인명" => "미상",
-                "수취인" => "미상",
-                "받는분" => "미상",
-                "받는사람" => "미상",
-                
-                // === 주소 관련 컬럼 ===
-                "주소" => "",
-                "배송지" => "",
-                "배송주소" => "",
-                "배송지주소" => "",
-                
-                // === 상품 관련 컬럼 ===
-                "상품명" => "",
-                "송장명" => "",
-                "품목명" => "",
-                "상품명칭" => "",
-                
-                // === 수량 관련 컬럼 ===
-                "수량" => "1",
-                "개수" => "1",
-                "수량_개수" => "1",
-                
-                // === 결제 관련 컬럼 ===
-                "결제수단" => "0",
-                "결제방법" => "0",
-                "결제방식" => "0",
-                
-                // === 기타 컬럼 ===
-                "주문번호" => "",
-                "송장번호" => "",
-                "배송메세지" => "",
-                "메모" => "",
-                "비고" => "",
-                
-                // === 기본값 ===
-                _ => ""
-            };
+                // 로그 파일 쓰기 권한 확인
+                if (!CanWriteToFile(logPath))
+                {
+                    Console.WriteLine($"❌ 로그 파일 쓰기 권한 없음: {logPath}");
+                    return;
+                }
+
+                // StreamWriter를 사용한 즉시 쓰기 및 플러시
+                using (var writer = new StreamWriter(logPath, true, Encoding.UTF8))
+                {
+                    var logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}";
+                    writer.WriteLine(logEntry);
+                    writer.Flush(); // 즉시 디스크에 쓰기
+                }
+
+                // 로그 파일 속성 정상화 (읽기 전용 등 제거)
+                try
+                {
+                    var fileInfo = new FileInfo(logPath);
+                    if (fileInfo.IsReadOnly)
+                    {
+                        fileInfo.IsReadOnly = false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️ 로그 파일 속성 변경 실패: {ex.Message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ 로그 파일 쓰기 실패: {ex.Message}");
+                Console.WriteLine($"❌ 로그 메시지: {message}");
+            }
         }
+
+        /// <summary>
+        /// 로그 파일 상태 진단 및 복구
+        /// </summary>
+        /// <param name="logPath">로그 파일 경로</param>
+        /// <returns>로그 파일 상태</returns>
+        private string DiagnoseLogFileStatus(string logPath)
+        {
+            try
+            {
+                var status = new StringBuilder();
+                status.AppendLine($"=== 로그 파일 상태 진단 ===");
+                status.AppendLine($"경로: {logPath}");
+                status.AppendLine($"절대 경로: {Path.GetFullPath(logPath)}");
+                status.AppendLine($"디렉토리 존재: {Directory.Exists(Path.GetDirectoryName(logPath))}");
+                status.AppendLine($"파일 존재: {File.Exists(logPath)}");
+                
+                if (File.Exists(logPath))
+                {
+                    var fileInfo = new FileInfo(logPath);
+                    status.AppendLine($"파일 크기: {fileInfo.Length} bytes");
+                    status.AppendLine($"마지막 수정: {fileInfo.LastWriteTime}");
+                    status.AppendLine($"읽기 전용: {fileInfo.IsReadOnly}");
+                    status.AppendLine($"쓰기 권한: {CanWriteToFile(logPath)}");
+                }
+                
+                status.AppendLine($"현재 작업 디렉토리: {Directory.GetCurrentDirectory()}");
+                status.AppendLine($"AppDomain.BaseDirectory: {AppDomain.CurrentDomain.BaseDirectory}");
+                status.AppendLine($"=== 진단 완료 ===");
+                
+                return status.ToString();
+            }
+            catch (Exception ex)
+            {
+                return $"로그 파일 상태 진단 실패: {ex.Message}";
+            }
+        }
+
+        #region 판매입력 데이터 처리 (Sales Input Data Processing)
+
+        /// <summary>
+        /// 판매입력 이카운트 자료를 처리하는 메서드
+        /// 
+        /// 처리 과정:
+        /// 1. 데이터베이스에서 판매입력 데이터 조회
+        /// 2. Excel 파일 생성 (헤더 없음)
+        /// 3. Dropbox에 파일 업로드
+        /// 4. KakaoWork 채팅방에 알림 전송
+        /// 
+        /// 파일명 규칙:
+        /// - 판매입력_이카운트자료_{yyMMdd}_{HH}시{mm}분}.xlsx
+        /// 
+        /// 설정 파일:
+        /// - DropboxFolderPath4: Dropbox 업로드 경로
+        /// - KakaoWork.ChatroomId.Check: 알림 전송 채팅방
+        /// 
+        /// 예외 처리:
+        /// - 데이터베이스 연결 오류
+        /// - Excel 파일 생성 오류
+        /// - Dropbox 업로드 오류
+        /// - KakaoWork 알림 전송 오류
+        /// </summary>
+        /// <returns>처리 성공 여부</returns>
+        public async Task<bool> ProcessSalesInputData()
+        {
+            const string METHOD_NAME = "ProcessSalesInputData";
+            const string TABLE_NAME = "송장출력_주문정보";
+            const string EXCEL_01 = "판매입력";
+            
+                            // 로그 서비스 초기화
+                var logService = new LogManagementService();
+                
+                try
+                {
+                    Console.WriteLine($"🔍 [{METHOD_NAME}] 판매입력 데이터 처리 시작...");
+                    Console.WriteLine($"🔍 [{METHOD_NAME}] 현재 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                    Console.WriteLine($"🔍 [{METHOD_NAME}] 호출 스택 확인 중...");
+                    
+                    // 로그 파일 경로 정보 출력
+                    logService.PrintLogFilePathInfo();
+                    
+                    // LogPathManager 정보 출력
+                    LogPathManager.PrintLogPathInfo();
+                    LogPathManager.ValidateLogFileLocations();
+                    
+                    logService.LogMessage($"[{METHOD_NAME}] 판매입력 데이터 처리 시작");
+                    logService.LogMessage($"[{METHOD_NAME}] 현재 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                    logService.LogMessage($"[{METHOD_NAME}] 호출 스택 확인 중...");
+
+                // 1단계: 테이블명 확인
+                Console.WriteLine($"📋 [{METHOD_NAME}] 대상 테이블: {TABLE_NAME}");
+                logService.LogMessage($"[{METHOD_NAME}] 대상 테이블: {TABLE_NAME}");
+
+                // 2단계: 데이터베이스에서 판매입력 데이터 조회
+                var salesData = await GetSalesDataFromDatabase(TABLE_NAME);
+                if (salesData == null || salesData.Rows.Count == 0)
+                {
+                    Console.WriteLine($"⚠️ [{METHOD_NAME}] 판매입력 데이터가 없습니다.");
+                    logService.LogMessage($"[{METHOD_NAME}] ⚠️ 판매입력 데이터가 없습니다.");
+                    return true; // 데이터가 없는 것은 오류가 아님
+                }
+
+                Console.WriteLine($"📊 [{METHOD_NAME}] 데이터 조회 완료: {salesData.Rows.Count:N0}건");
+                logService.LogMessage($"[{METHOD_NAME}] 📊 데이터 조회 완료: {salesData.Rows.Count:N0}건");
+
+                // 3단계: Excel 파일 생성 (헤더 없음)
+                var excelFileName = GenerateSalesDataExcelFileName();
+                var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
+                
+                logService.LogMessage($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
+                
+                var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(salesData, excelFilePath, EXCEL_01);
+                if (!excelCreated)
+                {
+                    Console.WriteLine($"❌ [{METHOD_NAME}] Excel 파일 생성 실패: {excelFilePath}");
+                    logService.LogMessage($"[{METHOD_NAME}] ❌ Excel 파일 생성 실패: {excelFilePath}");
+                    return false;
+                }
+
+                Console.WriteLine($"✅ [{METHOD_NAME}] Excel 파일 생성 완료: {excelFilePath}");
+                logService.LogMessage($"[{METHOD_NAME}] ✅ Excel 파일 생성 완료: {excelFilePath}");
+
+                // 4단계: Dropbox에 파일 업로드
+                var dropboxFolderPath = ConfigurationManager.AppSettings["DropboxFolderPath4"] ?? "/ㅎ.기타/판매입력/";
+                // 폴더 경로만 전달 (파일명은 UploadFileAsync에서 자동 추가)
+                var cleanFolderPath = dropboxFolderPath.TrimEnd('/');
+                
+                logService.LogMessage($"[{METHOD_NAME}] Dropbox 업로드 시작: 폴더={cleanFolderPath}, 파일={excelFileName}");
+                
+                var uploadedFilePath = await UploadFileToDropbox(excelFilePath, cleanFolderPath);
+                if (string.IsNullOrEmpty(uploadedFilePath))
+                {
+                    Console.WriteLine($"❌ [{METHOD_NAME}] Dropbox 업로드 실패: {cleanFolderPath}");
+                    logService.LogMessage($"[{METHOD_NAME}] ❌ Dropbox 업로드 실패: {cleanFolderPath}");
+                    return false;
+                }
+
+                Console.WriteLine($"✅ [{METHOD_NAME}] Dropbox 업로드 완료: {uploadedFilePath}");
+                logService.LogMessage($"[{METHOD_NAME}] ✅ Dropbox 업로드 완료: {uploadedFilePath}");
+
+                // 5단계: Dropbox 공유 링크 처리
+                // uploadedFilePath는 이미 공유 링크이므로 그대로 사용
+                var sharedLink = uploadedFilePath;
+                
+                Console.WriteLine($"🔗 [{METHOD_NAME}] Dropbox 공유 링크 확인: {sharedLink}");
+                logService.LogMessage($"[{METHOD_NAME}] 🔗 Dropbox 공유 링크 확인: {sharedLink}");
+
+                // 6단계: KakaoWork 채팅방에 알림 전송 (채팅방 ID도 함께 전달)
+                // app.config에서 카카오워크 채팅방 ID를 읽어와서 알림 전송 함수에 함께 전달
+                //var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
+                //if (string.IsNullOrEmpty(kakaoWorkChannelId))
+                //{
+                    //Console.WriteLine($"⚠️ [{METHOD_NAME}] app.config에 KakaoWorkChannelId가 설정되어 있지 않습니다.");
+                    //logService.LogMessage($"[{METHOD_NAME}] ⚠️ app.config에 KakaoWorkChannelId가 설정되어 있지 않음");
+                    //return false;
+                //}
+
+                // KakaoWorkService 싱글턴 인스턴스 사용
+                //var kakaoWorkService = KakaoWorkService.Instance;
+                
+                // 먼저 카카오워크 연결 상태 테스트
+                //logService.LogMessage($"[{METHOD_NAME}] 카카오워크 연결 상태 테스트 시작");
+                //var connectionTest = await kakaoWorkService.TestConnectionAsync();
+                //if (!connectionTest)
+                //{
+                    //Console.WriteLine($"❌ [{METHOD_NAME}] 카카오워크 연결 테스트 실패");
+                    //logService.LogMessage($"[{METHOD_NAME}] ❌ 카카오워크 연결 테스트 실패");
+                    //return false;
+                //}
+                
+                //Console.WriteLine($"✅ [{METHOD_NAME}] 카카오워크 연결 테스트 성공");
+                //logService.LogMessage($"[{METHOD_NAME}] ✅ 카카오워크 연결 테스트 성공");
+                
+                // 판매입력 데이터 알림 전송
+                //var notificationSent = await kakaoWorkService.SendSalesDataNotificationAsync(sharedLink, kakaoWorkChannelId);
+
+                //if (!notificationSent)
+                //{
+                    //Console.WriteLine($"❌ [{METHOD_NAME}] KakaoWork 판매입력 알림 전송 실패");
+                    //logService.LogMessage($"[{METHOD_NAME}] ❌ KakaoWork 판매입력 알림 전송 실패");
+                    //return false;
+                //}
+                Console.WriteLine($"✅ [{METHOD_NAME}] KakaoWork 판매입력 알림 전송 완료");
+                logService.LogMessage($"[{METHOD_NAME}] KakaoWork 판매입력 알림 전송 완료");
+
+                // 7단계: 임시 파일 정리
+                try
+                {
+                    if (File.Exists(excelFilePath))
+                    {
+                        File.Delete(excelFilePath);
+                        Console.WriteLine($"🗑️ [{METHOD_NAME}] 임시 Excel 파일 정리 완료");
+                        logService.LogMessage($"[{METHOD_NAME}] 🗑️ 임시 Excel 파일 정리 완료");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️ [{METHOD_NAME}] 임시 파일 정리 실패: {ex.Message}");
+                    logService.LogMessage($"[{METHOD_NAME}] ⚠️ 임시 파일 정리 실패: {ex.Message}");
+                    // 임시 파일 정리 실패는 전체 프로세스 실패로 간주하지 않음
+                }
+
+                Console.WriteLine($"✅ [{METHOD_NAME}] 판매입력 데이터 처리 완료");
+                logService.LogMessage($"[{METHOD_NAME}] ✅ 판매입력 데이터 처리 완료");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"❌ [{METHOD_NAME}] 처리 중 오류 발생: {ex.Message}";
+                var stackTraceMessage = $"📋 [{METHOD_NAME}] 스택 트레이스: {ex.StackTrace}";
+                
+                Console.WriteLine(errorMessage);
+                Console.WriteLine(stackTraceMessage);
+                
+                // app.log 파일에 오류 상세 정보 기록
+                logService.LogMessage(errorMessage);
+                logService.LogMessage(stackTraceMessage);
+                
+                // 내부 예외가 있는 경우 추가 로그
+                if (ex.InnerException != null)
+                {
+                    var innerErrorMessage = $"📋 [{METHOD_NAME}] 내부 예외: {ex.InnerException.Message}";
+                    Console.WriteLine(innerErrorMessage);
+                    logService.LogMessage(innerErrorMessage);
+                }
+                
+                // 추가 디버깅 정보
+                Console.WriteLine($"🔍 [{METHOD_NAME}] 현재 작업 디렉토리: {Environment.CurrentDirectory}");
+                Console.WriteLine($"🔍 [{METHOD_NAME}] 로그 파일 경로: {logService.LogFilePath}");
+                
+                return false;
+            }
+        }
+
+
+
+        /// <summary>
+        /// 데이터베이스에서 판매입력 데이터를 조회하는 메서드
+        /// </summary>
+        /// <param name="tableName">테이블명</param>
+        /// <returns>판매입력 데이터</returns>
+        private async Task<DataTable?> GetSalesDataFromDatabase(string tableName)
+        {
+            try
+            {
+                // 간단한 SELECT 쿼리로 모든 데이터 조회
+                var query = $"SELECT * FROM `{tableName}`";
+                
+                using (var connection = new MySqlConnection(_databaseService.GetConnectionString()))
+                {
+                    await connection.OpenAsync();
+                    
+                    using (var command = new MySqlCommand(query, connection))
+                    {
+                        using (var adapter = new MySqlDataAdapter(command))
+                        {
+                            var dataTable = new DataTable();
+                            adapter.Fill(dataTable);
+                            return dataTable;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ 데이터베이스 조회 실패: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 판매입력 데이터 Excel 파일명을 생성하는 메서드
+        /// </summary>
+        /// <returns>파일명</returns>
+        private string GenerateSalesDataExcelFileName()
+        {
+            var now = DateTime.Now;
+            var fileName = $"판매입력_이카운트자료_{now:yyMMdd}_{now:HH}시{now:mm}분.xlsx";
+            return fileName;
+        }
+
+        /// <summary>
+        /// Dropbox에 파일을 업로드하는 메서드
+        /// </summary>
+        /// <param name="localFilePath">로컬 파일 경로</param>
+        /// <param name="dropboxFolderPath">Dropbox 폴더 경로</param>
+        /// <returns>업로드된 파일의 Dropbox 경로</returns>
+        private async Task<string?> UploadFileToDropbox(string localFilePath, string dropboxFolderPath)
+        {
+            try
+            {
+                var dropboxService = DropboxService.Instance;
+                var uploadResult = await dropboxService.UploadFileAsync(localFilePath, dropboxFolderPath);
+                return uploadResult; // UploadFileAsync에서 반환된 실제 파일 경로 반환
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Dropbox 업로드 실패: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Dropbox 공유 링크를 생성하는 메서드
+        /// </summary>
+        /// <param name="dropboxFilePath">Dropbox 파일 경로</param>
+        /// <returns>공유 링크</returns>
+        private async Task<string?> CreateDropboxSharedLink(string dropboxFilePath)
+        {
+            try
+            {
+                Console.WriteLine($"🔗 [{nameof(CreateDropboxSharedLink)}] 공유 링크 생성 시작: {dropboxFilePath}");
+                
+                var dropboxService = DropboxService.Instance;
+                Console.WriteLine($"🔗 [{nameof(CreateDropboxSharedLink)}] DropboxService 인스턴스 획득 완료");
+                
+                var sharedLink = await dropboxService.CreateSharedLinkAsync(dropboxFilePath);
+                
+                if (string.IsNullOrEmpty(sharedLink))
+                {
+                    Console.WriteLine($"❌ [{nameof(CreateDropboxSharedLink)}] 공유 링크가 null 또는 빈 문자열로 반환됨");
+                    return null;
+                }
+                
+                Console.WriteLine($"✅ [{nameof(CreateDropboxSharedLink)}] 공유 링크 생성 성공: {sharedLink}");
+                return sharedLink;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ [{nameof(CreateDropboxSharedLink)}] Dropbox 공유 링크 생성 실패: {ex.Message}");
+                Console.WriteLine($"📋 [{nameof(CreateDropboxSharedLink)}] 예외 타입: {ex.GetType().Name}");
+                Console.WriteLine($"📋 [{nameof(CreateDropboxSharedLink)}] 스택 트레이스: {ex.StackTrace}");
+                
+                // 내부 예외가 있는 경우 추가 로그
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"📋 [{nameof(CreateDropboxSharedLink)}] 내부 예외: {ex.InnerException.Message}");
+                }
+                
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// KakaoWork 채팅방에 알림을 전송하는 메서드
+        /// </summary>
+        /// <param name="fileUrl">파일 다운로드 링크</param>
+        /// <returns>전송 성공 여부</returns>
+        private async Task<bool> SendKakaoWorkNotification(string fileUrl)
+        {
+            try
+            {
+                var kakaoWorkService = KakaoWorkService.Instance;
+                var notificationResult = await kakaoWorkService.SendSalesDataNotificationAsync(fileUrl);
+                return notificationResult;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ KakaoWork 알림 전송 실패: {ex.Message}");
+                return false;
+            }
+        }
+
+        #endregion
     }
-} 
+}

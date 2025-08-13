@@ -446,6 +446,67 @@ namespace LogisticManager.Services
                 throw;
             }
         }
+
+        /// <summary>
+        /// Dropbox 파일의 공유 링크를 생성하는 메서드
+        /// </summary>
+        /// <param name="dropboxPath">Dropbox 파일 경로</param>
+        /// <returns>공유 링크 URL</returns>
+        public async Task<string?> CreateSharedLinkAsync(string dropboxPath)
+        {
+            try
+            {
+                Console.WriteLine($"🔗 [DropboxService] 공유 링크 생성 시작: {dropboxPath}");
+
+                // Dropbox 인증 정보 확인
+                if (string.IsNullOrEmpty(_appKey) || string.IsNullOrEmpty(_appSecret) || string.IsNullOrEmpty(_refreshToken))
+                {
+                    var errorMsg = "Dropbox 인증 정보가 설정되지 않았습니다.";
+                    Console.WriteLine($"❌ [DropboxService] {errorMsg}");
+                    throw new InvalidOperationException(errorMsg);
+                }
+
+                Console.WriteLine($"✅ [DropboxService] Dropbox 인증 정보 확인 완료");
+
+                // 유효한 클라이언트 확보
+                Console.WriteLine($"🔗 [DropboxService] Dropbox 클라이언트 획득 시작...");
+                var client = await GetClientAsync();
+                Console.WriteLine($"✅ [DropboxService] Dropbox 클라이언트 획득 완료");
+
+                // 공유 링크 생성 (이미 존재하는 경우 기존 링크 반환)
+                Console.WriteLine($"🔗 [DropboxService] 공유 링크 API 호출 시작...");
+                var sharedLink = await client.Sharing.CreateSharedLinkWithSettingsAsync(dropboxPath);
+                Console.WriteLine($"✅ [DropboxService] 공유 링크 API 호출 완료");
+                
+                if (sharedLink == null)
+                {
+                    Console.WriteLine($"❌ [DropboxService] 공유 링크 API 응답이 null입니다.");
+                    return null;
+                }
+
+                Console.WriteLine($"📋 [DropboxService] 원본 공유 링크: {sharedLink.Url}");
+                
+                // 공유 링크 URL 반환 (dl=1 파라미터 추가로 직접 다운로드 링크 생성)
+                var downloadUrl = sharedLink.Url.Replace("www.dropbox.com", "dl.dropboxusercontent.com");
+                
+                Console.WriteLine($"✅ [DropboxService] 공유 링크 생성 완료: {downloadUrl}");
+                return downloadUrl;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ [DropboxService] 공유 링크 생성 오류: {ex.Message}");
+                Console.WriteLine($"📋 [DropboxService] 예외 타입: {ex.GetType().Name}");
+                Console.WriteLine($"📋 [DropboxService] 스택 트레이스: {ex.StackTrace}");
+                
+                // 내부 예외가 있는 경우 추가 로그
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"📋 [DropboxService] 내부 예외: {ex.InnerException.Message}");
+                }
+                
+                return null;
+            }
+        }
         #endregion
 
         #region IDisposable 구현

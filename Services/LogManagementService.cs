@@ -45,7 +45,8 @@ namespace LogisticManager.Services
         /// <param name="maxFileSizeMB">최대 파일 크기 (MB)</param>
         public LogManagementService(string? logFilePath = null, int maxFileSizeMB = 200)
         {
-            _logFilePath = logFilePath ?? Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            // LogPathManager를 사용하여 로그 파일 경로 통일
+            _logFilePath = logFilePath ?? LogPathManager.AppLogPath;
             _maxFileSizeBytes = maxFileSizeMB * 1024L * 1024L; // MB를 바이트로 변환
         }
 
@@ -178,6 +179,45 @@ namespace LogisticManager.Services
         }
 
         /// <summary>
+        /// 로그 메시지를 파일에 기록
+        /// 
+        /// 🎯 주요 기능:
+        /// - 로그 메시지를 app.log 파일에 기록
+        /// - 타임스탬프와 함께 메시지 저장
+        /// - 파일 크기 자동 관리 (200MB 초과 시 클리어)
+        /// - 스레드 안전한 로그 기록
+        /// 
+        /// 💡 사용 목적:
+        /// - 애플리케이션 동작 로그 기록
+        /// - 오류 추적 및 디버깅
+        /// - 시스템 모니터링
+        /// </summary>
+        /// <param name="message">기록할 로그 메시지</param>
+        public void LogMessage(string message)
+        {
+            try
+            {
+                lock (_lockObject)
+                {
+                    // 로그 파일 크기 체크 및 필요시 클리어
+                    CheckAndClearLogFileIfNeeded();
+                    
+                    // 타임스탬프와 함께 메시지 기록
+                    var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                    var logEntry = $"[{timestamp}] {message}";
+                    
+                    // 로그 파일에 메시지 추가
+                    File.AppendAllText(_logFilePath, logEntry + Environment.NewLine, Encoding.UTF8);
+                }
+            }
+            catch (Exception ex)
+            {
+                // 로그 기록 중 오류가 발생해도 애플리케이션에 영향을 주지 않도록 처리
+                Console.WriteLine($"[LogManagementService] 로그 메시지 기록 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// 로그 파일 관리 상태 출력
         /// 
         /// 🎯 주요 기능:
@@ -209,6 +249,18 @@ namespace LogisticManager.Services
                     Console.WriteLine("   ⚠️  경고: 로그 파일 크기가 임계값의 80%를 초과했습니다.");
                 }
             }
+        }
+
+        /// <summary>
+        /// 로그 파일 경로 정보 출력
+        /// </summary>
+        public void PrintLogFilePathInfo()
+        {
+            Console.WriteLine("📁 로그 파일 경로 정보:");
+            Console.WriteLine($"   현재 작업 디렉토리: {Environment.CurrentDirectory}");
+            Console.WriteLine($"   애플리케이션 기본 디렉토리: {AppDomain.CurrentDomain.BaseDirectory}");
+            Console.WriteLine($"   프로젝트 루트 디렉토리: {Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory)))}");
+            Console.WriteLine($"   최종 로그 파일 경로: {_logFilePath}");
         }
     }
 }

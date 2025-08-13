@@ -42,7 +42,7 @@ namespace LogisticManager.Services
         #region Private 필드
         private readonly HttpClient _httpClient;
         private readonly Dictionary<NotificationType, string> _chatroomIds;
-        private static readonly string _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "kakaowork_debug.log");
+        private static readonly string _logFilePath = LogPathManager.KakaoWorkDebugLogPath;
         #endregion
 
         #region Private 생성자
@@ -366,6 +366,191 @@ namespace LogisticManager.Services
                 _ => type.ToString()
             };
         }
+        #endregion
+
+        #region 판매입력 데이터 전송 (Sales Data Notification)
+
+        /// <summary>
+        /// 판매입력 이카운트 자료를 특정 채팅방에 전송하는 메서드 (채팅방 ID 직접 지정 가능)
+        /// 
+        /// 처리 과정:
+        /// 1. 현재 시간 기반 배치 구분 (1차~막차, 추가)
+        /// 2. 파일 다운로드 링크와 함께 메시지 전송
+        /// 3. 헤더, 텍스트, 버튼 블록으로 구성된 메시지
+        /// 
+        /// 배치 구분 규칙:
+        /// - 1차: 01:00~07:00
+        /// - 2차: 08:00~10:00
+        /// - 3차: 11:00~11:00
+        /// - 4차: 12:00~13:00
+        /// - 5차: 14:00~15:00
+        /// - 막차: 16:00~18:00
+        /// - 추가: 19:00~23:00
+        /// - 기타: 00:00
+        /// 
+        /// 메시지 구성:
+        /// - 헤더: 배치 - 판매입력_이카운트자료
+        /// - 텍스트: 파일 다운로드 후 DB로 한번 더 돌려주세요
+        /// - 버튼: 판매입력 파일 다운로드 (파일 링크)
+        /// </summary>
+        /// <param name="fileUrl">Dropbox 공유 링크</param>
+        /// <param name="chatroomId">카카오워크 채팅방 ID (null 또는 빈 값이면 기본값 사용)</param>
+        /// <returns>전송 성공 여부</returns>
+        public async Task<bool> SendSalesDataNotificationAsync(string fileUrl, string? chatroomId = null)
+        {
+            try
+            {
+                // 한글 주석: 판매입력 데이터 알림 전송 시작 로그
+                LogMessage("🔄 판매입력 데이터 알림 전송 시작...");
+                LogMessage($"📋 전달받은 채팅방 ID: {chatroomId ?? "null"}");
+                LogMessage($"🔗 파일 URL: {fileUrl}");
+
+                // 한글 주석: 현재 시간 기반 배치 구분
+                var now = DateTime.Now;
+                var timeString = now.ToString("MM월 dd일 HH시 mm분");
+                var batch = GetBatchByTime(now.Hour, now.Minute);
+                LogMessage($"⏰ 현재 시간: {timeString}, 배치: {batch}");
+
+                // 한글 주석: 채팅방 ID가 명시적으로 전달되지 않으면 기본값 사용
+                string targetChatroomId = !string.IsNullOrWhiteSpace(chatroomId)
+                    ? chatroomId
+                    : GetChatroomId(NotificationType.Check);
+                
+                LogMessage($"🎯 최종 사용할 채팅방 ID: {targetChatroomId}");
+
+                if (string.IsNullOrWhiteSpace(targetChatroomId))
+                {
+                    LogMessage("❌ 카카오워크 채팅방 ID가 지정되지 않았습니다.");
+                    return false;
+                }
+
+                // 한글 주석: 메시지 블록 구성
+                var message = new
+                {
+                    conversation_id = targetChatroomId,
+                    text = $"{batch} - 판매입력_이카운트자료",
+                    blocks = new object[]
+                    {
+                        new
+                        {
+                            type = "header",
+                            text = $"{batch} - 판매입력_이카운트자료",
+                            style = "blue"
+                        },
+                        new
+                        {
+                            type = "text",
+                            text = "파일 다운로드 후 DB로 한번 더 돌려주세요",
+                            markdown = true
+                        },
+                        new
+                        {
+                            type = "button",
+                            text = "판매입력 파일 다운로드",
+                            style = "default",
+                            action_type = "open_system_browser",
+                            value = fileUrl
+                        }
+                    }
+                };
+
+                LogMessage($"📝 메시지 구성 완료: conversation_id={targetChatroomId}, text={batch} - 판매입력_이카운트자료");
+
+                // 한글 주석: JSON 직렬화
+                var jsonContent = JsonConvert.SerializeObject(message);
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                
+                LogMessage($"📦 JSON 페이로드 크기: {jsonContent.Length} bytes");
+                LogMessage($"📦 JSON 페이로드 내용: {jsonContent}");
+
+                // 한글 주석: 카카오워크 API 호출
+                LogMessage($"🔗 요청 URL: https://api.kakaowork.com/v1/messages.send");
+                LogMessage($"🔑 Authorization 헤더: Bearer {_httpClient.DefaultRequestHeaders.Authorization?.Parameter ?? "설정되지 않음"}");
+                LogMessage($"📋 Content-Type: {content.Headers.ContentType}");
+                
+                var response = await _httpClient.PostAsync("https://api.kakaowork.com/v1/messages.send", content);
+                
+                LogMessage($"📡 HTTP 상태 코드: {response.StatusCode}");
+                LogMessage($"📡 HTTP 상태 설명: {response.ReasonPhrase}");
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    LogMessage($"✅ 판매입력 데이터 알림 전송 성공: {responseContent}");
+                    return true;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    LogMessage($"❌ 판매입력 데이터 알림 전송 실패: {response.StatusCode} - {errorContent}");
+                    
+                    // 응답 헤더도 로깅
+                    LogMessage($"📋 응답 헤더:");
+                    foreach (var header in response.Headers)
+                    {
+                        LogMessage($"  {header.Key}: {string.Join(", ", header.Value)}");
+                    }
+                    
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"❌ 판매입력 데이터 알림 전송 중 오류 발생: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 알림 종류에 따른 채팅방 ID를 반환하는 메서드
+        /// </summary>
+        /// <param name="type">알림 종류</param>
+        /// <returns>채팅방 ID</returns>
+        private string GetChatroomId(NotificationType type)
+        {
+            // 한글 주석: 알림 종류에 따른 채팅방 ID 조회
+            if (_chatroomIds.TryGetValue(type, out var chatroomId))
+            {
+                return chatroomId;
+            }
+
+            // 한글 주석: 기본값으로 Check 채팅방 사용
+            if (_chatroomIds.TryGetValue(NotificationType.Check, out var defaultChatroomId))
+            {
+                return defaultChatroomId;
+            }
+
+            // 한글 주석: 설정된 채팅방이 없으면 빈 문자열 반환
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// 현재 시간을 기반으로 배치를 구분하는 메서드
+        /// </summary>
+        /// <param name="hour">시간 (0-23)</param>
+        /// <param name="minute">분 (0-59)</param>
+        /// <returns>배치 구분 문자열</returns>
+        private string GetBatchByTime(int hour, int minute)
+        {
+            // 한글 주석: 시간대별 배치 구분
+            if (1 <= hour && hour <= 7)
+                return "1차";
+            else if (8 <= hour && hour <= 10)
+                return "2차";
+            else if (hour == 11)
+                return "3차";
+            else if (12 <= hour && hour <= 13)
+                return "4차";
+            else if (14 <= hour && hour <= 15)
+                return "5차";
+            else if (16 <= hour && hour <= 18)
+                return "막차";
+            else if (19 <= hour && hour <= 23)
+                return "추가";
+            else
+                return "";
+        }
+
         #endregion
 
         #region IDisposable 구현

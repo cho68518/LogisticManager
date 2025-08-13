@@ -5,6 +5,130 @@
   "last_updated": "2024-12-19",
   
   "mappings": {
+    "talkdeal_unavailable_table": {
+      "mapping_id": "talkdeal_unavailable_mapping_001",
+      "table_name": "송장출력_톡딜불가",
+      "description": "톡딜 불가 상품 정보 테이블 매핑 - 필수코드 기반 상품 분류",
+      "excel_file_pattern": "*.xlsx",
+      "excel_sheet_name": "Sheet1",
+      "processing_order": 2,
+      "is_active": true,
+      "columns": {
+        "쇼핑몰": {
+          "db_column": "쇼핑몰",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "쇼핑몰명",
+          "excel_column_index": 1,
+          "validation": {
+            "max_length": 255,
+            "allowed_values": ["11번가", "쿠팡", "지마켓", "옥션", "인터파크", "롯데온", "SSG", "티몬", "위메프", "카카오톡스토어"]
+          }
+        },
+        "품목코드": {
+          "db_column": "품목코드",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "상품 품목 코드",
+          "excel_column_index": 2,
+          "validation": {
+            "max_length": 255,
+            "pattern": "^[A-Z0-9_-]+$"
+          }
+        },
+        "상품명": {
+          "db_column": "상품명",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "상품명",
+          "excel_column_index": 3,
+          "validation": {
+            "max_length": 255
+          }
+        },
+        "필수코드1": {
+          "db_column": "필수코드1",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "1차 필수 분류 코드",
+          "excel_column_index": 4,
+          "validation": {
+            "max_length": 255,
+            "pattern": "^[A-Z0-9_-]+$"
+          }
+        },
+        "필수코드1상품명": {
+          "db_column": "필수코드1상품명",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "1차 필수 분류 코드에 해당하는 상품명",
+          "excel_column_index": 5,
+          "validation": {
+            "max_length": 255
+          }
+        },
+        "필수코드2": {
+          "db_column": "필수코드2",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "2차 필수 분류 코드",
+          "excel_column_index": 6,
+          "validation": {
+            "max_length": 255,
+            "pattern": "^[A-Z0-9_-]+$"
+          }
+        },
+        "필수코드2상품명": {
+          "db_column": "필수코드2상품명",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "2차 필수 분류 코드에 해당하는 상품명",
+          "excel_column_index": 7,
+          "validation": {
+            "max_length": 255
+          }
+        },
+        "필수코드3": {
+          "db_column": "필수코드3",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "3차 필수 분류 코드",
+          "excel_column_index": 8,
+          "validation": {
+            "max_length": 255,
+            "pattern": "^[A-Z0-9_-]+$"
+          }
+        },
+        "필수코드3상품명": {
+          "db_column": "필수코드3상품명",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "3차 필수 분류 코드에 해당하는 상품명",
+          "excel_column_index": 9,
+          "validation": {
+            "max_length": 255
+          }
+        }
+      },
+      "business_rules": {
+        "description": "톡딜 불가 상품 분류 규칙",
+        "rules": [
+          "필수코드1, 2, 3은 계층적 분류 구조를 가짐",
+          "상위 코드가 없으면 하위 코드는 의미가 없음",
+          "품목코드는 상품의 고유 식별자로 사용",
+          "쇼핑몰별로 다른 분류 체계를 가질 수 있음"
+        ]
+      },
+      "data_quality": {
+        "description": "데이터 품질 관리 규칙",
+        "checks": [
+          "품목코드 중복 방지",
+          "필수코드 패턴 검증",
+          "상품명 길이 제한",
+          "쇼핑몰명 유효성 검증"
+        ]
+      }
+    },
     "order_table": {
       "mapping_id": "order_mapping_001",
       "table_name": "송장출력_사방넷원본변환_Dev",
@@ -615,6 +739,527 @@
         "mapped_columns": 7,
         "additional_db_columns": 0,
         "mapping_status": "complete"
+      }
+    },
+
+    "merge_packing_table": {
+      "mapping_id": "merge_packing_mapping_001",
+      "table_name": "송장출력_특수출력_합포장변경",
+      "description": "합포장 변경 테이블 매핑",
+      "excel_file_pattern": "*.xlsx",
+      "excel_sheet_name": "Sheet1",
+      "processing_order": 1,
+      "is_active": true,
+      "columns": {
+        "품목코드": {
+          "db_column": "품목코드",
+          "data_type": "varchar",
+          "required": false,
+          "description": "품목코드",
+          "excel_column_index": 1
+        },
+        "품목명": {
+          "db_column": "품목명",
+          "data_type": "varchar",
+          "required": false,
+          "description": "품목명",
+          "excel_column_index": 2
+        },
+        "대체코드1": {
+          "db_column": "대체코드1",
+          "data_type": "varchar",
+          "required": false,
+          "description": "대체코드1",
+          "excel_column_index": 3
+        },
+        "대체코드1품목명": {
+          "db_column": "대체코드1품목명",
+          "data_type": "varchar",
+          "required": false,
+          "description": "대체코드1품목명",
+          "excel_column_index": 4
+        },
+        "대체1수량": {
+          "db_column": "대체1수량",
+          "data_type": "varchar",
+          "required": false,
+          "description": "대체1수량",
+          "excel_column_index": 5
+        },
+        "대체코드2": {
+          "db_column": "대체코드2",
+          "data_type": "varchar",
+          "required": false,
+          "description": "대체코드2",
+          "excel_column_index": 6
+        },
+        "대체코드2품목명": {
+          "db_column": "대체코드2품목명",
+          "data_type": "varchar",
+          "required": false,
+          "description": "대체코드2품목명",
+          "excel_column_index": 7
+        },
+        "대체2수량": {
+          "db_column": "대체2수량",
+          "data_type": "varchar",
+          "required": false,
+          "description": "대체2수량",
+          "excel_column_index": 8
+        },
+        "대체코드3": {
+          "db_column": "대체코드3",
+          "data_type": "varchar",
+          "required": false,
+          "description": "대체코드3",
+          "excel_column_index": 9
+        },
+        "대체코드3품목명": {
+          "db_column": "대체코드3품목명",
+          "data_type": "varchar",
+          "required": false,
+          "description": "대체코드3품목명",
+          "excel_column_index": 10
+        },
+        "대체3수량": {
+          "db_column": "대체3수량",
+          "data_type": "varchar",
+          "required": false,
+          "description": "대체3수량",
+          "excel_column_index": 11
+        },
+        "대체코드4": {
+          "db_column": "대체코드4",
+          "data_type": "varchar",
+          "required": false,
+          "description": "대체코드4",
+          "excel_column_index": 12
+        },
+        "대체코드4품목명": {
+          "db_column": "대체코드4품목명",
+          "data_type": "varchar",
+          "required": false,
+          "description": "대체코드4품목명",
+          "excel_column_index": 13
+        },
+        "대체4수량": {
+          "db_column": "대체4수량",
+          "data_type": "varchar",
+          "required": false,
+          "description": "대체4수량",
+          "excel_column_index": 14
+        }
+      },
+      "validation_rules": {
+        "max_lengths": {
+          "품목코드": 255,
+          "품목명": 255,
+          "대체코드1": 255,
+          "대체코드1품목명": 255,
+          "대체1수량": 255,
+          "대체코드2": 255,
+          "대체코드2품목명": 255,
+          "대체2수량": 255,
+          "대체코드3": 255,
+          "대체코드3품목명": 255,
+          "대체3수량": 255,
+          "대체코드4": 255,
+          "대체코드4품목명": 255,
+          "대체4수량": 255
+        }
+      },
+      "data_transformations": {
+        "품목코드": {
+          "special_handling": "trim_whitespace",
+          "description": "품목코드 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "품목명": {
+          "special_handling": "trim_whitespace",
+          "description": "품목명 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "대체코드1": {
+          "special_handling": "trim_whitespace",
+          "description": "대체코드1 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "대체코드1품목명": {
+          "special_handling": "trim_whitespace",
+          "description": "대체코드1품목명 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "대체1수량": {
+          "special_handling": "trim_whitespace",
+          "description": "대체1수량 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "대체코드2": {
+          "special_handling": "trim_whitespace",
+          "description": "대체코드2 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "대체코드2품목명": {
+          "special_handling": "trim_whitespace",
+          "description": "대체코드2품목명 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "대체2수량": {
+          "special_handling": "trim_whitespace",
+          "description": "대체2수량 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "대체코드3": {
+          "special_handling": "trim_whitespace",
+          "description": "대체코드3 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "대체코드3품목명": {
+          "special_handling": "trim_whitespace",
+          "description": "대체코드3품목명 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "대체3수량": {
+          "special_handling": "trim_whitespace",
+          "description": "대체3수량 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "대체코드4": {
+          "special_handling": "trim_whitespace",
+          "description": "대체코드4 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "대체코드4품목명": {
+          "special_handling": "trim_whitespace",
+          "description": "대체코드4품목명 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "대체4수량": {
+          "special_handling": "trim_whitespace",
+          "description": "대체4수량 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        }
+      },
+      "column_mapping_summary": {
+        "excel_columns": 14,
+        "db_columns": 14,
+        "mapped_columns": 14,
+        "additional_db_columns": 0,
+        "mapping_status": "complete"
+      }
+    },
+
+    "gamcheon_separation_table": {
+      "mapping_id": "gamcheon_separation_mapping_001",
+      "table_name": "송장출력_특수출력_감천분리출고",
+      "description": "감천분리출고 테이블 매핑",
+      "excel_file_pattern": "*.xlsx",
+      "excel_sheet_name": "Sheet1",
+      "processing_order": 1,
+      "is_active": true,
+      "columns": {
+        "품목코드": {
+          "db_column": "품목코드",
+          "data_type": "varchar",
+          "required": false,
+          "description": "품목코드",
+          "excel_column_index": 1
+        },
+        "상품명": {
+          "db_column": "상품명",
+          "data_type": "varchar",
+          "required": false,
+          "description": "상품명",
+          "excel_column_index": 2
+        },
+        "수량": {
+          "db_column": "수량",
+          "data_type": "varchar",
+          "required": false,
+          "description": "수량",
+          "excel_column_index": 3
+        },
+        "택배수량": {
+          "db_column": "택배수량",
+          "data_type": "varchar",
+          "required": false,
+          "description": "택배수량",
+          "excel_column_index": 4
+        }
+      },
+      "additional_columns": {},
+      "validation_rules": {
+        "max_lengths": {
+          "품목코드": 255,
+          "상품명": 255,
+          "수량": 255,
+          "택배수량": 255
+        }
+      },
+      "data_transformations": {
+        "품목코드": {
+          "special_handling": "trim_whitespace",
+          "description": "품목코드 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "상품명": {
+          "special_handling": "trim_whitespace",
+          "description": "상품명 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "수량": {
+          "special_handling": "trim_whitespace",
+          "description": "수량 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        },
+        "택배수량": {
+          "special_handling": "trim_whitespace",
+          "description": "택배수량 앞뒤 공백 제거",
+          "data_type_conversion": "any_to_string",
+          "default_value": ""
+        }
+      },
+      "column_mapping_summary": {
+        "excel_columns": 4,
+        "db_columns": 4,
+        "mapped_columns": 4,
+        "additional_db_columns": 0,
+        "mapping_status": "complete"
+      }
+    },
+
+    "invoice_management_table": {
+      "mapping_id": "invoice_management_mapping_001",
+      "table_name": "송장출력_관리자",
+      "description": "송장출력 관리자 테이블 매핑 - 품절제품 관리",
+      "excel_file_pattern": "*.xlsx",
+      "excel_sheet_name": "Sheet1",
+      "processing_order": 3,
+      "is_active": true,
+      "columns": {
+        "품절제품코드": {
+          "db_column": "품절제품코드",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "품절된 제품의 코드",
+          "excel_column_index": 1,
+          "validation": {
+            "max_length": 255,
+            "pattern": "^[A-Z0-9_-]+$"
+          }
+        },
+        "상품명": {
+          "db_column": "상품명",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "품절된 제품의 상품명",
+          "excel_column_index": 2,
+          "validation": {
+            "max_length": 255
+          }
+        }
+      },
+      "business_rules": {
+        "description": "품절제품 관리 규칙",
+        "rules": [
+          "품절제품코드는 고유한 식별자로 사용",
+          "상품명은 품절제품코드와 1:1 매칭",
+          "품절 상태인 제품들의 목록 관리"
+        ]
+      },
+      "data_quality": {
+        "description": "데이터 품질 관리 규칙",
+        "checks": [
+          "품절제품코드 중복 방지",
+          "상품명 길이 제한",
+          "품절제품코드 패턴 검증"
+        ]
+      }
+    },
+
+    "invoice_management_delivery_message_table": {
+      "mapping_id": "invoice_management_delivery_message_mapping_001",
+      "table_name": "송장출력_관리자_배송메세지",
+      "description": "송장출력 관리자 배송메세지 테이블 매핑 - 배송 관련 메시지 관리",
+      "excel_file_pattern": "*.xlsx",
+      "excel_sheet_name": "Sheet1",
+      "processing_order": 4,
+      "is_active": true,
+      "columns": {
+        "배송메세지": {
+          "db_column": "배송메세지",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "배송 시 사용할 메시지",
+          "excel_column_index": 1,
+          "validation": {
+            "max_length": 255
+          }
+        }
+      },
+      "business_rules": {
+        "description": "배송메세지 관리 규칙",
+        "rules": [
+          "배송 시 고객에게 전달할 메시지 관리",
+          "메시지 길이는 255자 이내로 제한",
+          "배송 상황별 메시지 템플릿 제공"
+        ]
+      },
+      "data_quality": {
+        "description": "데이터 품질 관리 규칙",
+        "checks": [
+          "배송메세지 길이 제한",
+          "메시지 내용 유효성 검증"
+        ]
+      }
+    },
+
+    "invoice_management_recipient_name_table": {
+      "mapping_id": "invoice_management_recipient_name_mapping_001",
+      "table_name": "송장출력_관리자_이름",
+      "description": "송장출력 관리자 수취인명 테이블 매핑 - 수취인명 관리",
+      "excel_file_pattern": "*.xlsx",
+      "excel_sheet_name": "Sheet1",
+      "processing_order": 5,
+      "is_active": true,
+      "columns": {
+        "수취인명": {
+          "db_column": "수취인명",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "수취인의 이름",
+          "excel_column_index": 1,
+          "validation": {
+            "max_length": 255
+          }
+        }
+      },
+      "business_rules": {
+        "description": "수취인명 관리 규칙",
+        "rules": [
+          "수취인명은 송장 출력 시 사용",
+          "이름 길이는 255자 이내로 제한",
+          "수취인명 중복 방지"
+        ]
+      },
+      "data_quality": {
+        "description": "데이터 품질 관리 규칙",
+        "checks": [
+          "수취인명 길이 제한",
+          "이름 형식 유효성 검증"
+        ]
+      }
+    },
+
+    "star_invoice_table": {
+      "mapping_id": "star_invoice_mapping_001",
+      "table_name": "별표송장",
+      "description": "별표송장 테이블 매핑 - 특별한 송장 정보 관리",
+      "excel_file_pattern": "*.xlsx",
+      "excel_sheet_name": "Sheet1",
+      "processing_order": 6,
+      "is_active": true,
+      "columns": {
+        "품번코드": {
+          "db_column": "품번코드",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "제품의 품번 코드",
+          "excel_column_index": 1,
+          "validation": {
+            "max_length": 255,
+            "pattern": "^[A-Z0-9_-]+$"
+          }
+        },
+        "상품": {
+          "db_column": "상품",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "제품명",
+          "excel_column_index": 2,
+          "validation": {
+            "max_length": 255
+          }
+        },
+        "적요": {
+          "db_column": "적요",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "송장의 적요 정보",
+          "excel_column_index": 3,
+          "validation": {
+            "max_length": 255
+          }
+        },
+        "배송메세지": {
+          "db_column": "배송메세지",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "배송 시 사용할 메시지",
+          "excel_column_index": 4,
+          "validation": {
+            "max_length": 255
+          }
+        },
+        "수취인명": {
+          "db_column": "수취인명",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "수취인의 이름",
+          "excel_column_index": 5,
+          "validation": {
+            "max_length": 255
+          }
+        },
+        "내용": {
+          "db_column": "내용",
+          "data_type": "varchar(255)",
+          "required": false,
+          "description": "송장의 추가 내용",
+          "excel_column_index": 6,
+          "validation": {
+            "max_length": 255
+          }
+        }
+      },
+      "business_rules": {
+        "description": "별표송장 관리 규칙",
+        "rules": [
+          "품번코드는 제품의 고유 식별자로 사용",
+          "상품명은 품번코드와 1:1 매칭",
+          "적요는 송장의 목적을 명시",
+          "배송메세지는 고객에게 전달할 내용",
+          "수취인명은 배송 대상자 정보",
+          "내용은 송장의 추가 설명 정보"
+        ]
+      },
+      "data_quality": {
+        "description": "데이터 품질 관리 규칙",
+        "checks": [
+          "품번코드 중복 방지",
+          "상품명 길이 제한",
+          "적요 정보 유효성 검증",
+          "배송메세지 길이 제한",
+          "수취인명 형식 검증",
+          "내용 길이 제한"
+        ]
       }
     }
   },
