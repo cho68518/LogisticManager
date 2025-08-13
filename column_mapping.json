@@ -1189,7 +1189,7 @@
           }
         },
         "상품": {
-          "db_column": "상품",
+          "db_column": "상품명",
           "data_type": "varchar(255)",
           "required": false,
           "description": "제품명",

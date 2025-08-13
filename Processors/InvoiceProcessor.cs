@@ -2000,7 +2000,8 @@ namespace LogisticManager.Processors
                 }
                 
                 // FileService를 사용하여 엑셀 파일 읽기 (로컬 파일 경로 사용)
-                var excelData = _fileService.ReadExcelToDataTable(localFilePath, "star_invoice_table");
+                // 별표송장 테이블의 경우 "Sheet1" 시트에서 데이터를 읽음
+                var excelData = _fileService.ReadExcelToDataTable(localFilePath, "Sheet1");
                 if (excelData?.Rows == null || excelData.Rows.Count == 0)
                 {
                     var noDataError = $"[{METHOD_NAME}] ❌ 엑셀 파일에서 데이터를 읽을 수 없습니다.";
@@ -2401,6 +2402,10 @@ namespace LogisticManager.Processors
                 {
                     mappingKey = "talkdeal_unavailable_table";
                 }
+                else if (tableName == "별표송장")
+                {
+                    mappingKey = "star_invoice_table";
+                }
                 else
                 {
                     // 기본값으로 order_table 사용
@@ -2439,6 +2444,14 @@ namespace LogisticManager.Processors
                 var mappingLog = $"[ValidateColumnMapping] 컬럼 매핑 검증 완료 - 테이블: {tableName}, 매핑키: {mappingKey}, 엑셀: {excelColumns.Count}개, 매핑: {columnMapping.Count}개";
                 WriteLogWithFlush(logPath, mappingLog);
                 
+                // 상세 매핑 정보 로깅
+                var detailLog = $"[ValidateColumnMapping] 상세 매핑 정보: {string.Join(", ", columnMapping.Select(kvp => $"{kvp.Key}->{kvp.Value}"))}";
+                WriteLogWithFlush(logPath, detailLog);
+                
+                // 엑셀 컬럼 정보 로깅
+                var excelColumnsLog = $"[ValidateColumnMapping] 엑셀 컬럼 목록: {string.Join(", ", excelColumns)}";
+                WriteLogWithFlush(logPath, excelColumnsLog);
+                
                 return columnMapping;
             }
             catch (Exception ex)
@@ -2464,6 +2477,10 @@ namespace LogisticManager.Processors
                 var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
                 var insertLog = $"[InsertDataWithMapping] 데이터 INSERT 시작 - 테이블: {tableName}, 행수: {excelData.Rows.Count:N0}";
                 WriteLogWithFlush(logPath, insertLog);
+                
+                // 컬럼 매핑 정보 로깅
+                var mappingInfoLog = $"[InsertDataWithMapping] 컬럼 매핑 정보: {string.Join(", ", columnMapping.Select(kvp => $"{kvp.Key}->{kvp.Value}"))}";
+                WriteLogWithFlush(logPath, mappingInfoLog);
                 
                 var insertCount = 0;
                 var batchSize = 100; // 배치 크기
@@ -2523,6 +2540,11 @@ namespace LogisticManager.Processors
             var columns = columnMapping.Values.ToList();
             var values = new List<string>();
             
+            // 디버깅을 위한 로깅 추가
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            var debugLog = $"[BuildInsertQuery] 쿼리 생성 시작 - 테이블: {tableName}, 컬럼수: {columns.Count}";
+            WriteLogWithFlush(logPath, debugLog);
+            
             foreach (var excelColumn in columnMapping.Keys)
             {
                 var value = row[excelColumn];
@@ -2546,7 +2568,16 @@ namespace LogisticManager.Processors
                 }
             }
             
-            return $"INSERT INTO {tableName} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", values)})";
+            var query = $"INSERT INTO {tableName} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", values)})";
+            
+            // 생성된 쿼리 로깅 (첫 번째 행만)
+            if (row.Table.Rows.IndexOf(row) == 0)
+            {
+                var queryLog = $"[BuildInsertQuery] 생성된 쿼리 예시: {query}";
+                WriteLogWithFlush(logPath, queryLog);
+            }
+            
+            return query;
         }
 
         /// <summary>
