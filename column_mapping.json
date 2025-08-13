@@ -1188,7 +1188,7 @@
             "pattern": "^[A-Z0-9_-]+$"
           }
         },
-        "상품": {
+        "상품명": {
           "db_column": "상품명",
           "data_type": "varchar(255)",
           "required": false,
