@@ -18,9 +18,19 @@ BEGIN
 	
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
+		DECLARE error_info TEXT DEFAULT '';
+		DECLARE error_code INT DEFAULT 0;
+		
+		-- MySQL 오류 정보 수집
+		GET DIAGNOSTICS CONDITION 1
+			error_code = MYSQL_ERRNO,
+			error_info = MESSAGE_TEXT;
+			
         ROLLBACK;
         DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
-        SELECT '오류가 발생하여 모든 작업이 롤백되었습니다.' AS ErrorMessage;
+        SELECT '오류가 발생하여 모든 작업이 롤백되었습니다.' AS ErrorMessage,
+		        error_code AS MySQLErrorCode,
+                error_info AS MySQLErrorMessage;
     END;
 
 	CREATE TEMPORARY TABLE IF NOT EXISTS sp_execution_log (

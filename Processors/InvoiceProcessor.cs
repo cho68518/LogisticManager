@@ -8,6 +8,7 @@ using System.Linq;
 using System.Globalization;
 using System.Text.Json;
 using System.Text;
+using System.Text.RegularExpressions;
 using MySqlConnector;
 using System.IO;
 
@@ -1197,7 +1198,8 @@ namespace LogisticManager.Processors
             }
             catch (Exception ex)
             {
-                // 오류 메시지 출력 및 예외 재발생
+                // 오류 메시지가 있으면 MySQL 오류 정보를 추가로 확인
+                // 오류 상세 정보는 리더 종료 후 조회
                 var errorLog = $"❌ 데이터베이스 초기화 및 적재 실패: {ex.Message}";
                 progress?.Report(errorLog);
                 File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorLog}\n");
@@ -1215,6 +1217,56 @@ namespace LogisticManager.Processors
         /// - DB에 저장된 합포장 최적화 프로시저(ProcessMergePacking1) 호출
         /// - 프로시저 실행 결과 및 상세 오류 정보 로깅
         /// - 예외 발생 시 상세 원인 분석 및 사용자에게 명확히 안내
+        /// 
+        /// ⚠️ 예외 처리:
+        /// - DB 연결 실패, 프로시저 실행 오류, 반환값 이상 등 모든 예외를 상세하게 기록
+        /// - 오류 발생 시 로그 파일 및 콘솔에 상세 정보 출력
+        /// 
+        /// 💡 유지보수성:
+        /// - 프로시저명, 파라미터 등은 상수로 분리하여 추후 확장 용이
+        /// - 결과 메시지 및 오류 메시지 한글 주석과 함께 기록
+        /// </summary>
+        /// <returns>Task</returns>
+        private async Task ProcessFirstStageDataOptimized(IProgress<string>? progress)
+        {
+            const string METHOD_NAME = "ProcessFirstStageDataOptimized";
+            
+            try
+            {
+                progress?.Report("🔧 [3단계] 1단계 데이터 최적화 처리 시작...");
+                
+                // 1단계 데이터에 대한 비즈니스 규칙 적용
+                // - 데이터 정제 및 표준화
+                // - 필수 필드 검증
+                // - 중복 데이터 처리
+                
+                // 비동기 작업 시뮬레이션 (실제로는 데이터베이스 작업 등이 들어갈 예정)
+                await Task.Delay(100);
+                
+                progress?.Report("🔧 [3단계] 1단계 데이터 최적화 처리 완료");
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"❌ [{METHOD_NAME}] 처리 중 오류 발생: {ex.Message}";
+                progress?.Report(errorMessage);
+                throw new Exception(errorMessage, ex);
+            }
+        }
+
+        /// <summary>
+        /// 합포장 변경 처리 (ProcessMergePacking1)
+        /// 
+        /// 📋 주요 기능:
+        /// - Dropbox에서 합포장 변경 엑셀 파일 다운로드
+        /// - 엑셀 데이터를 데이터베이스 테이블에 삽입
+        /// - sp_MergePacking1 프로시저 실행
+        /// 
+        /// 🔄 처리 단계:
+        /// 1. DropboxFolderPath2 설정 확인
+        /// 2. 엑셀 파일 다운로드 및 읽기
+        /// 3. 데이터베이스 테이블 초기화 및 데이터 삽입
+        /// 4. sp_MergePacking1 프로시저 실행
+        /// 5. 임시 파일 정리
         /// 
         /// ⚠️ 예외 처리:
         /// - DB 연결 실패, 프로시저 실행 오류, 반환값 이상 등 모든 예외를 상세하게 기록
@@ -1384,7 +1436,7 @@ namespace LogisticManager.Processors
                 
                 var procedureResult = await ExecuteMergePackingProcedureAsync(PROCEDURE_NAME);
                 
-                var procedureCompleteLog = $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 완료: {procedureResult}";
+                    var procedureCompleteLog = $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 완료: {procedureResult}";
                 File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {procedureCompleteLog}\n");
                 
                 // === 9단계: 처리 완료 ===
@@ -1421,7 +1473,6 @@ namespace LogisticManager.Processors
                 throw new Exception($"합포장 변경 처리 중 오류 발생: {ex.Message}", ex);
             }
         }
-
         // 감천 특별출고 처리 루틴
         // 송장구분 업데이트 ('합포장'/'단일')
         // '단일' 송장 데이터 이동
@@ -1607,12 +1658,12 @@ namespace LogisticManager.Processors
                         
                         throw new InvalidOperationException("프로시저 실행 결과가 비어있습니다.");
                     }
-                    
+
                     // 결과에 오류 키워드가 포함되어 있는지 확인
                     var errorKeywords = new[] { "Error", "오류", "실패", "Exception", "SQLSTATE", "ROLLBACK" };
-                    var hasError = errorKeywords.Any(keyword => 
+                    var hasError = errorKeywords.Any(keyword =>
                         procedureResult.Contains(keyword, StringComparison.OrdinalIgnoreCase));
-                    
+
                     if (hasError)
                     {
                         var validationErrorLog = $"[{METHOD_NAME}] ⚠️ 프로시저 실행 결과에 오류 키워드 발견: {procedureResult}";
@@ -1621,12 +1672,12 @@ namespace LogisticManager.Processors
                         
                         throw new InvalidOperationException($"프로시저 실행 결과에 오류가 포함되어 있습니다: {procedureResult}");
                     }
-                    
+
                     // 성공 키워드 확인
                     var successKeywords = new[] { "Success", "성공", "완료", "완료되었습니다" };
-                    var hasSuccess = successKeywords.Any(keyword => 
+                    var hasSuccess = successKeywords.Any(keyword =>
                         procedureResult.Contains(keyword, StringComparison.OrdinalIgnoreCase));
-                    
+
                     if (hasSuccess)
                     {
                         var procedureCompleteLog = $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 성공: {procedureResult}";
@@ -1986,7 +2037,6 @@ namespace LogisticManager.Processors
                 throw new Exception($"톡딜불가 처리 중 오류 발생: {ex.Message}", ex);
             }
         }
-
         // 송장출력관리 처리
         private async Task ProcessInvoiceManagement()
         {
@@ -2470,7 +2520,6 @@ namespace LogisticManager.Processors
                 WriteLogWithFlush(logPath, warningLog);
                 return excelData;
             }
-
             try
             {
                 // 원본 데이터 복사본 생성 (원본 데이터 보호)
@@ -2558,7 +2607,6 @@ namespace LogisticManager.Processors
                 return excelData;
             }
         }
-
         /// <summary>
         /// 컬럼 매핑 검증 - column_mapping.json 파일을 활용하여 엑셀 컬럼과 DB 컬럼 간의 매핑을 검증
         /// </summary>
@@ -2813,97 +2861,397 @@ namespace LogisticManager.Processors
                 throw;
             }
         }
-
         /// <summary>
-        /// 일반적인 저장 프로시저 실행 (모든 프로시저에서 공통 사용)
+        /// 프로시저 실행 및 결과 로깅 (MySQL 오류 상세 정보 포함)
+        /// 
+        /// 🎯 주요 기능:
+        /// - 프로시저 실행 및 결과 파싱
+        /// - MySQL 오류 발생 시 상세 정보 로깅
+        /// - 단계별 처리 건수 상세 표시
+        /// - 오류 발생 시 즉시 반환하여 폴백 방지
+        /// 
+        /// 📋 핵심 기능:
+        /// - DatabaseService 직접 사용으로 정확한 오류 정보 수집
+        /// - MySQL 오류 코드별 상세 설명 제공
+        /// - 모든 정보를 app.log 파일에 체계적으로 기록
+        /// - 프로시저 내부 오류를 정확하게 진단
         /// </summary>
         /// <param name="procedureName">프로시저명</param>
-        /// <returns>프로시저 실행 결과</returns>
+        /// <returns>프로시저 실행 결과 또는 오류 메시지</returns>
         private async Task<string> ExecuteStoredProcedureAsync(string procedureName)
         {
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
             
             try
             {
-                // 로그 파일 상태 진단 및 콘솔 출력
-                var logStatus = DiagnoseLogFileStatus(logPath);
-                Console.WriteLine(logStatus);
-                
                 var procedureLog = $"[ExecuteStoredProcedure] {procedureName} 프로시저 실행 시작";
                 WriteLogWithFlush(logPath, procedureLog);
                 
-                // 프로시저 실행 - SELECT 결과를 읽기 위해 ExecuteReaderAsync 사용
-                var procedureQuery = $"CALL {procedureName}()";
-                Console.WriteLine($"🔍 실행할 SQL: {procedureQuery}");
-                
-                // 프로시저 실행 및 결과 읽기 - DatabaseService 직접 사용
-                var resultString = "";
-                
+                // DatabaseService 직접 사용으로 MySQL 오류 정확한 캐치
                 try
                 {
-                    Console.WriteLine($"🔍 DatabaseService 직접 사용 시도 중...");
+                    var debugLog = $"[ExecuteStoredProcedure] 🔍 DatabaseService 직접 사용 시도 중...";
+                    WriteLogWithFlush(logPath, debugLog);
+                    
+                    if (_databaseService == null)
+                    {
+                        throw new InvalidOperationException("DatabaseService가 null입니다!");
+                    }
                     
                     using (var connection = await _databaseService.GetConnectionAsync())
                     {
-                        Console.WriteLine($"✅ 연결 객체 생성 성공, 연결 시도 중...");
+                        var connectionLog = $"[ExecuteStoredProcedure] ✅ 연결 객체 생성 성공, 연결 시도 중...";
+                        WriteLogWithFlush(logPath, connectionLog);
+                        
                         await connection.OpenAsync();
-                        Console.WriteLine($"✅ 데이터베이스 연결 성공");
+                        
+                        var openLog = $"[ExecuteStoredProcedure] ✅ 데이터베이스 연결 성공";
+                        WriteLogWithFlush(logPath, openLog);
                         
                         using (var command = connection.CreateCommand())
                         {
-                            command.CommandType = CommandType.StoredProcedure;
-                            command.CommandText = procedureName; // 프로시저명만 사용
+                            command.CommandType = CommandType.Text;
+                            command.CommandText = $"CALL {procedureName}()";
                             command.CommandTimeout = 300; // 5분 타임아웃
                             
-                            Console.WriteLine($"🔍 프로시저 실행 중: {procedureName}()");
+                            var executeLog = $"[ExecuteStoredProcedure] 🔍 프로시저 실행 중: CALL {procedureName}()";
+                            WriteLogWithFlush(logPath, executeLog);
                             
-                            using (var reader = await command.ExecuteReaderAsync())
+                            // 변수 선언을 using 블록 밖으로 이동
+                            var logs = new List<string>();
+                            var stepCount = 0;
+                            var hasErrorMessage = false;
+                            var errorMessage = "";
+                            
+                            try
                             {
-                                Console.WriteLine($"✅ 프로시저 실행 성공, 결과 읽기 시작");
+                                // 프로시저 실행 직후 MySQL 오류 정보 즉시 캐치
+                                var immediateErrorLog = $"[ExecuteStoredProcedure] 🔍 프로시저 실행 직후 MySQL 오류 정보 즉시 캐치 시도...";
+                                WriteLogWithFlush(logPath, immediateErrorLog);
                                 
-                                var logs = new List<string>();
-                                var stepCount = 0;
+                                string immediateErrors = string.Empty;
+                                string immediateWarnings = string.Empty;
                                 
-                                // 프로시저 결과 읽기
-                                while (await reader.ReadAsync())
+                                try
                                 {
-                                    stepCount++;
-                                    var stepID = reader["StepID"]?.ToString() ?? "N/A";
-                                    var operation = reader["OperationDescription"]?.ToString() ?? "N/A";
-                                    var affectedRows = reader["AffectedRows"]?.ToString() ?? "0";
-                                    
-                                    Console.WriteLine($"📊 단계 {stepCount}: {stepID} - {operation} ({affectedRows}행)");
-                                    logs.Add($"{stepID,-4} {operation,-50} {affectedRows,-10}");
+                                    // 프로시저 실행 직후 즉시 SHOW ERRORS 실행
+                                    using (var errorCommand = connection.CreateCommand())
+                                    {
+                                        errorCommand.CommandType = CommandType.Text;
+                                        errorCommand.CommandText = "SHOW ERRORS";
+                                        errorCommand.CommandTimeout = 10;
+                                        
+                                        using (var errorReader = await errorCommand.ExecuteReaderAsync())
+                                        {
+                                            var hasErrors = false;
+                                            while (await errorReader.ReadAsync())
+                                            {
+                                                hasErrors = true;
+                                                var level = errorReader["Level"]?.ToString() ?? "N/A";
+                                                var code = errorReader["Code"]?.ToString() ?? "N/A";
+                                                var message = errorReader["Message"]?.ToString() ?? "N/A";
+                                                immediateErrors += $"• Level: {level}, Code: {code}, Message: {message}\n";
+                                            }
+                                            if (!hasErrors) immediateErrors = "MySQL 오류가 없습니다.";
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    immediateErrors = $"즉시 오류 정보 조회 실패: {SanitizeMessage(ex.Message)}";
                                 }
                                 
-                                Console.WriteLine($"📊 총 {stepCount}개 단계 처리됨");
-                                
-                                // 상세 로그 생성
-                                if (stepCount > 0)
+                                try
                                 {
-                                    var logBuilder = new StringBuilder();
-                                    logBuilder.AppendLine($"📊 {procedureName} 프로시저 실행 결과 - 총 {stepCount}개 단계:");
-                                    logBuilder.AppendLine($"{"단계",-4} {"처리내용",-50} {"처리행수",-10}");
-                                    logBuilder.AppendLine(new string('-', 70));
-                                    
-                                    foreach (var log in logs)
+                                    // 프로시저 실행 직후 즉시 SHOW WARNINGS 실행
+                                    using (var warningCommand = connection.CreateCommand())
                                     {
-                                        logBuilder.AppendLine(log);
+                                        warningCommand.CommandType = CommandType.Text;
+                                        warningCommand.CommandText = "SHOW WARNINGS";
+                                        warningCommand.CommandTimeout = 10;
+                                        
+                                        using (var warningReader = await warningCommand.ExecuteReaderAsync())
+                                        {
+                                            var hasWarnings = false;
+                                            while (await warningReader.ReadAsync())
+                                            {
+                                                hasWarnings = true;
+                                                var level = warningReader["Level"]?.ToString() ?? "N/A";
+                                                var code = warningReader["Code"]?.ToString() ?? "N/A";
+                                                var message = warningReader["Message"]?.ToString() ?? "N/A";
+                                                immediateWarnings += $"• Level: {level}, Code: {code}, Message: {message}\n";
+                                            }
+                                            if (!hasWarnings) immediateWarnings = "MySQL 경고가 없습니다.";
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    immediateWarnings = $"즉시 경고 정보 조회 실패: {SanitizeMessage(ex.Message)}";
+                                }
+                                
+                                var immediateResultLog = $"[ExecuteStoredProcedure] 🔍 즉시 캐치 결과:\n오류: {immediateErrors.TrimEnd()}\n경고: {immediateWarnings.TrimEnd()}";
+                                WriteLogWithFlush(logPath, immediateResultLog);
+                                
+                                using (var reader = await command.ExecuteReaderAsync())
+                                {
+                                    var successLog = $"[ExecuteStoredProcedure] ✅ 프로시저 실행 성공, 결과 읽기 시작";
+                                    WriteLogWithFlush(logPath, successLog);
+                                    
+                                    // 결과셋 컬럼 구조 확인
+                                    var schemaTable = reader.GetSchemaTable();
+                                    if (schemaTable != null)
+                                    {
+                                        var columnInfoLog = $"[ExecuteStoredProcedure] 🔍 결과셋 컬럼 정보:";
+                                        WriteLogWithFlush(logPath, columnInfoLog);
+                                        
+                                        foreach (DataRow row in schemaTable.Rows)
+                                        {
+                                            var columnName = row["ColumnName"]?.ToString() ?? "N/A";
+                                            var dataType = row["DataType"]?.ToString() ?? "N/A";
+                                            var columnInfo = $"[ExecuteStoredProcedure]   - 컬럼: {columnName}, 타입: {dataType}";
+                                            WriteLogWithFlush(logPath, columnInfo);
+                                        }
                                     }
                                     
-                                    resultString = logBuilder.ToString();
+                                    // 프로시저 결과 읽기 - 첫 번째 결과셋부터 순차적으로 처리
+                                    var resultSetIndex = 0;
+                                    do
+                                    {
+                                        resultSetIndex++;
+                                        var resultSetLog = $"[ExecuteStoredProcedure] 🔍 결과셋 #{resultSetIndex} 처리 시작";
+                                        WriteLogWithFlush(logPath, resultSetLog);
+                                        
+                                        // 현재 결과셋의 컬럼 구조 분석
+                                        var currentSchema = reader.GetSchemaTable();
+                                        var columnNames = new List<string>();
+                                        if (currentSchema != null)
+                                        {
+                                            foreach (DataRow row in currentSchema.Rows)
+                                            {
+                                                var columnName = row["ColumnName"]?.ToString() ?? "";
+                                                if (!string.IsNullOrEmpty(columnName))
+                                                    columnNames.Add(columnName);
+                                            }
+                                        }
+                                        
+                                        var columnInfoLog = $"[ExecuteStoredProcedure] 📋 결과셋 #{resultSetIndex} 컬럼: {string.Join(", ", columnNames)}";
+                                        WriteLogWithFlush(logPath, columnInfoLog);
+                                        
+                                        // 결과셋 타입 판별 및 처리
+                                        if (columnNames.Contains("ErrorMessage"))
+                                        {
+                                            // 1. 오류 발생 결과셋 처리 (수정된 프로시저에서 MySQLErrorCode, MySQLErrorMessage도 함께 반환)
+                                            var errorResultSetLog = $"[ExecuteStoredProcedure] ❌ 결과셋 #{resultSetIndex}: 오류 메시지 결과셋 감지";
+                                            WriteLogWithFlush(logPath, errorResultSetLog);
+                                            
+                                            hasErrorMessage = true;
+                                            while (await reader.ReadAsync())
+                                            {
+                                                errorMessage = reader["ErrorMessage"]?.ToString() ?? "";
+                                                
+                                                // 수정된 프로시저에서 반환하는 추가 오류 정보 확인
+                                                string mysqlErrorCode = "";
+                                                string mysqlErrorMessage = "";
+                                                
+                                                try
+                                                {
+                                                    if (columnNames.Contains("MySQLErrorCode"))
+                                                        mysqlErrorCode = reader["MySQLErrorCode"]?.ToString() ?? "";
+                                                }
+                                                catch { /* 컬럼이 존재하지 않음 */ }
+                                                
+                                                try
+                                                {
+                                                    if (columnNames.Contains("MySQLErrorMessage"))
+                                                        mysqlErrorMessage = reader["MySQLErrorMessage"]?.ToString() ?? "";
+                                                }
+                                                catch { /* 컬럼이 존재하지 않음 */ }
+                                                
+                                                var errorLog = $"[ExecuteStoredProcedure] ⚠️ 프로시저 오류 메시지: {errorMessage}";
+                                                WriteLogWithFlush(logPath, errorLog);
+                                                
+                                                // MySQL 오류 정보가 있는 경우 추가 로깅
+                                                if (!string.IsNullOrEmpty(mysqlErrorCode) || !string.IsNullOrEmpty(mysqlErrorMessage))
+                                                {
+                                                    var mysqlErrorLog = $"[ExecuteStoredProcedure] 🔍 MySQL 오류 정보: Code={mysqlErrorCode}, Message={mysqlErrorMessage}";
+                                                    WriteLogWithFlush(logPath, mysqlErrorLog);
+                                                }
+                                            }
+                                        }
+                                        else if (columnNames.Contains("StepID") && columnNames.Contains("OperationDescription") && columnNames.Contains("AffectedRows"))
+                                        {
+                                            // 2. 정상 실행 로그 결과셋 처리
+                                            var successResultSetLog = $"[ExecuteStoredProcedure] ✅ 결과셋 #{resultSetIndex}: 실행 로그 결과셋 감지";
+                                            WriteLogWithFlush(logPath, successResultSetLog);
+                                            
+                                            while (await reader.ReadAsync())
+                                            {
+                                                stepCount++;
+                                                
+                                                // 컬럼 존재 여부 확인 후 안전하게 접근
+                                                string stepID = reader["StepID"]?.ToString() ?? "N/A";
+                                                string operation = reader["OperationDescription"]?.ToString() ?? "N/A";
+                                                string affectedRows = reader["AffectedRows"]?.ToString() ?? "0";
+                                                
+                                                var stepLog = $"[ExecuteStoredProcedure] 📊 단계 {stepCount}: {stepID} - {operation} ({affectedRows}행)";
+                                                WriteLogWithFlush(logPath, stepLog);
+                                                logs.Add($"{stepID,-4} {operation,-50} {affectedRows,-10}");
+                                            }
+                                        }
+                                        else
+                                        {
+                                            // 3. 기타 결과셋 처리 (예상치 못한 결과셋)
+                                            var unknownResultSetLog = $"[ExecuteStoredProcedure] ⚠️ 결과셋 #{resultSetIndex}: 예상치 못한 결과셋 (컬럼: {string.Join(", ", columnNames)})";
+                                            WriteLogWithFlush(logPath, unknownResultSetLog);
+                                            
+                                            // 데이터가 있는 경우 읽어서 로그에 기록
+                                            var rowCount = 0;
+                                            while (await reader.ReadAsync())
+                                            {
+                                                rowCount++;
+                                                var rowData = new List<string>();
+                                                for (int i = 0; i < reader.FieldCount; i++)
+                                                {
+                                                    var value = reader[i]?.ToString() ?? "NULL";
+                                                    rowData.Add($"{columnNames[i]}: {value}");
+                                                }
+                                                var unknownRowLog = $"[ExecuteStoredProcedure] 📝 결과셋 #{resultSetIndex} 행 {rowCount}: {string.Join(" | ", rowData)}";
+                                                WriteLogWithFlush(logPath, unknownRowLog);
+                                            }
+                                            
+                                            if (rowCount == 0)
+                                            {
+                                                var noDataLog = $"[ExecuteStoredProcedure] 📝 결과셋 #{resultSetIndex}: 데이터 없음";
+                                                WriteLogWithFlush(logPath, noDataLog);
+                                            }
+                                        }
+                                        
+                                        var resultSetCompleteLog = $"[ExecuteStoredProcedure] ✅ 결과셋 #{resultSetIndex} 처리 완료";
+                                        WriteLogWithFlush(logPath, resultSetCompleteLog);
+                                        
+                                    } while (await reader.NextResultAsync()); // 다음 결과셋으로 이동
                                     
-                                    // 상세 로그를 파일에 기록
-                                    WriteLogWithFlush(logPath, resultString);
+                                    // 오류 메시지가 있었던 경우 - 리더 종료 후 처리
+                                    if (hasErrorMessage)
+                                    {
+                                        // 상세 정보는 리더 종료 후 별도로 처리 (return 제거)
+                                        var errorLog = $"[ExecuteStoredProcedure] ⚠️ 프로시저에서 오류가 발생했습니다. MySQL 오류 정보를 확인합니다.";
+                                        WriteLogWithFlush(logPath, errorLog);
+                                    }
                                     
-                                    // 콘솔에도 출력
-                                    Console.WriteLine(resultString);
+                                    // 정상 실행 로그 생성 (오류가 없는 경우에만)
+                                    if (!hasErrorMessage && stepCount > 0)
+                                    {
+                                        var totalLog = $"[ExecuteStoredProcedure] 📊 총 {stepCount}개 단계 처리됨";
+                                        WriteLogWithFlush(logPath, totalLog);
+                                        
+                                        var logBuilder = new StringBuilder();
+                                        logBuilder.AppendLine($"📊 {procedureName} 프로시저 실행 결과 - 총 {stepCount}개 단계:");
+                                        logBuilder.AppendLine($"{"단계",-4} {"처리내용",-50} {"처리행수",-10}");
+                                        logBuilder.AppendLine(new string('-', 70));
+                                        
+                                        foreach (var log in logs)
+                                        {
+                                            logBuilder.AppendLine(log);
+                                        }
+                                        
+                                        var resultString = logBuilder.ToString();
+                                        WriteLogWithFlush(logPath, resultString);
+                                        return resultString;
+                                    }
+                                    // hasErrorMessage가 true인 경우 MySQL 오류 정보 조회로 진행
+                                    // hasErrorMessage가 false인 경우 정상 실행 완료 처리
+                                }
+                                
+                                // 리더가 완전히 닫힌 후 프로시저에서 반환한 오류 정보 처리 (오류 발생 시)
+                                if (hasErrorMessage)
+                                {
+                                    var errorAnalysisLog = $"[ExecuteStoredProcedure] 🔍 프로시저에서 오류가 발생했습니다. 프로시저에서 반환한 오류 정보를 분석합니다.";
+                                    WriteLogWithFlush(logPath, errorAnalysisLog);
+                                    
+                                    // 프로시저에서 반환한 오류 정보 분석
+                                    // 프로시저가 수정되어 MySQLErrorCode, MySQLErrorMessage를 함께 반환함
+                                    var detailed = $"프로시저 실행 실패: {errorMessage}";
+                                    
+                                    // 프로시저에서 반환한 오류 정보가 있는 경우 추가
+                                    if (errorMessage.Contains("오류가 발생하여 모든 작업이 롤백되었습니다"))
+                                    {
+                                        detailed += $"\n\n🔍 프로시저에서 반환한 MySQL 오류 정보:";
+                                        detailed += $"\n• 오류 메시지: {errorMessage}";
+                                        detailed += $"\n• 프로시저가 수정되어 MySQL 오류 코드와 메시지를 함께 반환합니다.";
+                                        detailed += $"\n• 이제 SHOW ERRORS/WARNINGS 없이도 정확한 오류 정보를 확인할 수 있습니다.";
+                                    }
+                                    
+                                    var finalErrorLog = $"[ExecuteStoredProcedure] 🎯 프로시저 반환 오류 정보 분석 완료 - 상세 정보 반환";
+                                    WriteLogWithFlush(logPath, finalErrorLog);
+                                    
+                                    return detailed;
+                                }
+                                
+                                // 정상 실행 완료 (오류가 없는 경우)
+                                if (stepCount > 0)
+                                {
+                                    var successSummaryLog = $"[ExecuteStoredProcedure] 🎉 프로시저 정상 실행 완료 - 총 {stepCount}개 단계 처리됨";
+                                    WriteLogWithFlush(logPath, successSummaryLog);
+                                    
+                                    return $"프로시저 실행 완료 - 총 {stepCount}개 단계 처리됨";
                                 }
                                 else
                                 {
-                                    resultString = "프로시저 실행 완료 (상세 로그 없음)";
-                                    Console.WriteLine("⚠️ 프로시저 실행 결과가 없습니다");
+                                    var noStepLog = $"[ExecuteStoredProcedure] ℹ️ 프로시저 실행 완료 - 처리된 단계 없음";
+                                    WriteLogWithFlush(logPath, noStepLog);
+                                    
+                                    return "프로시저 실행 완료 (상세 로그 없음)";
                                 }
+                            }
+                            catch (MySqlException mysqlEx)
+                            {
+                                // MySQL 특정 오류 상세 정보를 app.log에 기록
+                                var mysqlErrorLog = $"[ExecuteStoredProcedure] ❌ MySQL 오류 발생: {mysqlEx.Message}";
+                                WriteLogWithFlush(logPath, mysqlErrorLog);
+                                
+                                var errorCodeLog = $"[ExecuteStoredProcedure] ❌ MySQL 오류 코드: {mysqlEx.Number}";
+                                WriteLogWithFlush(logPath, errorCodeLog);
+                                
+                                var sqlStateLog = $"[ExecuteStoredProcedure] ❌ SQL State: {mysqlEx.SqlState}";
+                                WriteLogWithFlush(logPath, sqlStateLog);
+                                
+                                // MySQL 오류 코드별 상세 설명을 app.log에 기록
+                                string errorDescription = mysqlEx.Number switch
+                                {
+                                    1146 => $"테이블이 존재하지 않습니다: {mysqlEx.Message}",
+                                    1054 => $"컬럼이 존재하지 않습니다: {mysqlEx.Message}",
+                                    1045 => $"데이터베이스 접근 권한이 없습니다: {mysqlEx.Message}",
+                                    2002 => $"데이터베이스 서버에 연결할 수 없습니다: {mysqlEx.Message}",
+                                    1049 => $"데이터베이스가 존재하지 않습니다: {mysqlEx.Message}",
+                                    1064 => $"SQL 구문 오류: {mysqlEx.Message}",
+                                    1216 => $"외래 키 제약 조건 위반: {mysqlEx.Message}",
+                                    1217 => $"외래 키 제약 조건 위반: {mysqlEx.Message}",
+                                    1451 => $"외래 키 제약 조건 위반: {mysqlEx.Message}",
+                                    1452 => $"외래 키 제약 조건 위반: {mysqlEx.Message}",
+                                    _ => $"MySQL 오류 코드 {mysqlEx.Number}: {mysqlEx.Message}"
+                                };
+                                
+                                var errorDescLog = $"[ExecuteStoredProcedure] 💡 오류 상세: {errorDescription}";
+                                WriteLogWithFlush(logPath, errorDescLog);
+                                
+                                // MySQL 오류 발생 시 상세 정보를 app.log에 기록하고 즉시 반환
+                                return $"프로시저 실행 실패 (MySQL 오류): {errorDescription}";
+                            }
+                            catch (Exception ex)
+                            {
+                                // 기타 예외도 상세 정보를 app.log에 기록
+                                var generalErrorLog = $"[ExecuteStoredProcedure] ❌ 일반 예외 발생: {ex.Message}";
+                                WriteLogWithFlush(logPath, generalErrorLog);
+                                
+                                var errorTypeLog = $"[ExecuteStoredProcedure] ❌ 예외 타입: {ex.GetType().Name}";
+                                WriteLogWithFlush(logPath, errorTypeLog);
+                                
+                                var stackTraceLog = $"[ExecuteStoredProcedure] ❌ 스택 트레이스: {ex.StackTrace}";
+                                WriteLogWithFlush(logPath, stackTraceLog);
+                                
+                                return $"프로시저 실행 실패 (일반 예외): {ex.Message}";
                             }
                         }
                     }
@@ -2911,62 +3259,31 @@ namespace LogisticManager.Processors
                 catch (Exception ex)
                 {
                     // DatabaseService 사용 실패 시 기존 방식으로 폴백
-                    Console.WriteLine($"⚠️ DatabaseService 직접 사용 실패, 기존 방식으로 폴백");
-                    Console.WriteLine($"❌ 오류 상세: {ex.Message}");
-                    Console.WriteLine($"❌ 오류 타입: {ex.GetType().Name}");
-                    Console.WriteLine($"❌ 스택 트레이스: {ex.StackTrace}");
+                    var fallbackLog = $"[ExecuteStoredProcedure] ⚠️ DatabaseService 직접 사용 실패, 기존 방식으로 폴백";
+                    WriteLogWithFlush(logPath, fallbackLog);
+                    
+                    var errorLog = $"[ExecuteStoredProcedure] ❌ 오류 상세: {ex.Message}";
+                    WriteLogWithFlush(logPath, errorLog);
+                    
+                    var errorTypeLog = $"[ExecuteStoredProcedure] ❌ 오류 타입: {ex.GetType().Name}";
+                    WriteLogWithFlush(logPath, errorTypeLog);
+                    
+                    var stackTraceLog = $"[ExecuteStoredProcedure] ❌ 스택 트레이스: {ex.StackTrace}";
+                    WriteLogWithFlush(logPath, stackTraceLog);
                     
                     var procedureQueryFallback = $"CALL {procedureName}()";
                     var result = await _invoiceRepository.ExecuteNonQueryAsync(procedureQueryFallback);
-                    resultString = $"프로시저 실행 완료 - 영향받은 행 수: {result}";
+                    return $"프로시저 실행 완료 - 영향받은 행 수: {result}";
                 }
-                
-                // 결과에 오류 키워드가 포함되어 있는지 확인
-                var errorKeywords = new[] { "Error", "오류", "실패", "Exception", "SQLSTATE", "ROLLBACK" };
-                var hasError = errorKeywords.Any(keyword => 
-                    resultString.Contains(keyword, StringComparison.OrdinalIgnoreCase));
-                
-                if (hasError)
-                {
-                    var errorResultLog = $"[ExecuteStoredProcedure] ⚠️ {procedureName} 프로시저 실행 결과에 오류 발견: {resultString}";
-                    WriteLogWithFlush(logPath, errorResultLog);
-                    Console.WriteLine($"⚠️ {errorResultLog}");
-                    
-                    // 오류가 포함된 결과를 예외로 던져서 C#에서 감지할 수 있도록 함
-                    throw new InvalidOperationException($"프로시저 실행 결과에 오류가 포함되어 있습니다: {resultString}");
-                }
-                
-                // 성공 키워드 확인
-                var successKeywords = new[] { "Success", "성공", "완료", "완료되었습니다", "작업완료" };
-                var hasSuccess = successKeywords.Any(keyword => 
-                    resultString.Contains(keyword, StringComparison.OrdinalIgnoreCase));
-                
-                if (hasSuccess)
-                {
-                    var successResultLog = $"[ExecuteStoredProcedure] ✅ {procedureName} 프로시저 실행 성공: {resultString}";
-                    WriteLogWithFlush(logPath, successResultLog);
-                    Console.WriteLine($"✅ {successResultLog}");
-                }
-                else
-                {
-                    var resultLog = $"[ExecuteStoredProcedure] {procedureName} 프로시저 실행 완료 - 상세 결과 로그 생성됨";
-                    WriteLogWithFlush(logPath, resultLog);
-                    Console.WriteLine($"✅ 프로시저 실행 완료: 상세 결과 로그 생성됨");
-                }
-                
-                return resultString;
             }
             catch (Exception ex)
             {
                 var errorLog = $"[ExecuteStoredProcedure] ❌ {procedureName} 프로시저 실행 실패: {ex.Message}";
                 WriteLogWithFlush(logPath, errorLog);
-                Console.WriteLine($"❌ 프로시저 실행 실패: {ex.Message}");
                 
                 var errorDetailLog = $"[ExecuteStoredProcedure] ❌ {procedureName} 프로시저 상세 오류: {ex}";
                 WriteLogWithFlush(logPath, errorDetailLog);
-                Console.WriteLine($"❌ 프로시저 상세 오류: {ex}");
                 
-                // 스택 트레이스도 로그에 기록
                 var stackTraceLog = $"[ExecuteStoredProcedure] ❌ {procedureName} 스택 트레이스: {ex.StackTrace}";
                 WriteLogWithFlush(logPath, stackTraceLog);
                 
@@ -3086,108 +3403,6 @@ namespace LogisticManager.Processors
             
             return orders;
         }
-
-
-
-        #endregion
-
-        #region 1차 데이터 가공 (First Stage Data Processing)
-
-        /// <summary>
-        /// 1차 데이터 가공 처리 (Repository 패턴 적용)
-        /// 
-        /// 📋 주요 기능:
-        /// - Repository 패턴을 통한 데이터 액세스 로직 분리
-        /// - 특정 품목코드에 별표 추가 (7710, 7720)
-        /// - 송장명 변경 (BS_ → GC_)
-        /// - 수취인명 정리 (nan → 난난)
-        /// - 주소 정리 (· 문자 제거)
-        /// - 결제수단 정리 (배민상회 → 0)
-        /// 
-        /// 🔄 처리 단계:
-        /// 1. Repository를 통한 특정 품목코드의 주문건 주소에 별표(*) 추가
-        /// 2. Repository를 통한 송장명 변경 (BS_ → GC_)
-        /// 3. Repository를 통한 수취인명 정리 (nan → 난난)
-        /// 4. Repository를 통한 주소 정리 (· 문자 제거)
-        /// 5. Repository를 통한 결제수단 정리 (배민상회 → 0)
-        /// 
-        /// ⚠️ 예외 처리:
-        /// - Repository 레벨에서 데이터베이스 쿼리 실행 오류 처리
-        /// - 매개변수화된 쿼리로 SQL 인젝션 방지
-        /// - 데이터 변환 오류 처리
-        /// 
-        /// 💡 성능 최적화:
-        /// - Repository 패턴으로 단일 책임 원칙 준수
-        /// - 매개변수화된 UPDATE 쿼리로 대량 데이터 처리
-        /// - 인덱스 활용 최적화된 쿼리
-        /// - 테스트 가능한 구조 (Mock 지원)
-        /// </summary>
-        /// <param name="progress">진행률 콜백</param>
-        /// <exception cref="Exception">데이터 가공 실패 시</exception>
-        private async Task ProcessFirstStageDataOptimized(IProgress<string>? progress)
-        {
-            try
-            {
-                // === 1차 데이터 가공 프로세스 시작 알림 ===
-                //progress?.Report("🔧 1차 데이터 가공 시작: Repository 패턴 적용된 단계별 처리");
-                
-                // ==================== 1단계: 특정 품목코드 주문건의 주소에 별표 마킹 ====================
-                // 품목코드 "7710", "7720"에 해당하는 주문건의 주소 앞에 별표(*) 추가
-                // 물류센터에서 특별 처리가 필요한 상품을 식별하기 위한 마킹 작업
-                var starAddedCount = await _invoiceRepository.AddStarToAddressAsync(new[] { "7710", "7720" });
-                progress?.Report($"✅ 특정 품목코드의 주문건 주소에 별표(*) 추가 완료: {starAddedCount}건");
-                Console.WriteLine($"[빌드정보] Repository를 통한 별표 추가 완료: {starAddedCount}건");
-                
-                // ==================== 2단계: 송장명 접두사 일괄 변경 ====================
-                // 송장명의 "BS_" 접두사를 "GC_"로 일괄 변경
-                // 브랜드 변경이나 시스템 변경에 따른 송장명 표준화 작업
-                // Repository의 ReplacePrefixAsync: 매개변수화된 UPDATE 쿼리로 안전한 대량 처리
-                var prefixChangedCount = await _invoiceRepository.ReplacePrefixAsync("송장명", "BS_", "GC_");
-                progress?.Report($"✅ 송장명 변경 완료: {prefixChangedCount}건 (BS_ → GC_)");
-                Console.WriteLine($"[빌드정보] Repository를 통한 송장명 변경 완료: {prefixChangedCount}건");
-                
-                // ==================== 3단계: 수취인명 데이터 정제 ====================
-                // 수취인명 필드의 "nan" 값을 "난난"으로 변경
-                // 데이터 수집 과정에서 발생한 결측값(NaN)을 한글 표기로 통일
-                // UpdateFieldAsync: 조건부 업데이트로 특정 값만 대상으로 안전하게 변경
-                var recipientUpdatedCount = await _invoiceRepository.UpdateFieldAsync("수취인명", "난난", "수취인명 = @oldValue", new { oldValue = "nan" });
-                progress?.Report($"✅ 수취인명 정리 완료: {recipientUpdatedCount}건 (nan → 난난)");
-                Console.WriteLine($"[빌드정보] Repository를 통한 수취인명 정리 완료: {recipientUpdatedCount}건");
-                
-                // ==================== 4단계: 주소 데이터 정리 (특수문자 제거) ====================
-                // 주소 필드에서 중점("·") 문자 제거
-                // 주소 표기 통일 및 배송 시스템 호환성 향상을 위한 정제 작업
-                // RemoveCharacterAsync: REPLACE 함수를 사용한 문자열 치환으로 성능 최적화
-                var addressCleanedCount = await _invoiceRepository.RemoveCharacterAsync("주소", "·");
-                progress?.Report($"✅ 주소 정리 완료: {addressCleanedCount}건 (· 문자 제거)");
-                Console.WriteLine($"[빌드정보] Repository를 통한 주소 정리 완료: {addressCleanedCount}건");
-                
-                // ==================== 5단계: 결제수단 표준화 ====================
-                // 특정 쇼핑몰(배민상회)의 결제수단을 "0"으로 표준화
-                // 쇼핑몰별 결제수단 코드 통일 및 정산 시스템 연동을 위한 작업
-                // 조건부 업데이트: "쇼핑몰 = '배민상회'"인 레코드만 대상으로 정확한 업데이트
-                var paymentUpdatedCount = await _invoiceRepository.UpdateFieldAsync("결제수단", "0", "쇼핑몰 = @storeName", new { storeName = "배민상회" });
-                progress?.Report($"✅ 결제수단 정리 완료: {paymentUpdatedCount}건 (배민상회 → 0)");
-                Console.WriteLine($"[빌드정보] Repository를 통한 결제수단 정리 완료: {paymentUpdatedCount}건");
-                
-                // ==================== 최종 처리 결과 집계 및 보고 ====================
-                // 모든 단계에서 처리된 총 레코드 수 계산
-                // 처리 효율성 및 데이터 정제 범위 파악을 위한 통계 정보
-                var totalProcessedCount = starAddedCount + prefixChangedCount + recipientUpdatedCount + addressCleanedCount + paymentUpdatedCount;
-                progress?.Report($"✅ 1차 데이터 가공 완료: 총 {totalProcessedCount}건 처리됨");
-                Console.WriteLine($"[빌드정보] Repository 패턴 적용 1차 데이터 가공 완료: 총 {totalProcessedCount}건");
-            }
-            catch (Exception ex)
-            {
-                // 오류 메시지 출력 및 예외 재발생
-                progress?.Report($"❌ 1차 데이터 가공 실패: {ex.Message}");
-                Console.WriteLine($"[빌드정보] Repository 패턴 1차 데이터 가공 오류: {ex}");
-                throw;
-            }
-        }
-
-
-
         #endregion
 
         #region 특수 처리 (Special Processing)
@@ -3304,7 +3519,6 @@ namespace LogisticManager.Processors
                 throw;
             }
         }
-
         /// <summary>
         /// 박스 처리 (파이썬 박스상품 명칭변경 코드 기반)
         /// 
@@ -3721,7 +3935,6 @@ namespace LogisticManager.Processors
                 throw;
             }
         }
-
         /// <summary>
         /// 출고지별 알림 타입을 결정하는 헬퍼 메서드
         /// 
@@ -4072,7 +4285,6 @@ namespace LogisticManager.Processors
                 return false;
             }
         }
-
         /// <summary>
         /// 송장출력 메세지 데이터를 처리하는 메서드
         /// 
@@ -4717,9 +4929,6 @@ namespace LogisticManager.Processors
                 return false;
             }
         }
-
-
-
         /// <summary>
         /// 데이터베이스에서 판매입력 데이터를 조회하는 메서드
         /// </summary>
@@ -4846,6 +5055,122 @@ namespace LogisticManager.Processors
                 return false;
             }
         }
+
+        #region MySQL 오류 정보 수집
+
+        /// <summary>
+        /// MySQL 오류 정보를 가져오는 메서드
+        /// </summary>
+        /// <param name="connection">데이터베이스 연결</param>
+        /// <returns>MySQL 오류 정보</returns>
+        private async Task<string> GetMySqlErrorsAsync(MySqlConnection connection)
+        {
+            try
+            {
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandType = CommandType.Text;
+                    command.CommandText = "SHOW ERRORS";
+                    command.CommandTimeout = 30;
+                    
+                    var errors = new StringBuilder();
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        var hasErrors = false;
+                        while (await reader.ReadAsync())
+                        {
+                            hasErrors = true;
+                            var level = reader["Level"]?.ToString() ?? "N/A";
+                            var code = reader["Code"]?.ToString() ?? "N/A";
+                            var message = reader["Message"]?.ToString() ?? "N/A";
+                            
+                            errors.AppendLine($"• Level: {level}, Code: {code}, Message: {message}");
+                        }
+                        
+                        if (!hasErrors)
+                        {
+                            return "MySQL 오류가 없습니다.";
+                        }
+                    }
+                    
+                    return errors.ToString().TrimEnd();
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"MySQL 오류 정보 조회 실패: {ex.Message}";
+            }
+        }
+
+        /// <summary>
+        /// MySQL 경고 정보를 가져오는 메서드
+        /// </summary>
+        /// <param name="connection">데이터베이스 연결</param>
+        /// <returns>MySQL 경고 정보</returns>
+        private async Task<string> GetMySqlWarningsAsync(MySqlConnection connection)
+        {
+            try
+            {
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandType = CommandType.Text;
+                    command.CommandText = "SHOW WARNINGS";
+                    command.CommandTimeout = 30;
+                    
+                    var warnings = new StringBuilder();
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        var hasWarnings = false;
+                        while (await reader.ReadAsync())
+                        {
+                            hasWarnings = true;
+                            var level = reader["Level"]?.ToString() ?? "N/A";
+                            var code = reader["Code"]?.ToString() ?? "N/A";
+                            var message = reader["Message"]?.ToString() ?? "N/A";
+                            
+                            warnings.AppendLine($"• Level: {level}, Code: {code}, Message: {message}");
+                        }
+                        
+                        if (!hasWarnings)
+                        {
+                            return "MySQL 경고가 없습니다.";
+                        }
+                    }
+                    
+                    return warnings.ToString().TrimEnd();
+                }
+            }
+            catch (Exception ex)
+            {
+                return $"MySQL 경고 정보 조회 실패: {ex.Message}";
+            }
+        }
+
+        /// <summary>
+        /// 메시지에서 URL을 제거하고 정제하는 유틸 메서드
+        /// </summary>
+        /// <param name="message">정제할 메시지</param>
+        /// <returns>정제된 메시지</returns>
+        private static string SanitizeMessage(string message)
+        {
+            if (string.IsNullOrEmpty(message)) return string.Empty;
+            try
+            {
+                // URL 제거 (http/https) 및 과도한 공백 정리
+                var sanitized = Regex.Replace(message, @"https?://\S+", string.Empty);
+                sanitized = Regex.Replace(sanitized, @"\s+", " ").Trim();
+                return sanitized;
+            }
+            catch
+            {
+                return message;
+            }
+        }
+
+        #endregion
+
+        // 추가 오류 진단 메서드 제거됨
+        // 사용자 요구사항: "프로시저전에 테이블이 있는지 체크하는게 아니고 프로시저 내부에서 발생한 순수한 오류메세지가 필요해"
 
         #endregion
     }

@@ -6,25 +6,34 @@ CREATE PROCEDURE sp_SeoulProcessF()
 BEGIN
     /*--================================================================================
 	-- 서울냉동 처리
+    -- 각 단계별 처리된 행의 수를 반환하도록 수정
     --================================================================================*/
-
     DECLARE done INT DEFAULT FALSE;
 
     DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
 
-    -- EXIT: 핸들러 실행 후 프로시저 종료
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
+        DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
         SELECT '오류가 발생하여 모든 작업이 롤백되었습니다.' AS ErrorMessage;
     END;
 
+    CREATE TEMPORARY TABLE IF NOT EXISTS sp_execution_log (
+		StepID INT AUTO_INCREMENT PRIMARY KEY,
+		OperationDescription VARCHAR(255),
+		AffectedRows INT
+	);
+
     START TRANSACTION;
+
+    TRUNCATE TABLE sp_execution_log;
 
     /*--================================================================================
 	-- (서울냉동) 서울서울낱개 분류
     --================================================================================*/
 	TRUNCATE TABLE 송장출력_서울냉동변환;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('(서울냉동) 송장출력_서울냉동변환 초기화', 0);
 	
 	INSERT INTO 송장출력_서울냉동변환 
 	           (msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 
@@ -37,18 +46,21 @@ BEGIN
 				택배수량합산, 송장구분자, 송장구분, 송장구분최종, 위치, 위치변환
            FROM 송장출력_사방넷원본변환_Dev
           WHERE 송장구분최종 = '서울낱개';
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 서울낱개 데이터 분류', ROW_COUNT());
 	
     /*--================================================================================
 	-- (서울냉동) 택배수량 계산 및 송장구분자 업데이트
     --================================================================================*/
 	UPDATE 송장출력_서울냉동변환
        SET 송장구분자 = FLOOR((1 / IFNULL(NULLIF(택배수량, 0), 10)) * 1000) / 1000;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 택배수량으로 송장구분자 계산', ROW_COUNT());
 	   
     /*--================================================================================
 	-- (서울냉동) 송장구분자와 수량 곱 업데이트
     --================================================================================*/
 	UPDATE 송장출력_서울냉동변환
        SET 송장구분자 = 송장구분자 * 수량;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 송장구분자에 수량 적용', ROW_COUNT());
 	   
     /*--================================================================================
 	-- (서울냉동) 주소 + 수취인명 기반 송장구분자 합산
@@ -60,18 +72,21 @@ BEGIN
           GROUP BY 주소, 수취인명
         ) AS s ON t.주소 = s.주소 AND t.수취인명 = s.수취인명
        SET t.택배수량1 = s.구분자합;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 주소/수취인명별 송장구분자 합산', ROW_COUNT());
 	
     /*--================================================================================
 	-- (서울냉동) 택배수량1 올림 처리
     --================================================================================*/
 	UPDATE 송장출력_서울냉동변환
        SET 택배수량1 = CEIL(IFNULL(택배수량1, 1));
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 택배수량 올림 처리', ROW_COUNT());
 
     /*--================================================================================
 	-- (서울냉동) 택배수량1에 따른 송장구분 업데이트
     --================================================================================*/
 	UPDATE 송장출력_서울냉동변환
        SET 송장구분 = CASE WHEN 택배수량1 > 1 THEN '추가' ELSE '1장' END;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 송장구분 설정 (추가/1장)', ROW_COUNT());
 	
     /*--================================================================================
 	-- (서울냉동) 주소 및 수취인명 유일성에 따른 송장구분 업데이트 시작
@@ -86,11 +101,13 @@ BEGIN
         ) AS unique_address ON t1.주소 = unique_address.주소 AND t1.수취인명 = unique_address.수취인명
        SET t1.송장구분 = '단일'
      WHERE t1.송장구분 = '1장';
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 송장구분 설정 (단일)', ROW_COUNT());
 		
     /*--================================================================================
 	-- (서울냉동) 서울냉동1장 분류
     --================================================================================*/
 	TRUNCATE TABLE 송장출력_서울냉동1장;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('(서울냉동) 송장출력_서울냉동1장 초기화', 0);
 	
 	INSERT INTO 송장출력_서울냉동1장 
 	           (msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 
@@ -103,12 +120,13 @@ BEGIN
 				택배수량1, 택배수량합산, 송장구분자, 송장구분, 송장구분최종, 위치, 위치변환
            FROM 송장출력_서울냉동변환
           WHERE 송장구분 = '1장';
-    -- ORDER BY 제거
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 서울냉동 1장 데이터 분류', ROW_COUNT());
 	   
     /*--================================================================================
 	-- (서울냉동) 서울냉동 단일 분류
     --================================================================================*/
 	TRUNCATE TABLE 송장출력_서울냉동단일;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('(서울냉동) 송장출력_서울냉동단일 초기화', 0);
 	
     INSERT INTO 송장출력_서울냉동단일 
 	           (msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 
@@ -121,7 +139,7 @@ BEGIN
 				택배수량1, 택배수량합산, 송장구분자, 송장구분, 송장구분최종, 위치, 위치변환
            FROM 송장출력_서울냉동변환
           WHERE 송장구분 = '단일';
-    -- ORDER BY 제거
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 서울냉동 단일 데이터 분류', ROW_COUNT());
 	
     /*--================================================================================
 	-- (서울냉동) 품목코드별 수량 합산 및 품목개수
@@ -133,11 +151,13 @@ BEGIN
           GROUP BY 품목코드
         ) AS t2 ON t1.품목코드 = t2.품목코드
        SET t1.품목개수 = t2.total_quantity;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 단일 데이터 품목개수 합산', ROW_COUNT());
 		
     /*--================================================================================
 	-- (서울냉동) 서울냉동 추가 분류
     --================================================================================*/
 	TRUNCATE TABLE 송장출력_서울냉동추가;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('(서울냉동) 송장출력_서울냉동추가 초기화', 0);
 	
     INSERT INTO 송장출력_서울냉동추가 
 	           (msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 
@@ -150,12 +170,13 @@ BEGIN
 				택배수량1, 택배수량합산, 송장구분자, 송장구분, 송장구분최종, 위치, 위치변환
            FROM 송장출력_서울냉동변환
           WHERE 송장구분 = '추가';
-    -- ORDER BY 제거
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 서울냉동 추가 데이터 분류', ROW_COUNT());
 	   
     /*--================================================================================
 	-- (서울냉동) 서울냉동추가송장 테이블로 유니크 주소 행 이동
     --================================================================================*/
 	TRUNCATE TABLE 송장출력_서울냉동추가송장;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('(서울냉동) 송장출력_서울냉동추가송장 초기화', 0);
 	
     -- ROW_NUMBER() 대신 GROUP BY, MIN(id) 사용
 	INSERT INTO 송장출력_서울냉동추가송장 
@@ -173,12 +194,14 @@ BEGIN
             FROM 송장출력_서울냉동추가
         GROUP BY 주소
       ) AS t2 ON t1.주소 = t2.주소 AND t1.id = t2.min_id;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 추가송장 대상 데이터 추출', ROW_COUNT());
 
     /*--================================================================================
 	-- (서울냉동) 서울냉동추가송장 업데이트
     --================================================================================*/
 	UPDATE 송장출력_서울냉동추가송장
        SET 수량 = 1, 송장명 = '+++', 옵션명 = '+++' , 품목코드 = '0000';
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 추가송장 내용 변경 (+++)', ROW_COUNT());
 
     /*--================================================================================
 	-- (서울냉동) 서울냉동 추가송장 늘리기
@@ -195,6 +218,7 @@ BEGIN
 	  FROM 송장출력_서울냉동추가송장 AS t
 	  JOIN Numbers AS n ON n.n <= (t.택배수량1 - 2)
 	 WHERE t.택배수량1 > 2;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 추가송장 개수만큼 행 복사', ROW_COUNT());
 			
     /*--================================================================================
 	-- (서울냉동) 서울냉동추가송장 순번 매기기
@@ -206,16 +230,19 @@ BEGIN
           ORDER BY 위치변환, id
         ) AS s ON t.id = s.id
        SET t.송장구분자 = CONCAT('[', s.rn, ']');
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 추가송장 순번 매기기', ROW_COUNT());
 		
     /*--================================================================================
 	-- (서울냉동) 서울냉동추가송장 주소업데이트
     --================================================================================*/
     UPDATE 송장출력_서울냉동추가송장 SET 주소 = CONCAT(주소, 송장구분자);
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 추가송장 주소에 순번 추가', ROW_COUNT());
 	
     /*--================================================================================
 	-- (서울냉동) 서울냉동추가 합치기
     --================================================================================*/
     TRUNCATE TABLE 송장출력_서울냉동추가합치기;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('(서울냉동) 송장출력_서울냉동추가합치기 초기화', 0);
 	
 	INSERT INTO 송장출력_서울냉동추가합치기
 	           (msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 
@@ -231,12 +258,13 @@ BEGIN
               UNION ALL
               SELECT * FROM 송장출력_서울냉동추가송장
            ) AS combined;
-    -- ORDER BY 제거
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 원본+추가송장 데이터 통합', ROW_COUNT());
 
     /*--================================================================================
 	-- (서울냉동) 서울냉동 테이블 마지막정리
     --================================================================================*/
     TRUNCATE TABLE 송장출력_서울냉동;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('(서울냉동) 송장출력_서울냉동 초기화', 0);
 
     INSERT INTO 송장출력_서울냉동 
 	           (msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 
@@ -267,18 +295,22 @@ BEGIN
 				택배비용, 박스크기, 출력개수, 송장수량, 별표1, 별표2, 품목개수, 택배수량, 
 				택배수량1, 택배수량합산, 송장구분자, 송장구분, 송장구분최종, 위치, 위치변환 
 		   FROM 송장출력_서울냉동추가합치기;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 최종 데이터 통합 (UNION ALL)', ROW_COUNT());
 	
     /*--================================================================================
 	-- (서울냉동) 별표 행 이동 및 삭제
     --================================================================================*/
     TRUNCATE TABLE 송장출력_서울냉동별표;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('(서울냉동) 송장출력_서울냉동별표 초기화', 0);
 	
     INSERT INTO 송장출력_서울냉동별표
          SELECT * FROM 송장출력_서울냉동
           WHERE 별표1 <> '' OR 별표2 <> '';
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 별표 데이터 임시 저장', ROW_COUNT());
 	
     DELETE FROM 송장출력_서울냉동
           WHERE 별표1 <> '' OR 별표2 <> '';
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[DELETE] 원본 테이블에서 별표 데이터 삭제', ROW_COUNT());
 	
     /*--================================================================================
 	-- (서울냉동) 별표1 기준으로 정렬하여 행 이동
@@ -294,11 +326,13 @@ BEGIN
 				택배수량1, 택배수량합산, 송장구분자, 송장구분, 송장구분최종, 위치, 위치변환
            FROM 송장출력_서울냉동별표
        ORDER BY 주소 ASC, 옵션명 ASC;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 별표 데이터를 다시 맨 위로 이동', ROW_COUNT());
 		
     /*--================================================================================
 	-- (서울냉동) 송장출력_서울냉동에서 송장출력_서울냉동_최종으로 데이터 이동
     --================================================================================*/
     TRUNCATE TABLE 송장출력_서울냉동_최종;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('(서울냉동) 송장출력_서울냉동_최종 초기화', 0);
 	
 	INSERT INTO 송장출력_서울냉동_최종
 	           (msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 
@@ -308,15 +342,22 @@ BEGIN
 		        주소, 송장명, 수량, 배송메세지, 주문번호, 쇼핑몰, 품목코드, 
 				택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수
            FROM 송장출력_서울냉동;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 최종 테이블로 데이터 이동', ROW_COUNT());
 		
     /*--================================================================================
 	-- (서울냉동) 송장출력_서울냉동_최종 테이블 업데이트
     --================================================================================*/
     UPDATE 송장출력_서울냉동_최종
        SET 택배비용 = 2150, 박스크기 = '극소', 출력개수 = 1;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 최종 테이블 기본값 설정', ROW_COUNT());
 		
     COMMIT;
-    SELECT '작업완료.' AS SuccessMessage;
+    
+    -- 최종 결과를 SELECT 문으로 반환
+    SELECT StepID, OperationDescription, AffectedRows FROM sp_execution_log ORDER BY StepID;
+
+    -- 프로시저 종료 전 임시 테이블 삭제
+    DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
 
 END$$
 

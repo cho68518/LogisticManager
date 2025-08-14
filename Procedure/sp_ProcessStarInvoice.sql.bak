@@ -8,17 +8,9 @@ BEGIN
 	-- 송장출력관리 처리
     -- 각 단계별 처리된 행의 수를 반환하도록 수정
     --==================================================================================*/
-	-- 각 단계별 처리 건수를 기록할 임시 테이블 생성
-	CREATE TEMPORARY TABLE IF NOT EXISTS sp_execution_log (
-		StepID INT AUTO_INCREMENT PRIMARY KEY,
-		OperationDescription VARCHAR(255),
-		AffectedRows INT
-	);
-
 	DECLARE var_관리자메세지 VARCHAR(255);
 	DECLARE done_msg BOOLEAN DEFAULT FALSE;
-    -- 커서 루프 내의 업데이트 건수를 합산할 변수
-	DECLARE loop_updated_rows INT DEFAULT 0;
+    DECLARE loop_updated_rows INT DEFAULT 0;
 
 	DECLARE cur_msg CURSOR FOR SELECT TRIM(배송메세지) FROM 송장출력_관리자_배송메세지 WHERE TRIM(배송메세지) != '';
 	
@@ -27,20 +19,23 @@ BEGIN
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
-        -- 오류 발생 시 임시 테이블 삭제
         DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
         SELECT '오류가 발생하여 모든 작업이 롤백되었습니다.' AS ErrorMessage;
     END;
 
+	CREATE TEMPORARY TABLE IF NOT EXISTS sp_execution_log (
+		StepID INT AUTO_INCREMENT PRIMARY KEY,
+		OperationDescription VARCHAR(255),
+		AffectedRows INT
+	);
+
     START TRANSACTION;
 
-    -- 로그 테이블 초기화
     TRUNCATE TABLE sp_execution_log;
 
     TRUNCATE TABLE 송장출력_관리자;
     TRUNCATE TABLE 송장출력_관리자_배송메세지;
     TRUNCATE TABLE 송장출력_관리자_이름;
-    -- 단계별 처리 건수 기록
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('관리자 테이블 3개 초기화 (TRUNCATE)', 0);
 
     -- 품번코드 또는 상품명
@@ -61,19 +56,27 @@ BEGIN
           WHERE TRIM(수취인명) IS NOT NULL AND TRIM(수취인명) != '';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 관리자_수취인명', ROW_COUNT());
 
+    /*--=============================================================
     -- 배송메세지에서 별표지우기
+    --=============================================================*/
     UPDATE 송장출력_사방넷원본변환_Dev
        SET 배송메세지 = REPLACE(배송메세지, '★', '')
      WHERE 배송메세지 LIKE '%★%';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 배송메세지 별표 제거', ROW_COUNT());
 
+	/*--=============================================================
 	-- 별표 품목코드 데이터입력
+    --===============================================================*/
     UPDATE 송장출력_사방넷원본변환 AS s 
 	  JOIN 송장출력_관리자 AS a ON s.품목코드 = a.품절제품코드 
 	   SET s.별표1 = '★★★';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 별표 품목코드 입력', ROW_COUNT());
 
-    -- 배송메세지 검색하여 별표 입력 (커서 루프)
+    /*--============================================================================================================
+    -- 송장출력_사방넷원본변환 테이블의 배송메세지에 송장출력_관리자_배송메세지 테이블의 배송메세지가
+    --    TRIM 함수를 이용해 빈칸을 제거한 후 포함되는 경우에
+    --    해당하는 행을 찾고, 그에 해당하는 송장출력_사방넷원본변환 테이블의 별표1 컬럼에 별표 세 개를 넣어줍니다.
+    --============================================================================================================*/
 	OPEN cur_msg;
 
 	msg_loop: LOOP
@@ -82,6 +85,7 @@ BEGIN
 			LEAVE msg_loop;
 		END IF;
 
+		-- FULLTEXT 인덱스를 사용하여 매우 빠르게 검색하고 업데이트합니다.
 		UPDATE 송장출력_사방넷원본변환
 		   SET 별표1 = '★★★'
 		 WHERE MATCH(배송메세지) AGAINST(var_관리자메세지 IN BOOLEAN MODE);
@@ -91,57 +95,80 @@ BEGIN
 	CLOSE cur_msg;
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 배송메세지 검색으로 별표 입력 (루프 총합)', loop_updated_rows);
 
+    /*--=============================================================
     -- 별표 수취인 데이터입력
+    --===============================================================*/
     UPDATE 송장출력_사방넷원본변환 AS s 
 	  JOIN 송장출력_관리자_이름 AS a 
 	    ON s.수취인명 = a.수취인명 
 	   SET s.별표1 = '★★★';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 별표 수취인 입력', ROW_COUNT());
 
+    /*--=============================================================	
     -- 별표 제주도
+    --===============================================================*/
     UPDATE 송장출력_사방넷원본변환 
 	   SET 별표2 = '제주' 
 	 WHERE 주소 LIKE '%제주특별%' OR 주소 LIKE '%제주 제주%';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 제주도 주소 표시', ROW_COUNT());
 
+    /*--=============================================================	
     -- 별표 고객 공통 마킹
+    --===============================================================*/
     UPDATE 송장출력_사방넷원본변환 AS t1 
 	  JOIN (SELECT 주소, 수취인명 FROM 송장출력_사방넷원본변환 WHERE 별표1 = '★★★') AS t2 
         ON t1.주소 = t2.주소 AND t1.수취인명 = t2.수취인명 
  	   SET t1.별표1 = '★★★';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 별표 고객 공통 마킹', ROW_COUNT());
 
+    /*--=============================================================		
     -- 박스상품 명칭변경	
+    --===============================================================*/
     UPDATE 송장출력_사방넷원본변환 
 	   SET 송장명 = CONCAT('▨▧▦ ', 송장명) 
 	 WHERE 송장명 LIKE '%박스%';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 박스상품 명칭 변경', ROW_COUNT());
 
+	/*--=============================================================		
 	-- 택배 박스 낱개 나누기
+    --===============================================================*/
+    -- 택배수량 컬럼의 값이 1인 경우에는 '박스', 그 외의 경우에는 '낱개'로 변경.
     UPDATE 송장출력_사방넷원본변환 
 	   SET 택배수량1 = CASE WHEN CAST(택배수량 AS UNSIGNED) = 1 THEN '박스' ELSE '낱개' END 
 	 WHERE 택배수량 REGEXP '^[0-9]+$';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 택배 박스/낱개 구분', ROW_COUNT());
 
+	/*--=============================================================		
 	-- 송장 출고지별로 구분
+    --===============================================================*/
     UPDATE 송장출력_사방넷원본변환 
 	   SET `송장구분최종` = CONCAT(`송장구분`, IFNULL(`택배수량1`, ''));
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 송장구분최종 설정', ROW_COUNT());
 
+    /*--=============================================================		
     -- 냉동 렉 위치 입력
+    --===============================================================*/
+    -- 품목등록 테이블과 송장출력_사방넷원본변환 테이블을 JOIN하여
+    -- '품목코드'가 일치하는 경우, '품목등록' 테이블의 '품목그룹2코드' 값으로
+    -- '송장출력_사방넷원본변환' 테이블의 '위치' 필드를 한 번에 업데이트.
     UPDATE 송장출력_사방넷원본변환 AS s 
 	  JOIN 품목등록 AS p 
 	    ON s.품목코드 = p.품목코드 
 	   SET s.위치     = p.품목그룹2코드;
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 냉동 렉 위치 입력', ROW_COUNT());
 
+	/*--=============================================================	
 	-- 빈 위치 업데이트
+    --=============================================================*/
     UPDATE 송장출력_사방넷원본변환 
 	   SET 위치 = '99-1' 
 	 WHERE 위치 IS NULL OR 위치 = '';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 빈 위치를 99-1로 설정', ROW_COUNT());
 
+	/*--=============================================================
 	-- '위치변환' 업데이트
+    --=============================================================*/
+    -- '위치' 값에 따라 '위치변환' 컬럼을 조건부로 업데이트.
     UPDATE 송장출력_사방넷원본변환
        SET 위치변환 =
            CASE
@@ -150,22 +177,29 @@ BEGIN
            END;
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 위치변환 설정', ROW_COUNT());
 
+    /*--=============================================================
     -- 냉동 공산 제품 중 작은 품목 합포장처리
+    --=============================================================*/
     UPDATE 송장출력_사방넷원본변환
        SET 위치 = '공3'
      WHERE 위치 = '공2' AND 택배수량 BETWEEN 20 AND 1000000;
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 합포장 처리 (공3)', ROW_COUNT());
 
+    /*--=============================================================
     -- 냉동창고 공산품 송장분리입력
+    --=============================================================*/
     UPDATE 송장출력_사방넷원본변환
        SET 주소 = CONCAT(주소, '☆')
      WHERE 위치 = '공2';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 냉동창고 공산품 송장분리 (주소에 ☆ 추가)', ROW_COUNT());
 
+    /*--=============================================================
     -- 공통박스 분류작업
+    --=============================================================*/
     TRUNCATE TABLE 송장출력_공통박스;
 	INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('공통박스 테이블 초기화 (TRUNCATE)', 0);
 	
+	-- 수량이 2 이상인 행만을 복사하여 추가
     INSERT INTO 송장출력_공통박스 (
 	            msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 주소, 옵션명, 수량, 
 				배송메세지, 주문번호, 쇼핑몰, 수집시간, 송장명, 품목코드, 택배비용, 박스크기, 출력개수, 송장수량, 
@@ -179,7 +213,9 @@ BEGIN
           WHERE 택배수량1 = '박스';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 공통박스 데이터 복사', ROW_COUNT());
 
+	/*--=============================================================	
 	-- 박스 공통늘리기
+    --=============================================================*/
     INSERT INTO 송장출력_공통박스 (
         msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2,
         우편번호, 주소, 옵션명, 수량, 배송메세지, 주문번호, 쇼핑몰, 수집시간,
@@ -195,23 +231,35 @@ BEGIN
 			t.송장구분최종, t.위치, t.위치변환
 		FROM
 			송장출력_공통박스 AS t
+		-- 숫자 테이블과 조인하여 행을 복제
 		JOIN
 			Numbers AS n ON n.n <= (t.수량 - 1)
 		WHERE
 			t.수량 > 1;
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 박스 수량만큼 행 복사', ROW_COUNT());
 
-    -- 박스주문 순번 매기기 1
+    /*--=============================================================	
+    -- 박스주문 순번 매기기	1
+    --=============================================================*/
+    -- 사용자 변수를 이용한 UPDATE
+    -- 서브쿼리에서 위치변환, id 순으로 정렬 후,
+    -- @current_location 변수로 그룹이 바뀌는 것을 감지하여
+    -- @seq 변수를 1로 초기화하거나 1씩 증가시킴
+	-- 송장출력_공통박스 테이블의 송장구분자 업데이트
     UPDATE
         송장출력_공통박스 AS t
         JOIN
         (
             SELECT
                 id,
+                -- @current_location 변수와 현재 행의 위치변환 값을 비교
+                -- 같으면 순번(@seq)을 1 증가, 다르면 1로 초기화
                 @seq := IF(@current_location = 위치변환, @seq + 1, 1) AS sequence_num,
+                -- @current_location 변수에 현재 위치변환 값을 할당하여 다음 행에서 비교할 수 있도록 준비
                 @current_location := 위치변환
             FROM
                 송장출력_공통박스,
+                -- 프로시저 내에서 사용할 사용자 변수 초기화
                 (SELECT @seq := 0, @current_location := '') AS vars
             ORDER BY
                 위치변환, id
@@ -220,42 +268,62 @@ BEGIN
         t.송장구분자 = CONCAT('(', s.sequence_num, ')');
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 박스주문 순번 매기기 1', ROW_COUNT());
 
+	/*--=============================================================
 	-- 박스주문 주소업데이트
+    --=============================================================*/
 	UPDATE 송장출력_공통박스 SET 주소 = CONCAT(주소, 송장구분자);
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 박스주문 주소에 순번 추가', ROW_COUNT());
 
-    -- 박스주문 순번 매기기 2
+    /*--=============================================================	
+    -- 박스주문 순번 매기기	2
+    --=============================================================*/
+	-- 동일한 주소 그룹 내에서 첫 번째 주소는 그대로 두고, 두 번째 주소부터 순번을 (2), (3)... 형식으로 붙이는 것
+	-- 사용자 변수를 활용하여 동일 주소 그룹에 순번을 매기고,
+    -- 순번이 2 이상인 경우에만 주소 뒤에 '(순번)'을 추가합니다.
+	-- 송장출력_공통박스 테이블의 주소 업데이트
     UPDATE
         송장출력_공통박스 AS t
         JOIN
         (
             SELECT
                 id,
+                -- 원본 주소 값을 보존하여 CONCAT에 사용
                 주소 AS original_address,
+                -- @current_address 변수와 현재 행의 주소 값을 비교
+                -- 같으면 순번(@seq)을 1 증가, 다르면 1로 초기화하여 순번(rn) 생성
                 @seq := IF(@current_address = 주소, @seq + 1, 1) AS rn,
+                -- @current_address 변수에 현재 주소 값을 할당하여 다음 행에서 비교
                 @current_address := 주소
             FROM
                 송장출력_공통박스,
+                -- 프로시저 실행 전, 사용자 변수를 0과 빈 문자열로 초기화
                 (SELECT @seq := 0, @current_address := '') AS vars
             ORDER BY
                 주소, id
         ) AS s ON t.id = s.id
     SET
         t.주소 = CONCAT(s.original_address, ' (', s.rn, ')')
+    -- 계산된 순번(rn)이 1보다 큰, 즉 그룹 내 두 번째 이상인 데이터만 업데이트
     WHERE
         s.rn > 1;
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 박스주문 순번 매기기 2', ROW_COUNT());
 
-	-- 박스주문 수량 1로 변경
+	/*--================================================================================
+	-- 박스주문 수량1로변경
+    --================================================================================*/
     UPDATE 송장출력_공통박스 SET 수량 = 1;
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 박스주문 수량을 1로 변경', ROW_COUNT());
 
+	/*--================================================================================
 	-- 박스주문 유일자설정 (위치변환)
+    --================================================================================*/
 	UPDATE 송장출력_공통박스 
 	   SET 위치변환 = CONCAT('0',위치, 품목코드, LPAD(수량, 2, '0'), 수취인명, 주소, 전화번호1);
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 박스주문 위치변환 재설정', ROW_COUNT());
 
-	-- 공통박스 수량 처리
+	/*--================================================================================
+	--공통박스 수량 처리 (품목코드별로 수량을 합산하여 출력개수에 업데이트)
+    --================================================================================*/
 	UPDATE 송장출력_공통박스 AS t1 
         INNER JOIN (
             SELECT 품목코드, SUM(수량) AS total_quantity
@@ -265,14 +333,20 @@ BEGIN
         SET t1.품목개수 = t2.total_quantity;
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 공통박스 품목개수 합산', ROW_COUNT());
 
-	-- 개별작업1 (송장구분최종 업데이트)
+	/*--================================================================================
+	-- 개별작업1	(송장구분최종 업데이트)
+	--   : 서울낱개 중 서울 주소 + 쇼핑몰 조건
+	--   : 서울박스 중 서울 주소 + 쇼핑몰 조건
+    --================================================================================*/
 	UPDATE 송장출력_사방넷원본변환
 	   SET
+			-- `송장구분최종`의 현재 값에 따라 새로운 값을 조건부로 할당합니다.
 			송장구분최종 = CASE 송장구분최종
 				WHEN '냉동낱개' THEN '서울낱개'
 				WHEN '냉동박스' THEN '서울박스'
 			END
 	   WHERE
+			-- 두 업데이트 쿼리의 WHERE 조건을 통합합니다.
 			송장구분최종 IN ('냉동낱개', '냉동박스')
 			AND SUBSTRING(
 					TRIM(SUBSTRING_INDEX(주소, ']', -1)), 1, 2
@@ -280,7 +354,10 @@ BEGIN
 			AND 쇼핑몰 IN ('Cafe24(신)', 'Gfresh');
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 개별작업 1 (서울낱개/서울박스)', ROW_COUNT());
 			
-	-- 개별작업2 (송장구분최종 업데이트)
+	/*--================================================================================
+	-- 개별작업2	(송장구분최종 업데이트)
+	--   : 서울박스 중 서울 주소 → 서울박스
+    --================================================================================*/
     UPDATE 송장출력_공통박스
        SET 송장구분최종 = '서울박스'
      WHERE 송장구분최종 = '냉동박스'
@@ -292,10 +369,10 @@ BEGIN
 
     COMMIT;
 
-    -- [수정] 최종 결과를 SELECT 문으로 반환
+    -- 최종 결과를 SELECT 문으로 반환
     SELECT StepID, OperationDescription, AffectedRows FROM sp_execution_log ORDER BY StepID;
 
-    -- [추가] 프로시저 종료 전 임시 테이블 삭제
+    -- 프로시저 종료 전 임시 테이블 삭제
     DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
 
 END$$
