@@ -2832,14 +2832,79 @@ namespace LogisticManager.Processors
                 var procedureLog = $"[ExecuteStoredProcedure] {procedureName} 프로시저 실행 시작";
                 WriteLogWithFlush(logPath, procedureLog);
                 
-                // 프로시저 실행
+                // 프로시저 실행 - SELECT 결과를 읽기 위해 ExecuteReaderAsync 사용
                 var procedureQuery = $"CALL {procedureName}()";
                 Console.WriteLine($"🔍 실행할 SQL: {procedureQuery}");
                 
-                var result = await _invoiceRepository.ExecuteNonQueryAsync(procedureQuery);
+                // 프로시저 실행 및 결과 읽기 - DatabaseService 직접 사용
+                var resultString = "";
                 
-                // 프로시저 실행 결과를 문자열로 변환 (int 타입 처리)
-                var resultString = result.ToString();
+                try
+                {
+                    using (var connection = await _databaseService.GetConnectionAsync())
+                    {
+                        await connection.OpenAsync();
+                        
+                        using (var command = connection.CreateCommand())
+                        {
+                            command.CommandType = CommandType.Text;
+                            command.CommandText = procedureQuery;
+                            command.CommandTimeout = 300; // 5분 타임아웃
+                            
+                            using (var reader = await command.ExecuteReaderAsync())
+                            {
+                                var logs = new List<string>();
+                                var stepCount = 0;
+                                
+                                // 프로시저 결과 읽기
+                                while (await reader.ReadAsync())
+                                {
+                                    stepCount++;
+                                    var stepID = reader["StepID"]?.ToString() ?? "N/A";
+                                    var operation = reader["OperationDescription"]?.ToString() ?? "N/A";
+                                    var affectedRows = reader["AffectedRows"]?.ToString() ?? "0";
+                                    
+                                    logs.Add($"{stepID,-4} {operation,-50} {affectedRows,-10}");
+                                }
+                                
+                                // 상세 로그 생성
+                                if (stepCount > 0)
+                                {
+                                    var logBuilder = new StringBuilder();
+                                    logBuilder.AppendLine($"📊 {procedureName} 프로시저 실행 결과 - 총 {stepCount}개 단계:");
+                                    logBuilder.AppendLine($"{"단계",-4} {"처리내용",-50} {"처리행수",-10}");
+                                    logBuilder.AppendLine(new string('-', 70));
+                                    
+                                    foreach (var log in logs)
+                                    {
+                                        logBuilder.AppendLine(log);
+                                    }
+                                    
+                                    resultString = logBuilder.ToString();
+                                    
+                                    // 상세 로그를 파일에 기록
+                                    WriteLogWithFlush(logPath, resultString);
+                                    
+                                    // 콘솔에도 출력
+                                    Console.WriteLine(resultString);
+                                }
+                                else
+                                {
+                                    resultString = "프로시저 실행 완료 (상세 로그 없음)";
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // DatabaseService 사용 실패 시 기존 방식으로 폴백
+                    Console.WriteLine($"⚠️ DatabaseService 직접 사용 실패, 기존 방식으로 폴백: {ex.Message}");
+                    
+                    var procedureQueryFallback = $"CALL {procedureName}()";
+                    var result = await _invoiceRepository.ExecuteNonQueryAsync(procedureQueryFallback);
+                    resultString = $"프로시저 실행 완료 - 영향받은 행 수: {result}";
+                }
                 
                 // 결과에 오류 키워드가 포함되어 있는지 확인
                 var errorKeywords = new[] { "Error", "오류", "실패", "Exception", "SQLSTATE", "ROLLBACK" };
@@ -2869,9 +2934,9 @@ namespace LogisticManager.Processors
                 }
                 else
                 {
-                    var resultLog = $"[ExecuteStoredProcedure] {procedureName} 프로시저 실행 완료 - 결과: {resultString}";
+                    var resultLog = $"[ExecuteStoredProcedure] {procedureName} 프로시저 실행 완료 - 상세 결과 로그 생성됨";
                     WriteLogWithFlush(logPath, resultLog);
-                    Console.WriteLine($"✅ 프로시저 실행 완료: {resultString}");
+                    Console.WriteLine($"✅ 프로시저 실행 완료: 상세 결과 로그 생성됨");
                 }
                 
                 return resultString;
