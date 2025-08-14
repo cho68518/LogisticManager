@@ -576,12 +576,73 @@ namespace LogisticManager.Processors
                 finalProgressReporter?.Report(50);
                 Console.WriteLine("✅ ProcessTalkDealUnavailable 메서드 호출 완료");
 
-                // 송장출력관리 처리    
+                // 송장출력관리 처리  
+                // 배송메세지에서 별표지우기 
+                // 별표 품목코드 데이터입력 
+                // 별표1 = '★★★' (별표 배송메세지 데이터입력)
+                // 별표 수취인 데이터입력
+                // 별표 제주도
+                // 별표 고객 공통 마킹
+                // 박스상품 명칭변경
+                // 택배 박스 낱개 나누기
+                // 카카오 행사 송장 코드 (구현 하지 않음)
+                // 송장 출고지별로 구분
+                // 냉동 렉 위치 입력
+                // 냉동 공산 제품 중 작은 품목 합포장처리
+                // 빈 위치 업데이트
+                // 이름 주소 전화번호 합치기
+                // 냉동창고 공산품 송장분리입력
+                // 공통박스 분류작업
+                // 박스 공통늘리기
+                // 박스주문 순번 매기기1 (송장구분자에 순번 업데이트)
+                // 박스주문 주소업데이트
+                // 박스주소 순번 매기기2 (주소 업데이트, 주소에 순번 업데이트)
+                // 박스주문 수량1로변경
+                // 박스주문 유일자설정 (위치변환)
+                // 공통박스 수량 처리 (품목코드별로 수량을 합산하여 출력개수에 업데이트)
+                // 개별작업1	(송장구분최종 업데이트)
+	            //    : 서울낱개 중 서울 주소 + 쇼핑몰 조건
+	            //    : 서울박스 중 서울 주소 + 쇼핑몰 조건
+                // 개별작업2	(송장구분최종 업데이트)
+	            //   : 서울박스 중 서울 주소 → 서울박스
                 finalProgress?.Report("📜 [4-6]  송장출력관리 처리");
                 Console.WriteLine("🔍 ProcessInvoiceManagement 메서드 호출 시작...");
                 await ProcessInvoiceManagement(); // 📝 4-6 송장출력관리 처리
                 finalProgressReporter?.Report(55);
                 Console.WriteLine("✅ ProcessInvoiceManagement 메서드 호출 완료");
+
+                // 서울냉동처리
+                // (서울냉동) 서울서울낱개 분류
+                // (서울냉동) 택배수량 계산 및 송장구분자 업데이트
+                // (서울냉동) 송장구분자와 수량 곱 업데이트
+                // (서울냉동) 주소 + 수취인명 기반 송장구분자 합산
+                // (서울냉동) 택배수량1 올림 처리
+                // (서울냉동) 택배수량1에 따른 송장구분 업데이트
+                // (서울냉동) 주소 및 수취인명 유일성에 따른 송장구분 업데이트 시작
+                // (서울냉동) 서울냉동1장 분류
+                // (서울냉동) 서울냉동 단일 분류
+                // (서울냉동) 품목코드별 수량 합산 및 품목개수
+                // (서울냉동) 서울냉동 추가 분류
+                // (서울냉동) 서울냉동추가송장 테이블로 유니크 주소 행 이동
+                // (서울냉동) 서울냉동추가송장 업데이트
+                // (서울냉동) 서울냉동 추가송장 늘리기
+                // (서울냉동) 서울냉동추가송장 순번 매기기
+                // (서울냉동) 서울냉동추가송장 주소업데이트
+                // (서울냉동) 서울냉동추가 합치기
+                // (서울냉동) 서울냉동 테이블 마지막정리
+                // (서울냉동) 별표 행 이동 및 삭제
+                // (서울냉동) 별표1 기준으로 정렬하여 행 이동
+                // (서울냉동) 송장출력_서울냉동에서 송장출력_서울냉동_최종으로 데이터 이동
+                // (서울냉동) 송장출력_서울냉동_최종 테이블 업데이트(택배비용, 박스크기, 출력개수 업데이트)                
+                finalProgress?.Report("❄️ [4-7] 서울냉동 처리");
+                Console.WriteLine("🔍 ProcessSeoulFrozenManagement 메서드 호출 시작...");
+                await ProcessSeoulFrozenManagement(); // 📝 4-7 서울냉동 처리
+                finalProgressReporter?.Report(57);
+                Console.WriteLine("✅ ProcessSeoulFrozenManagement 메서드 호출 완료");
+
+
+
+
 
 
                 //await ProcessSpecialMarking(); // 🏷️ 지능형 별표 마킹
@@ -2221,6 +2282,148 @@ namespace LogisticManager.Processors
                 throw new Exception($"송장출력관리 처리 중 오류 발생: {ex.Message}", ex);
             }
         }
+
+        // 서울냉동 처리
+        private async Task ProcessSeoulFrozenManagement()
+        {
+            const string METHOD_NAME = "ProcessSeoulFrozenManagement";
+            const string PROCEDURE_NAME = "sp_SeoulProcessF";
+            
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            var startTime = DateTime.Now;
+            
+            try
+            {
+                // === 1단계: 처리 시작 로깅 ===
+                var startLog = $"[{METHOD_NAME}] 서울냉동 처리 시작 - {startTime:yyyy-MM-dd HH:mm:ss}";
+                WriteLogWithFlush(logPath, startLog);
+                _progress?.Report($"📦 {startLog}");
+                
+                // 로그 파일 상태 진단 및 콘솔 출력
+                var logStatus = DiagnoseLogFileStatus(logPath);
+                Console.WriteLine(logStatus);
+                
+                // === 프로시저 호출 ===
+                string procedureResult = "";
+                var insertCount = 0; // 서울냉동 처리는 프로시저만 실행하므로 데이터 삽입 건수는 0
+
+                // 프로시저명이 지정된 경우에만 실행 (값이 없으면 건너뜀)
+                if (!string.IsNullOrWhiteSpace(PROCEDURE_NAME))
+                {
+                    var procedureLog = $"[{METHOD_NAME}] 🚀 {PROCEDURE_NAME} 프로시저 호출 시작";
+                    WriteLogWithFlush(logPath, procedureLog);
+                    _progress?.Report(procedureLog);
+                    //finalProgressReporter?.Report(55);
+
+                    try
+                    {
+                        // 프로시저 실행 전 로그 파일 상태 재확인
+                        var preProcedureLog = $"[{METHOD_NAME}] 🔍 프로시저 실행 전 로그 파일 상태 확인";
+                        WriteLogWithFlush(logPath, preProcedureLog);
+
+                        // 프로시저 실행
+                        procedureResult = await ExecuteStoredProcedureAsync(PROCEDURE_NAME);
+
+                        // 프로시저 실행 결과 상세 검증
+                        if (string.IsNullOrEmpty(procedureResult))
+                        {
+                            var nullResultLog = $"[{METHOD_NAME}] ⚠️ 프로시저 실행 결과가 null 또는 빈 문자열입니다.";
+                            WriteLogWithFlush(logPath, nullResultLog);
+                            Console.WriteLine($"⚠️ {nullResultLog}");
+
+                            throw new InvalidOperationException("프로시저 실행 결과가 비어있습니다.");
+                        }
+
+                        // 결과에 오류 키워드가 포함되어 있는지 확인
+                        var errorKeywords = new[] { "Error", "오류", "실패", "Exception", "SQLSTATE", "ROLLBACK" };
+                        var hasError = errorKeywords.Any(keyword =>
+                            procedureResult.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+
+                        if (hasError)
+                        {
+                            var validationErrorLog = $"[{METHOD_NAME}] ⚠️ 프로시저 실행 결과에 오류 키워드 발견: {procedureResult}";
+                            WriteLogWithFlush(logPath, validationErrorLog);
+                            Console.WriteLine($"⚠️ {validationErrorLog}");
+
+                            throw new InvalidOperationException($"프로시저 실행 결과에 오류가 포함되어 있습니다: {procedureResult}");
+                        }
+
+                        // 성공 키워드 확인
+                        var successKeywords = new[] { "Success", "성공", "완료", "완료되었습니다" };
+                        var hasSuccess = successKeywords.Any(keyword =>
+                            procedureResult.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+
+                        if (hasSuccess)
+                        {
+                            var procedureCompleteLog = $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 성공: {procedureResult}";
+                            WriteLogWithFlush(logPath, procedureCompleteLog);
+                            _progress?.Report(procedureCompleteLog);
+                        }
+                        else
+                        {
+                            var procedureCompleteLog = $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 완료: {procedureResult}";
+                            WriteLogWithFlush(logPath, procedureCompleteLog);
+                            _progress?.Report(procedureCompleteLog);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // 프로시저 실행 중 예외 처리
+                        var procedureErrorLog = $"[{METHOD_NAME}] ❌ {PROCEDURE_NAME} 프로시저 실행 오류: {ex.Message}";
+                        WriteLogWithFlush(logPath, procedureErrorLog);
+                        Console.WriteLine($"❌ {procedureErrorLog}");
+
+                        var procedureDetailLog = $"[{METHOD_NAME}] ❌ {PROCEDURE_NAME} 프로시저 상세 오류: {ex}";
+                        WriteLogWithFlush(logPath, procedureDetailLog);
+                        Console.WriteLine($"❌ {procedureDetailLog}");
+
+                        // 프로시저 실행 실패 시 로그 파일 상태 재확인
+                        var postErrorLog = $"[{METHOD_NAME}] 🔍 프로시저 실행 실패 후 로그 파일 상태 확인";
+                        WriteLogWithFlush(logPath, postErrorLog);
+
+                        throw; // 상위로 오류 전파
+                    }
+                }
+                else
+                {
+                    var noProcedureLog = $"[{METHOD_NAME}] ℹ️ 프로시저명이 지정되지 않아 프로시저 실행 단계를 건너뜁니다.";
+                    WriteLogWithFlush(logPath, noProcedureLog);
+                    _progress?.Report(noProcedureLog);
+                }
+                
+                var endTime = DateTime.Now;
+                var duration = endTime - startTime;
+                var completionLog = $"[{METHOD_NAME}] 🎉 송장출력관리 처리 완료 - 소요시간: {duration.TotalSeconds:F1}초";
+                WriteLogWithFlush(logPath, completionLog);
+                _progress?.Report(completionLog);
+                
+                var successStats = $"[{METHOD_NAME}] 📊 처리 통계 - 데이터: {insertCount:N0}건, 프로시저결과: {procedureResult}, 소요시간: {duration.TotalSeconds:F1}초";
+                WriteLogWithFlush(logPath, successStats);
+            }
+            catch (Exception ex)
+            {
+                var errorTime = DateTime.Now;
+                var errorDuration = errorTime - startTime;
+                
+                var errorLog = $"[{METHOD_NAME}] ❌ 오류 발생 - {errorTime:yyyy-MM-dd HH:mm:ss} (소요시간: {errorDuration.TotalSeconds:F1}초)";
+                WriteLogWithFlush(logPath, errorLog);
+                
+                var errorDetailLog = $"[{METHOD_NAME}] ❌ 오류 상세: {ex.Message}";
+                WriteLogWithFlush(logPath, errorDetailLog);
+                
+                var errorStackTraceLog = $"[{METHOD_NAME}] ❌ 스택 트레이스: {ex.StackTrace}";
+                WriteLogWithFlush(logPath, errorStackTraceLog);
+                
+                // === 사용자에게 오류 메시지 전달 ===
+                var userErrorMessage = $"❌ 송장출력관리 처리 실패: {ex.Message}";
+                WriteLogWithFlush(logPath, userErrorMessage);
+                
+                // === 예외 재발생 ===
+                throw new Exception($"송장출력관리 처리 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+
+
 
         /// <summary>
         /// 범용 엑셀 데이터 전처리 - 빈 행 제거 및 null 값 처리
@@ -4348,7 +4551,7 @@ namespace LogisticManager.Processors
                 Console.WriteLine($"🔗 [{METHOD_NAME}] Dropbox 공유 링크 확인: {sharedLink}");
                 logService.LogMessage($"[{METHOD_NAME}] 🔗 Dropbox 공유 링크 확인: {sharedLink}");
 
-                // 6단계: KakaoWork 채팅방에 알림 전송 (채팅방 ID도 함께 전달)
+                // 6단계: KakaoWork 채팅방에 알림 전송 (채팅방 ID도 함께 전달) 추후 OPEN
                 // app.config에서 카카오워크 채팅방 ID를 읽어와서 알림 전송 함수에 함께 전달
                 //var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
                 //if (string.IsNullOrEmpty(kakaoWorkChannelId))

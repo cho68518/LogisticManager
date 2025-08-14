@@ -1127,5 +1127,47 @@ namespace LogisticManager.Services
         }
 
         #endregion
+
+        #region 연결 관리 (Connection Management)
+
+        /// <summary>
+        /// 데이터베이스 연결 객체 반환 (동기)
+        /// </summary>
+        /// <returns>MySQL 연결 객체</returns>
+        public MySqlConnection GetConnection()
+        {
+            try
+            {
+                var connection = new MySqlConnection(_connectionString);
+                Console.WriteLine("✅ DatabaseService: 데이터베이스 연결 객체 생성 완료");
+                return connection;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ DatabaseService: 데이터베이스 연결 객체 생성 실패: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 데이터베이스 연결 객체 반환 (비동기)
+        /// </summary>
+        /// <returns>MySQL 연결 객체</returns>
+        public async Task<MySqlConnection> GetConnectionAsync()
+        {
+            try
+            {
+                var connection = new MySqlConnection(_connectionString);
+                Console.WriteLine("✅ DatabaseService: 데이터베이스 연결 객체 생성 완료 (비동기)");
+                return await Task.FromResult(connection);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ DatabaseService: 데이터베이스 연결 객체 생성 실패 (비동기): {ex.Message}");
+                throw;
+            }
+        }
+
+        #endregion
     }
 } 
