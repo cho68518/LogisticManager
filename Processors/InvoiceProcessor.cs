@@ -2841,18 +2841,26 @@ namespace LogisticManager.Processors
                 
                 try
                 {
+                    Console.WriteLine($"🔍 DatabaseService 직접 사용 시도 중...");
+                    
                     using (var connection = await _databaseService.GetConnectionAsync())
                     {
+                        Console.WriteLine($"✅ 연결 객체 생성 성공, 연결 시도 중...");
                         await connection.OpenAsync();
+                        Console.WriteLine($"✅ 데이터베이스 연결 성공");
                         
                         using (var command = connection.CreateCommand())
                         {
-                            command.CommandType = CommandType.Text;
-                            command.CommandText = procedureQuery;
+                            command.CommandType = CommandType.StoredProcedure;
+                            command.CommandText = procedureName; // 프로시저명만 사용
                             command.CommandTimeout = 300; // 5분 타임아웃
+                            
+                            Console.WriteLine($"🔍 프로시저 실행 중: {procedureName}()");
                             
                             using (var reader = await command.ExecuteReaderAsync())
                             {
+                                Console.WriteLine($"✅ 프로시저 실행 성공, 결과 읽기 시작");
+                                
                                 var logs = new List<string>();
                                 var stepCount = 0;
                                 
@@ -2864,8 +2872,11 @@ namespace LogisticManager.Processors
                                     var operation = reader["OperationDescription"]?.ToString() ?? "N/A";
                                     var affectedRows = reader["AffectedRows"]?.ToString() ?? "0";
                                     
+                                    Console.WriteLine($"📊 단계 {stepCount}: {stepID} - {operation} ({affectedRows}행)");
                                     logs.Add($"{stepID,-4} {operation,-50} {affectedRows,-10}");
                                 }
+                                
+                                Console.WriteLine($"📊 총 {stepCount}개 단계 처리됨");
                                 
                                 // 상세 로그 생성
                                 if (stepCount > 0)
@@ -2891,6 +2902,7 @@ namespace LogisticManager.Processors
                                 else
                                 {
                                     resultString = "프로시저 실행 완료 (상세 로그 없음)";
+                                    Console.WriteLine("⚠️ 프로시저 실행 결과가 없습니다");
                                 }
                             }
                         }
@@ -2899,7 +2911,10 @@ namespace LogisticManager.Processors
                 catch (Exception ex)
                 {
                     // DatabaseService 사용 실패 시 기존 방식으로 폴백
-                    Console.WriteLine($"⚠️ DatabaseService 직접 사용 실패, 기존 방식으로 폴백: {ex.Message}");
+                    Console.WriteLine($"⚠️ DatabaseService 직접 사용 실패, 기존 방식으로 폴백");
+                    Console.WriteLine($"❌ 오류 상세: {ex.Message}");
+                    Console.WriteLine($"❌ 오류 타입: {ex.GetType().Name}");
+                    Console.WriteLine($"❌ 스택 트레이스: {ex.StackTrace}");
                     
                     var procedureQueryFallback = $"CALL {procedureName}()";
                     var result = await _invoiceRepository.ExecuteNonQueryAsync(procedureQueryFallback);
