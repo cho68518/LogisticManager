@@ -258,46 +258,46 @@ namespace LogisticManager.Services
             }
 
             // 전화번호1 변환
-            //if (dataTable.Columns.Contains("전화번호1"))
-            //{
-            //    var originalValue = row["전화번호1"]?.ToString() ?? string.Empty;
-            //    var transformedValue = NormalizePhoneNumber(originalValue);
-            //    
-            //    if (originalValue != transformedValue)
-            //    {
-            //        row["전화번호1"] = transformedValue;
-            //        hasChanges = true;
-            //        Console.WriteLine($"📞 [행{rowNumber}] 전화번호1 변환: '{originalValue}' → '{transformedValue}'");
-            //    }
-            //}
+            if (dataTable.Columns.Contains("전화번호1"))
+            {
+                var originalValue = row["전화번호1"]?.ToString() ?? string.Empty;
+                var transformedValue = NormalizePhoneNumber(originalValue);
+                
+                if (originalValue != transformedValue)
+                {
+                    row["전화번호1"] = transformedValue;
+                    hasChanges = true;
+                    Console.WriteLine($"📞 [행{rowNumber}] 전화번호1 변환: '{originalValue}' → '{transformedValue}'");
+                }
+            }
 
             // 전화번호2 변환
-            //if (dataTable.Columns.Contains("전화번호2"))
-            //{
-            //    var originalValue = row["전화번호2"]?.ToString() ?? string.Empty;
-            //    var transformedValue = NormalizePhoneNumber(originalValue);
-            //    
-            //    if (originalValue != transformedValue)
-            //    {
-            //        row["전화번호2"] = transformedValue;
-            //        hasChanges = true;
-            //        Console.WriteLine($"📞 [행{rowNumber}] 전화번호2 변환: '{originalValue}' → '{transformedValue}'");
-            //    }
-            //}
+            if (dataTable.Columns.Contains("전화번호2"))
+            {
+                var originalValue = row["전화번호2"]?.ToString() ?? string.Empty;
+                var transformedValue = NormalizePhoneNumber(originalValue);
+                
+                if (originalValue != transformedValue)
+                {
+                    row["전화번호2"] = transformedValue;
+                    hasChanges = true;
+                    Console.WriteLine($"📞 [행{rowNumber}] 전화번호2 변환: '{originalValue}' → '{transformedValue}'");
+                }
+            }
 
             // 우편번호 변환
-            //if (dataTable.Columns.Contains("우편번호"))
-            //{
-            //    var originalValue = row["우편번호"]?.ToString() ?? string.Empty;
-            //    var transformedValue = NormalizeZipCode(originalValue);
-            //    
-            //    if (originalValue != transformedValue)
-            //    {
-            //        row["우편번호"] = transformedValue;
-            //        hasChanges = true;
-            //        Console.WriteLine($"📮 [행{rowNumber}] 우편번호 변환: '{originalValue}' → '{transformedValue}'");
-            //    }
-            //}
+            if (dataTable.Columns.Contains("우편번호"))
+            {
+                var originalValue = row["우편번호"]?.ToString() ?? string.Empty;
+                var transformedValue = NormalizeZipCode(originalValue);
+                
+                if (originalValue != transformedValue)
+                {
+                    row["우편번호"] = transformedValue;
+                    hasChanges = true;
+                    Console.WriteLine($"📮 [행{rowNumber}] 우편번호 변환: '{originalValue}' → '{transformedValue}'");
+                }
+            }
 
             // 주소 변환 및 품목코드별 특수 처리
             // - NormalizeAddress 메서드를 통해 주소 문자열을 정제함
@@ -426,18 +426,18 @@ namespace LogisticManager.Services
             }
 
             // 옵션명 변환 (특수문자 제거)
-            //if (dataTable.Columns.Contains("옵션명"))
-            //{
-            //    var originalValue = row["옵션명"]?.ToString() ?? string.Empty;
-            //    var transformedValue = NormalizeOptionName(originalValue);
-            //    
-            //    if (originalValue != transformedValue)
-            //    {
-            //        row["옵션명"] = transformedValue;
-            //        hasChanges = true;
-            //        Console.WriteLine($"⚙️ [행{rowNumber}] 옵션명 변환: '{originalValue}' → '{transformedValue}'");
-            //    }
-            //}
+            if (dataTable.Columns.Contains("옵션명"))
+            {
+                var originalValue = row["옵션명"]?.ToString() ?? string.Empty;
+                var transformedValue = NormalizeOptionName(originalValue);
+                
+                if (originalValue != transformedValue)
+                {
+                    row["옵션명"] = transformedValue;
+                    hasChanges = true;
+                    Console.WriteLine($"⚙️ [행{rowNumber}] 옵션명 변환: '{originalValue}' → '{transformedValue}'");
+                }
+            }
 
             // 수량 변환
             if (dataTable.Columns.Contains("수량"))

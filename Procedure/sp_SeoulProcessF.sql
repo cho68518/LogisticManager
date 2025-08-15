@@ -54,7 +54,7 @@ BEGIN
 		        주소, 옵션명, 수량, 배송메세지, 주문번호, 쇼핑몰, 수집시간, 송장명, 품목코드, 
 				택배비용, 박스크기, 출력개수, 송장수량, 별표1, 별표2, 품목개수, 택배수량, 택배수량1, 
 				택배수량합산, 송장구분자, 송장구분, 송장구분최종, 위치, 위치변환
-           FROM 송장출력_사방넷원본변환_Dev
+           FROM 송장출력_사방넷원본변환
           WHERE 송장구분최종 = '서울낱개';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 서울낱개 데이터 분류', ROW_COUNT());
 	

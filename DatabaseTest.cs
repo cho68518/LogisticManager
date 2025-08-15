@@ -3,6 +3,8 @@ using MySqlConnector;
 using System.IO;
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using LogisticManager.Constants;
+using LogisticManager.Services;
 
 namespace LogisticManager
 {
@@ -21,6 +23,21 @@ namespace LogisticManager
                 // settings.json에서 직접 데이터베이스 설정 읽기
                 var (server, database, user, password, port) = LoadDatabaseSettingsFromJson();
                 
+                // 설정값 엄격한 검증 (필수 값이 누락된 경우 테스트 중단)
+                var (isValid, validationMessages) = SettingsValidationService.ValidateDatabaseSettings(server, database, user, password, port);
+                if (!isValid)
+                {
+                    Console.WriteLine("❌ DatabaseTest: 설정값 유효성 검증 실패:");
+                    foreach (var message in validationMessages)
+                    {
+                        Console.WriteLine($"   {message}");
+                    }
+                    
+                    // 필수값이 누락된 경우 테스트 중단
+                    Console.WriteLine(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                    return;
+                }
+                
                 Console.WriteLine($"🔍 DatabaseTest: 설정값 검증");
                 File.AppendAllText(logPath, "🔍 DatabaseTest: 설정값 검증\n");
                 Console.WriteLine($"   DB_SERVER: '{server}' (길이: {server?.Length ?? 0})");
@@ -34,7 +51,7 @@ namespace LogisticManager
                 Console.WriteLine($"   DB_PORT: '{port}' (길이: {port?.Length ?? 0})");
                 File.AppendAllText(logPath, $"   DB_PORT: '{port}' (길이: {port?.Length ?? 0})\n");
                 
-                var connectionString = $"Server={server};Database={database};User ID={user};Password={password};Port={port};CharSet=utf8mb4;SslMode=none;AllowPublicKeyRetrieval=true;Convert Zero Datetime=True;";
+                var connectionString = string.Format(DatabaseConstants.CONNECTION_STRING_UTF8MB4_TEMPLATE, server, database, user, password, port);
                 
                 Console.WriteLine($"🔗 DatabaseTest: 연결 문자열 생성 완료");
                 File.AppendAllText(logPath, "🔗 DatabaseTest: 연결 문자열 생성 완료\n");
@@ -112,50 +129,78 @@ namespace LogisticManager
         {
             try
             {
-                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DatabaseConstants.SETTINGS_FILE_NAME);
                 
-                if (File.Exists(settingsPath))
+                // 설정 파일 경로 검증
+                var (pathValid, pathMessage) = SettingsValidationService.ValidateSettingsFilePath(settingsPath);
+                if (!pathValid)
                 {
-                    var jsonContent = File.ReadAllText(settingsPath);
-                    if (!string.IsNullOrEmpty(jsonContent))
-                    {
-                        Console.WriteLine($"📄 DatabaseTest: settings.json 파일 내용: {jsonContent}");
-                        
-                        var settings = JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonContent);
-                        if (settings != null)
-                        {
-                            var server = settings.GetValueOrDefault("DB_SERVER", "gramwonlogis2.mycafe24.com");
-                            var database = settings.GetValueOrDefault("DB_NAME", "gramwonlogis2");
-                            var user = settings.GetValueOrDefault("DB_USER", "gramwonlogis2");
-                            var password = settings.GetValueOrDefault("DB_PASSWORD", "jung5516!");
-                            var port = settings.GetValueOrDefault("DB_PORT", "3306");
-                            
-                            Console.WriteLine($"✅ DatabaseTest: settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.");
-                            return (server, database, user, password, port);
-                        }
-                        else
-                        {
-                            Console.WriteLine("❌ DatabaseTest: settings.json 파싱 실패");
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("⚠️ DatabaseTest: settings.json 파일이 비어있음");
-                    }
+                    Console.WriteLine($"❌ {pathMessage}");
+                    Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_NOT_FOUND);
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_SETTINGS_FILE_COMPLETELY_MISSING);
                 }
-                else
+                
+                var jsonContent = File.ReadAllText(settingsPath);
+                if (string.IsNullOrEmpty(jsonContent))
                 {
-                    Console.WriteLine($"⚠️ DatabaseTest: settings.json 파일이 존재하지 않음: {settingsPath}");
+                    Console.WriteLine("⚠️ DatabaseTest: settings.json 파일이 비어있음");
+                    Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_READ_FAILED);
+                    throw new InvalidOperationException("설정 파일이 비어있습니다.");
                 }
+                
+                Console.WriteLine($"📄 DatabaseTest: settings.json 파일 내용: {jsonContent}");
+                
+                var settings = JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonContent);
+                if (settings == null)
+                {
+                    Console.WriteLine("❌ DatabaseTest: settings.json 파싱 실패");
+                    Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_PARSE_FAILED);
+                    throw new InvalidOperationException("설정 파일 파싱에 실패했습니다.");
+                }
+                
+                // 설정값 추출 (null 체크 포함)
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_SERVER, out var server) || string.IsNullOrWhiteSpace(server))
+                {
+                    Console.WriteLine("❌ DatabaseTest: DB_SERVER 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_NAME, out var database) || string.IsNullOrWhiteSpace(database))
+                {
+                    Console.WriteLine("❌ DatabaseTest: DB_NAME 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_USER, out var user) || string.IsNullOrWhiteSpace(user))
+                {
+                    Console.WriteLine("❌ DatabaseTest: DB_USER 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_PASSWORD, out var password) || string.IsNullOrEmpty(password))
+                {
+                    Console.WriteLine("❌ DatabaseTest: DB_PASSWORD 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_PORT, out var port) || string.IsNullOrWhiteSpace(port))
+                {
+                    Console.WriteLine("❌ DatabaseTest: DB_PORT 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                Console.WriteLine($"✅ DatabaseTest: settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.");
+                Console.WriteLine(DatabaseConstants.SUCCESS_SETTINGS_LOADED);
+                return (server, database, user, password, port);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"❌ DatabaseTest: settings.json 읽기 실패: {ex.Message}");
+                Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_READ_FAILED);
+                throw new InvalidOperationException($"설정 파일 읽기 실패: {ex.Message}", ex);
             }
-            
-            // 기본값 반환
-            Console.WriteLine("🔄 DatabaseTest: 기본값을 사용합니다.");
-            return ("gramwonlogis2.mycafe24.com", "gramwonlogis2", "gramwonlogis2", "jung5516!", "3306");
         }
+        
+
     }
 } 

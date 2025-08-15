@@ -2,6 +2,8 @@ using MySqlConnector;
 using System.Data;
 using System.Configuration;
 using LogisticManager.Models;
+using LogisticManager.Constants;
+using LogisticManager.Services;
 
 namespace LogisticManager.Services
 {
@@ -81,23 +83,34 @@ namespace LogisticManager.Services
             // settings.json에서 직접 데이터베이스 설정 읽기 (무조건 JSON 파일 우선)
             var (server, database, user, password, port) = LoadDatabaseSettingsFromJson();
             
+            // null 체크 (LoadDatabaseSettingsFromJson에서 예외가 발생하지 않았는지 확인)
+            if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(database) || 
+                string.IsNullOrWhiteSpace(user) || string.IsNullOrEmpty(password) || string.IsNullOrWhiteSpace(port))
+            {
+                Console.WriteLine("❌ DatabaseService: 설정값이 null입니다.");
+                throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+            }
+            
             // 설정값 검증 및 로깅
             Console.WriteLine($"🔍 DatabaseService: settings.json에서 읽어온 설정값");
-            Console.WriteLine($"   DB_SERVER: '{server}' (길이: {server?.Length ?? 0})");
-            Console.WriteLine($"   DB_NAME: '{database}' (길이: {database?.Length ?? 0})");
-            Console.WriteLine($"   DB_USER: '{user}' (길이: {user?.Length ?? 0})");
-            Console.WriteLine($"   DB_PASSWORD: '{password}' (길이: {password?.Length ?? 0})");
-            Console.WriteLine($"   DB_PORT: '{port}' (길이: {port?.Length ?? 0})");
+            Console.WriteLine($"   DB_SERVER: '{server}' (길이: {server.Length})");
+            Console.WriteLine($"   DB_NAME: '{database}' (길이: {database.Length})");
+            Console.WriteLine($"   DB_USER: '{user}' (길이: {user.Length})");
+            Console.WriteLine($"   DB_PASSWORD: '{password}' (길이: {password.Length})");
+            Console.WriteLine($"   DB_PORT: '{port}' (길이: {port.Length})");
             
-            // 설정값 검증 (필수 값이 누락된 경우 기본값 사용)
-            if (string.IsNullOrEmpty(server) || string.IsNullOrEmpty(database) || string.IsNullOrEmpty(user))
+            // 설정값 엄격한 검증 (이제 null이 아님을 보장)
+            var (isValid, validationMessages) = SettingsValidationService.ValidateDatabaseSettings(server, database, user, password, port);
+            if (!isValid)
             {
-                Console.WriteLine("⚠️ DatabaseService: 필수 설정값이 누락되어 기본값을 사용합니다.");
-                server = "gramwonlogis2.mycafe24.com";
-                database = "gramwonlogis2";
-                user = "gramwonlogis2";
-                password = "jung5516!";
-                port = "3306";
+                Console.WriteLine("❌ DatabaseService: 필수 설정값 검증 실패:");
+                foreach (var message in validationMessages)
+                {
+                    Console.WriteLine($"   {message}");
+                }
+                
+                // 필수값이 누락된 경우 애플리케이션 중단
+                throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
             }
             
             // 최종 설정값 로깅
@@ -108,7 +121,7 @@ namespace LogisticManager.Services
             Console.WriteLine($"   포트: {port}");
             
             // 연결 문자열 생성
-            _connectionString = $"Server={server};Database={database};User Id={user};Password={password};Port={port};CharSet=utf8;Convert Zero Datetime=True;Allow User Variables=True;";
+            _connectionString = string.Format(DatabaseConstants.CONNECTION_STRING_TEMPLATE, server, database, user, password, port);
             
             // MappingService 인스턴스 생성
             _mappingService = new MappingService();
@@ -129,6 +142,7 @@ namespace LogisticManager.Services
         /// 읽기 순서:
         /// 1. settings.json 파일에서 직접 읽기
         /// 2. 파일이 없거나 읽기 실패 시 기본값 사용
+        /// 3. 설정값 유효성 검증
         /// 
         /// 반환값:
         /// - (server, database, user, password, port) 튜플
@@ -138,51 +152,94 @@ namespace LogisticManager.Services
         {
             try
             {
-                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DatabaseConstants.SETTINGS_FILE_NAME);
                 
-                if (File.Exists(settingsPath))
+                // 설정 파일 경로 검증
+                var (pathValid, pathMessage) = SettingsValidationService.ValidateSettingsFilePath(settingsPath);
+                if (!pathValid)
                 {
-                    var jsonContent = File.ReadAllText(settingsPath);
-                    if (!string.IsNullOrEmpty(jsonContent))
-                    {
-                        Console.WriteLine($"📄 settings.json 파일 내용: {jsonContent}");
-                        
-                        var settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
-                        if (settings != null)
-                        {
-                            var server = settings.GetValueOrDefault("DB_SERVER", "gramwonlogis2.mycafe24.com");
-                            var database = settings.GetValueOrDefault("DB_NAME", "gramwonlogis2");
-                            var user = settings.GetValueOrDefault("DB_USER", "gramwonlogis2");
-                            var password = settings.GetValueOrDefault("DB_PASSWORD", "jung5516!");
-                            var port = settings.GetValueOrDefault("DB_PORT", "3306");
-                            
-                            Console.WriteLine($"✅ settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.");
-                            return (server, database, user, password, port);
-                        }
-                        else
-                        {
-                            Console.WriteLine("❌ settings.json 파싱 실패");
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("⚠️ settings.json 파일이 비어있음");
-                    }
+                    Console.WriteLine($"❌ {pathMessage}");
+                    Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_NOT_FOUND);
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_SETTINGS_FILE_COMPLETELY_MISSING);
                 }
-                else
+                
+                var jsonContent = File.ReadAllText(settingsPath);
+                if (string.IsNullOrEmpty(jsonContent))
                 {
-                    Console.WriteLine($"⚠️ settings.json 파일이 존재하지 않음: {settingsPath}");
+                    Console.WriteLine("⚠️ settings.json 파일이 비어있음");
+                    Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_READ_FAILED);
+                    throw new InvalidOperationException("설정 파일이 비어있습니다.");
                 }
+                
+                Console.WriteLine($"📄 settings.json 파일 내용: {jsonContent}");
+                
+                var settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
+                if (settings == null)
+                {
+                    Console.WriteLine("❌ settings.json 파싱 실패");
+                    Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_PARSE_FAILED);
+                    throw new InvalidOperationException("설정 파일 파싱에 실패했습니다.");
+                }
+                
+                // 설정값 추출 (null 체크 포함)
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_SERVER, out var server) || string.IsNullOrWhiteSpace(server))
+                {
+                    Console.WriteLine("❌ DB_SERVER 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_NAME, out var database) || string.IsNullOrWhiteSpace(database))
+                {
+                    Console.WriteLine("❌ DB_NAME 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_USER, out var user) || string.IsNullOrWhiteSpace(user))
+                {
+                    Console.WriteLine("❌ DB_USER 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_PASSWORD, out var password) || string.IsNullOrEmpty(password))
+                {
+                    Console.WriteLine("❌ DB_PASSWORD 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_PORT, out var port) || string.IsNullOrWhiteSpace(port))
+                {
+                    Console.WriteLine("❌ DB_PORT 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                // 설정값 유효성 검증 (이제 null이 아님을 보장)
+                var (isValid, validationMessages) = SettingsValidationService.ValidateDatabaseSettings(server, database, user, password, port);
+                if (!isValid)
+                {
+                    Console.WriteLine("⚠️ 설정값 유효성 검증 실패:");
+                    foreach (var message in validationMessages)
+                    {
+                        Console.WriteLine($"   {message}");
+                    }
+                    
+                    // 필수값이 누락된 경우 애플리케이션 중단
+                    Console.WriteLine("❌ 필수 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                Console.WriteLine($"✅ settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.");
+                Console.WriteLine(DatabaseConstants.SUCCESS_SETTINGS_LOADED);
+                return (server, database, user, password, port);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"❌ settings.json 읽기 실패: {ex.Message}");
+                Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_READ_FAILED);
+                throw new InvalidOperationException($"설정 파일 읽기 실패: {ex.Message}", ex);
             }
-            
-            // 기본값 반환
-            Console.WriteLine("🔄 기본값을 사용합니다.");
-            return ("gramwonlogis2.mycafe24.com", "gramwonlogis2", "gramwonlogis2", "jung5516!", "3306");
         }
+        
+
 
         #endregion
 
@@ -209,9 +266,41 @@ namespace LogisticManager.Services
                 // 로그 파일 크기 체크 및 필요시 클리어
                 _logManagementService.CheckAndClearLogFileIfNeeded();
                 
-                // 로그 파일에 메시지 작성
+                // 로그 파일에 메시지 작성 (긴 메시지는 여러 줄로 나누기)
                 var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}\n");
+                var timestamp = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}";
+                
+                if (message.Length > 100)
+                {
+                    // 긴 메시지는 여러 줄로 나누기
+                    var words = message.Split(new[] { ", " }, StringSplitOptions.None);
+                    var currentLine = "";
+                    
+                    foreach (var word in words)
+                    {
+                        if ((currentLine + word).Length > 100 && !string.IsNullOrEmpty(currentLine))
+                        {
+                            // 현재 줄이 너무 길면 새 줄로
+                            File.AppendAllText(logPath, $"{timestamp} {currentLine.Trim()}\n");
+                            currentLine = word;
+                        }
+                        else
+                        {
+                            currentLine += (string.IsNullOrEmpty(currentLine) ? "" : ", ") + word;
+                        }
+                    }
+                    
+                    // 마지막 줄 처리
+                    if (!string.IsNullOrEmpty(currentLine))
+                    {
+                        File.AppendAllText(logPath, $"{timestamp} {currentLine.Trim()}\n");
+                    }
+                }
+                else
+                {
+                    // 짧은 메시지는 한 줄로
+                    File.AppendAllText(logPath, $"{timestamp} {message}\n");
+                }
             }
             catch (Exception ex)
             {
@@ -631,7 +720,9 @@ namespace LogisticManager.Services
                             queryCount++;
                             var queryLog = $"[DatabaseService] 쿼리 {queryCount} 실행 시작";
                             var sqlLog = $"[DatabaseService] SQL: {sql}";
-                            var paramLog = $"[DatabaseService] 매개변수: {string.Join(", ", parameters.Select(p => $"{p.Key}={p.Value}"))}";
+                            // 매개변수 로그 (긴 경우 여러 줄로 나누기)
+                            var paramMessage = string.Join(", ", parameters.Select(p => $"{p.Key}={p.Value}"));
+                            var paramLog = $"[DatabaseService] 매개변수: {paramMessage}";
                             
                             Console.WriteLine(queryLog);
                             Console.WriteLine(sqlLog);

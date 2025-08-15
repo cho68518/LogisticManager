@@ -4,6 +4,10 @@ DROP PROCEDURE IF EXISTS sp_InvoiceSplit$$
 
 CREATE PROCEDURE sp_InvoiceSplit()
 BEGIN
+    -- 오류 처리용 변수들 (EXIT HANDLER에서 사용)
+    DECLARE error_info TEXT DEFAULT '';
+    DECLARE error_code INT DEFAULT 0;
+	
     -- =================================================================
 	-- 감천 특별출고 처리 루틴
     -- =================================================================
@@ -12,31 +16,32 @@ BEGIN
     DECLARE v_msg1_cheonggwa, v_msg2_cheonggwa, v_msg3_cheonggwa, v_msg4_cheonggwa, v_msg5_cheonggwa, v_msg6_cheonggwa VARCHAR(255);
     
     -- 오류 발생 시 롤백하고 임시 테이블을 정리
+    -- 오류 발생 시 자동 롤백, 상세한 오류 메시지를 반환
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        -- 오류 저장 변수
-        DECLARE v_sqlstate CHAR(5);
-        DECLARE v_error_no INT;
-        DECLARE v_error_message TEXT;
+		-- MySQL 오류 정보 수집
+		GET DIAGNOSTICS CONDITION 1
+			error_code = MYSQL_ERRNO,
+			error_info = MESSAGE_TEXT;
 
-        -- 발생한 오류의 상세 정보.
-        GET DIAGNOSTICS CONDITION 1
-            v_sqlstate = RETURNED_SQLSTATE,
-            v_error_no = MYSQL_ERRNO,
-            v_error_message = MESSAGE_TEXT;
-
-        -- 트랜잭션을 롤백.
         ROLLBACK;
-
-        -- 상세 오류 메시지.
-        SELECT CONCAT(
-            'Error (SQLSTATE: ', v_sqlstate, ', Error No: ', v_error_no, '): ', v_error_message,
-            ' | The transaction was rolled back.'
-        ) AS ErrorMessage;
+        DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
+        SELECT '오류가 발생하여 모든 작업이 롤백되었습니다.' AS ErrorMessage,
+		        error_code AS MySQLErrorCode,
+                error_info AS MySQLErrorMessage;
     END;
 
-    -- =================================================================
-    
+    CREATE TEMPORARY TABLE IF NOT EXISTS sp_execution_log (
+		StepID INT AUTO_INCREMENT PRIMARY KEY,
+		OperationDescription VARCHAR(255),
+		AffectedRows INT
+	);
+
+    START TRANSACTION;
+
+	-- 임시 로그 테이블 초기화
+    TRUNCATE TABLE sp_execution_log;
+	
     -- 송장출력_메세지 --> 송장출력_메세지부산, 송장출력_메세지청과
     TRUNCATE TABLE 송장출력_메세지부산;
     TRUNCATE TABLE 송장출력_메세지청과;
@@ -44,16 +49,19 @@ BEGIN
     INSERT INTO 송장출력_메세지부산 (쇼핑몰, msg1, msg2, msg3, msg4, msg5, msg6)
     SELECT 쇼핑몰, msg1, msg2, msg3, msg4, msg5, msg6
     FROM 송장출력_메세지;
-
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 송장출력_메세지부산 처리', ROW_COUNT());
+	
     INSERT INTO 송장출력_메세지청과 (쇼핑몰, msg1, msg2, msg3, msg4, msg5, msg6)
     SELECT 쇼핑몰, msg1, msg2, msg3, msg4, msg5, msg6
     FROM 송장출력_메세지;
-
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 송장출력_메세지청과 처리', ROW_COUNT());
+	
     -- 이 UPDATE 문은 '송장출력_특수출력_감천분리출고' 테이블에 '택배수량' 컬럼이 존재한다고 가정합니다.
     UPDATE 송장출력_특수출력_감천분리출고 a
     LEFT JOIN 품목등록 b ON a.품목코드 = b.품목코드
     SET a.택배수량 = COALESCE(b.택배수량, 10);
-            
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 송장출력_특수출력_감천분리출고 처리', ROW_COUNT());
+	
     SELECT msg1, msg2, msg3, msg4, msg5, msg6
       INTO v_msg1_default, v_msg2_default, v_msg3_default, v_msg4_default, v_msg5_default, v_msg6_default
       FROM 송장출력_메세지
@@ -80,19 +88,19 @@ BEGIN
     SELECT a.품목코드, a.수량, COALESCE(b.택배수량, 10)
     FROM 송장출력_특수출력_감천분리출고 a
     LEFT JOIN 품목등록 b ON a.품목코드 = b.품목코드;
-
-    -- =================================================================
-    START TRANSACTION;
-
+	
+	
     -- '송장출력_사방넷원본변환' 테이블을 대상으로 하도록 통일
     -- 2-1. 송장구분 업데이트 ('합포장'/'단일')
-    UPDATE 송장출력_사방넷원본변환_Dev main_table
+    UPDATE 송장출력_사방넷원본변환 main_table
     JOIN (
         SELECT id, COUNT(*) OVER (PARTITION BY 주소) as address_count
-        FROM 송장출력_사방넷원본변환_Dev
+        FROM 송장출력_사방넷원본변환
         WHERE 품목코드 IN (SELECT 품목코드 FROM temp_gamcheon_codes)
     ) AS sub_query ON main_table.id = sub_query.id
     SET main_table.송장구분 = IF(sub_query.address_count > 1, '합포장', '단일');
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 합포장, 단일 처리', ROW_COUNT());
+
 
     -- 2-2. '단일' 및 조건부 '합포장' 데이터 분리 및 이동
     TRUNCATE TABLE 송장출력_사방넷원본변환_특수출력감천;
@@ -107,35 +115,41 @@ BEGIN
 	
 	INSERT INTO 송장출력_사방넷원본변환_특수출력감천
 		SELECT s.*
-		FROM 송장출력_사방넷원본변환_Dev s
+		FROM 송장출력_사방넷원본변환 s
 		JOIN (
 			SELECT DISTINCT 품목코드, 수량 FROM temp_gamcheon_codes
 		) AS t ON s.품목코드 = t.품목코드
 		WHERE s.송장구분 = '단일' OR (s.송장구분 = '합포장' AND s.수량 >= t.수량);
-  
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 송장출력_사방넷원본변환_특수출력감천 처리', ROW_COUNT());
+	
     DELETE s
-    FROM 송장출력_사방넷원본변환_Dev s
+    FROM 송장출력_사방넷원본변환 s
     JOIN temp_gamcheon_codes t ON s.품목코드 = t.품목코드
     WHERE s.송장구분 = '단일' OR (s.송장구분 = '합포장' AND s.수량 >= t.수량);
-
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[DELETE] 송장출력_사방넷원본변환 처리', ROW_COUNT());
+	
     -- 2-3. 분리된 데이터 가공 (`GC_` 접두사 정리)
     -- 모든 송장명이 'GC_'로 시작하도록 보장
     UPDATE 송장출력_사방넷원본변환_특수출력감천
     SET 송장명 = CONCAT('GC_', TRIM(LEADING 'GC_' FROM 송장명));
-
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 분리된 데이터 가공 처리', ROW_COUNT());
+	
     -- 2-4. 가공된 데이터 원본 테이블로 다시 병합
-    INSERT INTO 송장출력_사방넷원본변환_Dev SELECT * FROM 송장출력_사방넷원본변환_특수출력감천;
-
+    INSERT INTO 송장출력_사방넷원본변환 SELECT * FROM 송장출력_사방넷원본변환_특수출력감천;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 가공된 데이터 원본 테이블로 다시 병합', ROW_COUNT());
+	
     -- 2-5. 전체 데이터 후처리 작업 (여러 UPDATE 문을 로직별로 통합)
     -- 빈 품목코드 및 한 글자 수취인명 처리
-    UPDATE 송장출력_사방넷원본변환_Dev
+    UPDATE 송장출력_사방넷원본변환
     SET
         품목코드 = CASE WHEN 품목코드 = '' OR 품목코드 IS NULL THEN '0000' ELSE 품목코드 END,
         송장명   = CASE WHEN 품목코드 = '' OR 품목코드 IS NULL THEN '--' ELSE 송장명 END,
         수취인명 = CASE WHEN CHAR_LENGTH(수취인명) = 1 THEN CONCAT(수취인명, 수취인명) ELSE 수취인명 END;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 빈 품목코드 및 한 글자 수취인명 처리', ROW_COUNT());
+
 
     -- 송장구분자 및 송장구분(출고지) 업데이트 (하나의 UPDATE로 통합)
-    UPDATE 송장출력_사방넷원본변환_Dev
+    UPDATE 송장출력_사방넷원본변환
        SET
            송장구분자 = LEFT(TRIM(송장명), 3),
            송장구분 = CASE
@@ -146,9 +160,10 @@ BEGIN
                         WHEN LEFT(TRIM(송장명), 3) = 'GC_' THEN '감천'
                         ELSE '냉동'
                       END;
-
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 송장구분자 및 송장구분(출고지) 업데이트', ROW_COUNT());
+	
     -- 메시지 및 택배수량 업데이트 (하나의 UPDATE로 통합)
-    UPDATE 송장출력_사방넷원본변환_Dev s
+    UPDATE 송장출력_사방넷원본변환 s
     LEFT JOIN 송장출력_메세지 m       ON s.쇼핑몰   = m.쇼핑몰
     LEFT JOIN 송장출력_메세지부산 mb  ON s.쇼핑몰   = mb.쇼핑몰
     LEFT JOIN 송장출력_메세지청과 mc  ON s.쇼핑몰   = mc.쇼핑몰
@@ -161,7 +176,8 @@ BEGIN
         s.msg5 = CASE s.송장구분 WHEN '부산' THEN IFNULL(mb.msg5, v_msg5_busan) WHEN '청과' THEN IFNULL(mc.msg5, v_msg5_cheonggwa) ELSE IFNULL(m.msg5, v_msg5_default) END,
         s.msg6 = CASE s.송장구분 WHEN '부산' THEN IFNULL(mb.msg6, v_msg6_busan) WHEN '청과' THEN IFNULL(mc.msg6, v_msg6_cheonggwa) ELSE IFNULL(m.msg6, v_msg6_default) END,
         s.택배수량 = IFNULL(p.택배수량, 10);
-
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 메시지 및 택배수량 업데이트', ROW_COUNT());
+	
     -- 2-6. 최종 리포트 테이블 생성 (컬럼 순서 및 개수 수정)
     TRUNCATE TABLE 송장출력_주문정보;
 	
@@ -203,15 +219,16 @@ BEGIN
 		CASE 송장구분 WHEN '위탁' THEN '본사창고' WHEN '부산' THEN '부산창고' WHEN '공산' THEN '경기공산' WHEN '청과' THEN '부산청과' WHEN '냉동' THEN '본사창고' WHEN '감천' THEN '감천항 물류센터' ELSE '본사창고' END AS 전화번호,
 		전화번호2, 
 		주문상태
-    FROM 송장출력_사방넷원본변환_Dev;
-
+    FROM 송장출력_사방넷원본변환;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 최종 리포트 테이블 생성', ROW_COUNT());
+	
     COMMIT;
 
-    -- =================================================================
-    -- 3. 마무리
-    -- =================================================================
-    DROP TEMPORARY TABLE IF EXISTS temp_gamcheon_codes;
-    SELECT '작업완료.' AS ResultMessage;
+    -- 최종 결과를 SELECT 문으로 반환
+    SELECT StepID, OperationDescription, AffectedRows FROM sp_execution_log ORDER BY StepID;
+
+    -- 프로시저 종료 후 임시 테이블 삭제
+    DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
 
 END$$
 

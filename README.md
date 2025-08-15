@@ -65,9 +65,9 @@ dotnet run
 
 ```json
 {
-  "DB_SERVER": "gramwonlogis.mycafe24.com",
-  "DB_NAME": "gramwonlogis",
-  "DB_USER": "gramwonlogis",
+  "DB_SERVER": "gramwonlogis2.mycafe24.com",
+  "DB_NAME": "gramwonlogis2",
+  "DB_USER": "gramwonlogis2",
   "DB_PASSWORD": "jung5516!",
   "DB_PORT": "3306",
   "INPUT_FOLDER_PATH": "C:\\Work\\Input\\",

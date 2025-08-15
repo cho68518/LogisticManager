@@ -137,16 +137,21 @@ namespace LogisticManager.Repositories
             {
                 // System.Configuration 사용
                 var environment = System.Configuration.ConfigurationManager.AppSettings["Environment"] ?? "Test";
+                Console.WriteLine($"[DEBUG] 현재 환경 설정: {environment}");
                 
                 string configKey = environment.ToUpper() switch
                 {
                     "TEST" => "InvoiceTable.TestName",
                     "PROD" or "PRODUCTION" => "InvoiceTable.Name",
                     "DEV" or "DEVELOPMENT" => "InvoiceTable.DevName",
+                    "MAIN" => "InvoiceTable.Name",
                     _ => "InvoiceTable.Name"
                 };
                 
+                Console.WriteLine($"[DEBUG] 선택된 설정 키: {configKey}");
+                
                 var tableName = System.Configuration.ConfigurationManager.AppSettings[configKey];
+                Console.WriteLine($"[DEBUG] 설정에서 읽은 테이블명: {tableName ?? "(null)"}");
                 
                 if (!string.IsNullOrWhiteSpace(tableName))
                 {
@@ -156,6 +161,8 @@ namespace LogisticManager.Repositories
                 
                 // 기본 설정 시도
                 var defaultTableName = System.Configuration.ConfigurationManager.AppSettings["InvoiceTable.Name"];
+                Console.WriteLine($"[DEBUG] 기본 설정에서 읽은 테이블명: {defaultTableName ?? "(null)"}");
+                
                 if (!string.IsNullOrWhiteSpace(defaultTableName))
                 {
                     Console.WriteLine($"✅ Configuration에서 기본 테이블명 로드: {defaultTableName}");
@@ -987,63 +994,270 @@ namespace LogisticManager.Repositories
             // === 1단계: 결과 컬렉션 초기화 ===
             var invoices = new List<InvoiceDto>();
             
+            var debugLog = $"[DEBUG] DataTable 변환 시작 - 행 수: {dataTable.Rows.Count}";
+            Console.WriteLine(debugLog);
+            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {debugLog}\n");
+            
+            var columnLog = $"[DEBUG] DataTable 컬럼들: {string.Join(", ", dataTable.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}";
+            Console.WriteLine(columnLog);
+            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {columnLog}\n");
+            
             // === 2단계: DataTable의 각 행을 InvoiceDto 객체로 변환 ===
             foreach (DataRow row in dataTable.Rows)
             {
                 // === 2-1: 새 InvoiceDto 객체 생성 및 필드별 안전한 값 할당 ===
+                
+                // 원본 값 로깅
+                var originalValuesLog = $"[DEBUG] 원본 DataRow 값:";
+                Console.WriteLine(originalValuesLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {originalValuesLog}\n");
+                
+                // 컬럼 존재 여부 확인
+                var columnExistsLog = $"[DEBUG] 컬럼 존재 여부 확인:";
+                Console.WriteLine(columnExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {columnExistsLog}\n");
+                
+                var phone1ExistsLog = $"[DEBUG]   전화번호1 컬럼 존재: {dataTable.Columns.Contains("전화번호1")}";
+                Console.WriteLine(phone1ExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {phone1ExistsLog}\n");
+                
+                var phone2ExistsLog = $"[DEBUG]   전화번호2 컬럼 존재: {dataTable.Columns.Contains("전화번호2")}";
+                Console.WriteLine(phone2ExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {phone2ExistsLog}\n");
+                
+                var zipCodeExistsLog = $"[DEBUG]   우편번호 컬럼 존재: {dataTable.Columns.Contains("우편번호")}";
+                Console.WriteLine(zipCodeExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {zipCodeExistsLog}\n");
+                
+                var optionNameExistsLog = $"[DEBUG]   옵션명 컬럼 존재: {dataTable.Columns.Contains("옵션명")}";
+                Console.WriteLine(optionNameExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {optionNameExistsLog}\n");
+                
+                var specialNoteExistsLog = $"[DEBUG]   배송메세지 컬럼 존재: {dataTable.Columns.Contains("배송메세지")}";
+                Console.WriteLine(specialNoteExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {specialNoteExistsLog}\n");
+                
+                var storeNameExistsLog = $"[DEBUG]   쇼핑몰 컬럼 존재: {dataTable.Columns.Contains("쇼핑몰")}";
+                Console.WriteLine(storeNameExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {storeNameExistsLog}\n");
+                
+                var collectedAtExistsLog = $"[DEBUG]   수집시간 컬럼 존재: {dataTable.Columns.Contains("수집시간")}";
+                Console.WriteLine(collectedAtExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {collectedAtExistsLog}\n");
+                
+                var productCodeExistsLog = $"[DEBUG]   품목코드 컬럼 존재: {dataTable.Columns.Contains("품목코드")}";
+                Console.WriteLine(productCodeExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {productCodeExistsLog}\n");
+                
+                var orderNumberMallExistsLog = $"[DEBUG]   주문번호(쇼핑몰) 컬럼 존재: {dataTable.Columns.Contains("주문번호(쇼핑몰)")}";
+                Console.WriteLine(orderNumberMallExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderNumberMallExistsLog}\n");
+                
+                var paymentAmountExistsLog = $"[DEBUG]   결제금액 컬럼 존재: {dataTable.Columns.Contains("결제금액")}";
+                Console.WriteLine(paymentAmountExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paymentAmountExistsLog}\n");
+                
+                var orderAmountExistsLog = $"[DEBUG]   주문금액 컬럼 존재: {dataTable.Columns.Contains("주문금액")}";
+                Console.WriteLine(orderAmountExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderAmountExistsLog}\n");
+                
+                var paymentMethodExistsLog = $"[DEBUG]   결제수단 컬럼 존재: {dataTable.Columns.Contains("결제수단")}";
+                Console.WriteLine(paymentMethodExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paymentMethodExistsLog}\n");
+                
+                var taxTypeExistsLog = $"[DEBUG]   면과세구분 컬럼 존재: {dataTable.Columns.Contains("면과세구분")}";
+                Console.WriteLine(taxTypeExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {taxTypeExistsLog}\n");
+                
+                var orderStatusExistsLog = $"[DEBUG]   주문상태 컬럼 존재: {dataTable.Columns.Contains("주문상태")}";
+                Console.WriteLine(orderStatusExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderStatusExistsLog}\n");
+                
+                var shippingTypeExistsLog = $"[DEBUG]   배송송 컬럼 존재: {dataTable.Columns.Contains("배송송")}";
+                Console.WriteLine(shippingTypeExistsLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {shippingTypeExistsLog}\n");
+                
+                // 실제 값 읽기
+                var phone1Log = $"[DEBUG]   전화번호1: '{row["전화번호1"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(phone1Log);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {phone1Log}\n");
+                
+                var phone2Log = $"[DEBUG]   전화번호2: '{row["전화번호2"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(phone2Log);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {phone2Log}\n");
+                
+                var zipCodeLog = $"[DEBUG]   우편번호: '{row["우편번호"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(zipCodeLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {zipCodeLog}\n");
+                
+                var optionNameLog = $"[DEBUG]   옵션명: '{row["옵션명"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(optionNameLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {optionNameLog}\n");
+                
+                var specialNoteLog = $"[DEBUG]   배송메세지: '{row["배송메세지"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(specialNoteLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {specialNoteLog}\n");
+                
+                var storeNameLog = $"[DEBUG]   쇼핑몰: '{row["쇼핑몰"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(storeNameLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {storeNameLog}\n");
+                
+                var collectedAtLog = $"[DEBUG]   수집시간: '{row["수집시간"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(collectedAtLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {collectedAtLog}\n");
+                
+                var productCodeLog = $"[DEBUG]   품목코드: '{row["품목코드"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(productCodeLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {productCodeLog}\n");
+                
+                var orderNumberMallLog = $"[DEBUG]   주문번호(쇼핑몰): '{row["주문번호(쇼핑몰)"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(orderNumberMallLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderNumberMallLog}\n");
+                
+                var paymentAmountLog = $"[DEBUG]   결제금액: '{row["결제금액"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(paymentAmountLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paymentAmountLog}\n");
+                
+                var orderAmountLog = $"[DEBUG]   주문금액: '{row["주문금액"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(orderAmountLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderAmountLog}\n");
+                
+                var paymentMethodLog = $"[DEBUG]   결제수단: '{row["결제수단"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(paymentMethodLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paymentMethodLog}\n");
+                
+                var taxTypeLog = $"[DEBUG]   면과세구분: '{row["면과세구분"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(taxTypeLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {taxTypeLog}\n");
+                
+                var orderStatusLog = $"[DEBUG]   주문상태: '{row["주문상태"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(orderStatusLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderStatusLog}\n");
+                
+                var shippingTypeLog = $"[DEBUG]   배송송: '{row["배송송"]?.ToString() ?? "NULL"}'";
+                Console.WriteLine(shippingTypeLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {shippingTypeLog}\n");
+                
                 var invoice = new InvoiceDto
                 {
                     // === 고객 정보 필드 (null 안전성 보장) ===
                     // ?. 연산자: null 체크 후 ToString() 실행
-                    // ?? 연산자: null인 경우 기본값(빈 문자열) 사용
-                    RecipientName = row["수취인명"]?.ToString() ?? string.Empty,   // 수취인명 (필수)
-                    Phone1 = row["전화번호1"]?.ToString() ?? string.Empty,         // 주 전화번호
-                    Phone2 = row["전화번호2"]?.ToString() ?? string.Empty,         // 보조 전화번호
-                    ZipCode = row["우편번호"]?.ToString() ?? string.Empty,         // 우편번호
-                    Address = row["주소"]?.ToString() ?? string.Empty,             // 배송 주소
-                    
-                    // === 주문 상품 정보 필드 ===
-                    OptionName = row["옵션명"]?.ToString() ?? string.Empty,       // 상품 옵션명
-                    
-                    // 수량 필드: 정수 변환 with 기본값 처리
-                    // Convert.ToInt32: null이거나 변환 불가능한 값인 경우 예외 발생 가능
-                    // ?? 1: null인 경우 기본값 1 사용하여 0 수량 방지
-                    Quantity = Convert.ToInt32(row["수량"] ?? 1),
-                    
-                    SpecialNote = row["배송메세지"]?.ToString() ?? string.Empty,   // 배송 메시지
-                    
-                    // === 주문 식별 정보 필드 ===
-                    OrderNumber = row["주문번호"]?.ToString() ?? string.Empty,     // 내부 주문번호
-                    StoreName = row["쇼핑몰"]?.ToString() ?? string.Empty,         // 쇼핑몰명
-                    
-                    // === 시간 정보 필드 ===
-                    // 날짜 변환: null인 경우 현재 시간을 기본값으로 사용
-                    // DateTime 변환 실패 시 예외가 발생할 수 있으므로 기본값 필수
-                    CollectedAt = Convert.ToDateTime(row["수집시간"] ?? DateTime.Now),
-                    
-                    // === 상품 정보 필드 ===
-                    ProductName = row["송장명"]?.ToString() ?? string.Empty,       // 송장명/상품명
-                    ProductCode = row["품목코드"]?.ToString() ?? string.Empty,     // 품목코드
-                    OrderNumberMall = row["주문번호(쇼핑몰)"]?.ToString() ?? string.Empty, // 쇼핑몰 주문번호
-                    
-                    // === 금액 정보 필드 (decimal 변환) ===
-                    // Convert.ToDecimal: 금액 데이터의 정확한 소수점 처리
-                    // ?? 0: null인 경우 0원으로 기본값 설정
-                    PaymentAmount = Convert.ToDecimal(row["결제금액"] ?? 0),       // 결제금액
-                    OrderAmount = Convert.ToDecimal(row["주문금액"] ?? 0),         // 주문금액
-                    
-                    // === 결제 및 처리 정보 필드 ===
-                    PaymentMethod = row["결제수단"]?.ToString() ?? string.Empty,   // 결제수단
-                    TaxType = row["면과세구분"]?.ToString() ?? string.Empty,       // 면세/과세 구분
-                    OrderStatus = row["주문상태"]?.ToString() ?? string.Empty,     // 주문 상태
-                    ShippingType = row["배송송"]?.ToString() ?? string.Empty       // 배송 구분
+                    // ?? 연산자: null이면 빈 문자열 반환
+                    RecipientName = row["수취인명"]?.ToString() ?? string.Empty,
+                    Phone1 = row["전화번호1"]?.ToString() ?? string.Empty,
+                    Phone2 = row["전화번호2"]?.ToString() ?? string.Empty,
+                    ZipCode = row["우편번호"]?.ToString() ?? string.Empty,
+                    Address = row["주소"]?.ToString() ?? string.Empty,
+                    OptionName = row["옵션명"]?.ToString() ?? string.Empty,
+                    Quantity = int.TryParse(row["수량"]?.ToString(), out int qty) ? qty : (int?)null,
+                    ProductName = row["송장명"]?.ToString() ?? string.Empty,
+                    ProductCode = row["품목코드"]?.ToString() ?? string.Empty,
+                    ProductCount = row["품목개수"]?.ToString() ?? string.Empty,
+                    SpecialNote = row["배송메세지"]?.ToString() ?? string.Empty,
+                    OrderNumber = row["주문번호"]?.ToString() ?? string.Empty,
+                    StoreName = row["쇼핑몰"]?.ToString() ?? string.Empty,
+                    CollectedAt = DateTime.TryParse(row["수집시간"]?.ToString(), out DateTime collectedAt) ? collectedAt : (DateTime?)null,
+                    OrderNumberMall = row["주문번호(쇼핑몰)"]?.ToString() ?? string.Empty,
+                    OrderAmount = row["주문금액"]?.ToString() ?? string.Empty,
+                    PaymentAmount = row["결제금액"]?.ToString() ?? string.Empty,
+                    PaymentMethod = row["결제수단"]?.ToString() ?? string.Empty,
+                    TaxType = row["면과세구분"]?.ToString() ?? string.Empty,
+                    OrderStatus = row["주문상태"]?.ToString() ?? string.Empty,
+                    DeliveryCost = row["택배비용"]?.ToString() ?? string.Empty,
+                    BoxSize = row["박스크기"]?.ToString() ?? string.Empty,
+                    DeliveryQuantity = row["택배수량"]?.ToString() ?? string.Empty,
+                    DeliveryQuantity1 = row["택배수량1"]?.ToString() ?? string.Empty,
+                    DeliveryQuantitySum = row["택배수량합산"]?.ToString() ?? string.Empty,
+                    ShippingType = row["배송송"]?.ToString() ?? string.Empty,
+                    PrintCount = row["출력개수"]?.ToString() ?? string.Empty,
+                    InvoiceQuantity = row["송장수량"]?.ToString() ?? string.Empty,
+                    InvoiceSeparator = row["송장구분자"]?.ToString() ?? string.Empty,
+                    InvoiceType = row["송장구분"]?.ToString() ?? string.Empty,
+                    InvoiceTypeFinal = row["송장구분최종"]?.ToString() ?? string.Empty,
+                    Location = row["위치"]?.ToString() ?? string.Empty,
+                    LocationConverted = row["위치변환"]?.ToString() ?? string.Empty,
+                    Star1 = row["별표1"]?.ToString() ?? string.Empty,
+                    Star2 = row["별표2"]?.ToString() ?? string.Empty,
+                    Msg1 = row["msg1"]?.ToString() ?? string.Empty,
+                    Msg2 = row["msg2"]?.ToString() ?? string.Empty,
+                    Msg3 = row["msg3"]?.ToString() ?? string.Empty,
+                    Msg4 = row["msg4"]?.ToString() ?? string.Empty,
+                    Msg5 = row["msg5"]?.ToString() ?? string.Empty,
+                    Msg6 = row["msg6"]?.ToString() ?? string.Empty
                 };
                 
-                // === 2-2: 변환된 객체를 결과 리스트에 추가 ===
+                // 변환된 값 로깅
+                var convertedValuesLog = $"[DEBUG] 변환된 InvoiceDto 값:";
+                Console.WriteLine(convertedValuesLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {convertedValuesLog}\n");
+                
+                var phone1ConvertedLog = $"[DEBUG]   Phone1: '{invoice.Phone1}'";
+                Console.WriteLine(phone1ConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {phone1ConvertedLog}\n");
+                
+                var phone2ConvertedLog = $"[DEBUG]   Phone2: '{invoice.Phone2}'";
+                Console.WriteLine(phone2ConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {phone2ConvertedLog}\n");
+                
+                var zipCodeConvertedLog = $"[DEBUG]   ZipCode: '{invoice.ZipCode}'";
+                Console.WriteLine(zipCodeConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {zipCodeConvertedLog}\n");
+                
+                var optionNameConvertedLog = $"[DEBUG]   OptionName: '{invoice.OptionName}'";
+                Console.WriteLine(optionNameConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {optionNameConvertedLog}\n");
+                
+                var specialNoteConvertedLog = $"[DEBUG]   SpecialNote: '{invoice.SpecialNote}'";
+                Console.WriteLine(specialNoteConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {specialNoteConvertedLog}\n");
+                
+                var storeNameConvertedLog = $"[DEBUG]   StoreName: '{invoice.StoreName}'";
+                Console.WriteLine(storeNameConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {storeNameConvertedLog}\n");
+                
+                var collectedAtConvertedLog = $"[DEBUG]   CollectedAt: '{invoice.CollectedAt}'";
+                Console.WriteLine(collectedAtConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {collectedAtConvertedLog}\n");
+                
+                var productCodeConvertedLog = $"[DEBUG]   ProductCode: '{invoice.ProductCode}'";
+                Console.WriteLine(productCodeConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {productCodeConvertedLog}\n");
+                
+                var orderNumberMallConvertedLog = $"[DEBUG]   OrderNumberMall: '{invoice.OrderNumberMall}'";
+                Console.WriteLine(orderNumberMallConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderNumberMallConvertedLog}\n");
+                
+                var paymentAmountConvertedLog = $"[DEBUG]   PaymentAmount: '{invoice.PaymentAmount}'";
+                Console.WriteLine(paymentAmountConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paymentAmountConvertedLog}\n");
+                
+                var orderAmountConvertedLog = $"[DEBUG]   OrderAmount: '{invoice.OrderAmount}'";
+                Console.WriteLine(orderAmountConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderAmountConvertedLog}\n");
+                
+                var paymentMethodConvertedLog = $"[DEBUG]   PaymentMethod: '{invoice.PaymentMethod}'";
+                Console.WriteLine(paymentMethodConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paymentMethodConvertedLog}\n");
+                
+                var taxTypeConvertedLog = $"[DEBUG]   TaxType: '{invoice.TaxType}'";
+                Console.WriteLine(taxTypeConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {taxTypeConvertedLog}\n");
+                
+                var orderStatusConvertedLog = $"[DEBUG]   OrderStatus: '{invoice.OrderStatus}'";
+                Console.WriteLine(orderStatusConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderStatusConvertedLog}\n");
+                
+                var shippingTypeConvertedLog = $"[DEBUG]   ShippingType: '{invoice.ShippingType}'";
+                Console.WriteLine(shippingTypeConvertedLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {shippingTypeConvertedLog}\n");
+                
+                var separatorLog = $"[DEBUG] ========================================";
+                Console.WriteLine(separatorLog);
+                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {separatorLog}\n");
+                
                 invoices.Add(invoice);
             }
             
-            // === 3단계: 변환 완료된 InvoiceDto 컬렉션 반환 ===
             return invoices;
         }
 

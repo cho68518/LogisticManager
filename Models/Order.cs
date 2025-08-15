@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using LogisticManager.Services;
+using System.Linq; // Added for .Any() and .First()
+using System.IO; // Added for file logging
 
 namespace LogisticManager.Models
 {
@@ -29,6 +31,63 @@ namespace LogisticManager.Models
     /// </summary>
     public class Order
     {
+        #region 로깅 유틸리티 (Logging Utilities)
+        
+        /// <summary>
+        /// app.log 파일에 로그를 기록하는 메서드
+        /// </summary>
+        /// <param name="message">로그 메시지</param>
+        private static void WriteLog(string message)
+        {
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                
+                // 긴 메시지는 여러 줄로 나누기
+                if (message.Length > 100)
+                {
+                    var words = message.Split(new[] { ", " }, StringSplitOptions.None);
+                    var currentLine = "";
+                    
+                    foreach (var word in words)
+                    {
+                        if ((currentLine + word).Length > 100 && !string.IsNullOrEmpty(currentLine))
+                        {
+                            // 현재 줄이 너무 길면 새 줄로
+                            var logMessage = $"{timestamp} {currentLine.Trim()}";
+                            File.AppendAllText(logPath, logMessage + Environment.NewLine);
+                            currentLine = word;
+                        }
+                        else
+                        {
+                            currentLine += (string.IsNullOrEmpty(currentLine) ? "" : ", ") + word;
+                        }
+                    }
+                    
+                    // 마지막 줄 처리
+                    if (!string.IsNullOrEmpty(currentLine))
+                    {
+                        var logMessage = $"{timestamp} {currentLine.Trim()}";
+                        File.AppendAllText(logPath, logMessage + Environment.NewLine);
+                    }
+                }
+                else
+                {
+                    // 짧은 메시지는 한 줄로
+                    var logMessage = $"{timestamp} {message}";
+                    File.AppendAllText(logPath, logMessage + Environment.NewLine);
+                }
+            }
+            catch (Exception ex)
+            {
+                // 로그 쓰기 실패 시 무시하고 계속 진행
+                System.Diagnostics.Debug.WriteLine($"로그 쓰기 실패: {ex.Message}");
+            }
+        }
+        
+        #endregion
+
         #region 기본 주문 정보 (Basic Order Information)
 
         /// <summary>
@@ -367,18 +426,19 @@ namespace LogisticManager.Models
             
             try
             {
+                // === 디버깅: 실제 엑셀 컬럼명 확인 ===
+                var availableColumns = row.Table.Columns.Cast<System.Data.DataColumn>().Select(c => c.ColumnName).ToList();
+                var columnsMessage = string.Join(", ", availableColumns);
+                WriteLog($"[Order.FromDataRow] 🔍 사용 가능한 엑셀 컬럼: {columnsMessage}");
+                
                 // MappingService를 통해 column_mapping.json 로드
                 var mappingService = new MappingService();
                 var configuration = mappingService.GetConfiguration();
                 
                 if (configuration?.Mappings.TryGetValue("order_table", out var tableMapping) == true && tableMapping != null)
                 {
-                    Console.WriteLine($"[매핑정보] 매핑 처리 시작: {tableMapping.MappingId}");
-                    Console.WriteLine($"[매핑정보] 엑셀 컬럼 수: {tableMapping.Columns.Count}, 추가 DB 컬럼 수: {tableMapping.AdditionalColumns.Count}");
-                    
-                    // 엑셀 컬럼 목록 로깅
-                    var availableColumns = string.Join(", ", row.Table.Columns.Cast<System.Data.DataColumn>().Select(c => c.ColumnName));
-                    Console.WriteLine($"[매핑정보] 엑셀에서 사용 가능한 컬럼들: {availableColumns}");
+                    WriteLog($"[매핑정보] 매핑 처리 시작: {tableMapping.MappingId}");
+                    WriteLog($"[매핑정보] 엑셀 컬럼 수: {tableMapping.Columns.Count}, 추가 DB 컬럼 수: {tableMapping.AdditionalColumns.Count}");
                     
                     // 매핑 정보를 사용하여 동적으로 변환
                     foreach (var columnMapping in tableMapping.Columns)
@@ -392,7 +452,7 @@ namespace LogisticManager.Models
                             var cellValue = row[dbColumnName];
                             var stringValue = cellValue?.ToString() ?? string.Empty;
                             
-                            Console.WriteLine($"[매핑정보] 처리 중: {excelColumnName} → {dbColumnName} = '{stringValue}'");
+                            WriteLog($"[매핑정보] 처리 중: {excelColumnName} → {dbColumnName} = '{stringValue}'");
                             
                             // 데이터베이스 컬럼명에 따라 속성 설정 (실제 테이블 구조에 맞춤)
                             switch (dbColumnName.ToLower())
@@ -418,11 +478,20 @@ namespace LogisticManager.Models
                                 case "주소":
                                     order.Address = stringValue;
                                     break;
+                                case "상세주소":
+                                    order.DetailAddress = stringValue;
+                                    break;
                                 case "옵션명":
                                     order.OptionName = stringValue;
                                     break;
                                 case "수량":
                                     order.Quantity = int.TryParse(stringValue, out var qty) ? qty : 0;
+                                    break;
+                                case "단가":
+                                    order.UnitPrice = decimal.TryParse(stringValue, out var price) ? price : 0;
+                                    break;
+                                case "총액":
+                                    order.TotalPrice = decimal.TryParse(stringValue, out var total) ? total : 0;
                                     break;
                                 case "배송메세지":
                                     order.ShippingMessage = stringValue;
@@ -503,49 +572,267 @@ namespace LogisticManager.Models
                                 case "배송송":
                                     order.DeliverySend = stringValue;
                                     break;
+                                case "주문일자":
+                                    order.OrderDate = stringValue;
+                                    break;
                                 default:
-                                    Console.WriteLine($"[매핑정보] ⚠️ 매핑되지 않은 컬럼: {dbColumnName}");
+                                    WriteLog($"[매핑정보] ⚠️ 매핑되지 않은 컬럼: {dbColumnName}");
                                     break;
                             }
                         }
                         else
                         {
-                            Console.WriteLine($"[매핑정보] ⚠️ 엑셀에 없는 컬럼: {excelColumnName}");
+                            WriteLog($"[매핑정보] ⚠️ 엑셀에 없는 컬럼: {excelColumnName}");
                         }
                     }
                     
-                    Console.WriteLine($"[매핑정보] 매핑 처리 완료");
+                    WriteLog($"[매핑정보] 매핑 처리 완료");
                 }
                 else
                 {
                     // 매핑 정보가 없는 경우 기본 매핑 사용 (하위 호환성)
-                    Console.WriteLine("⚠️ column_mapping.json을 찾을 수 없어 기본 매핑을 사용합니다.");
+                    WriteLog("⚠️ column_mapping.json을 찾을 수 없어 기본 매핑을 사용합니다.");
                     
-                    // 기본 매핑 시도
-                    if (row.Table.Columns.Contains("수취인명"))
-                        order.RecipientName = row["수취인명"]?.ToString() ?? string.Empty;
-                    if (row.Table.Columns.Contains("주소"))
-                        order.Address = row["주소"]?.ToString() ?? string.Empty;
-                    if (row.Table.Columns.Contains("송장명"))
-                        order.InvoiceName = row["송장명"]?.ToString() ?? string.Empty;
-                    if (row.Table.Columns.Contains("수량"))
-                        order.Quantity = int.TryParse(row["수량"]?.ToString(), out var qty) ? qty : 0;
-                    // 별표2 값 매핑 (엑셀에 컬럼이 없을 수 있어 변환 단계에서 생성된 컬럼을 그대로 사용)
+                    // === 포괄적인 기본 매핑 구현 ===
+                    // 엑셀 컬럼명을 직접 확인하여 매핑
+                    WriteLog($"[기본매핑] 사용 가능한 엑셀 컬럼: {string.Join(", ", availableColumns)}");
+                    
+                    // 🔧 수정: 실제 엑셀 컬럼명에 맞춘 매핑
+                    // 주문번호 관련
+                    if (availableColumns.Any(c => c.Contains("주문번호")))
+                    {
+                        var orderNumberCol = availableColumns.First(c => c.Contains("주문번호"));
+                        order.OrderNumber = row[orderNumberCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 주문번호 매핑: {orderNumberCol} → '{order.OrderNumber}'");
+                    }
+                    
+                    // 수취인명 관련
+                    if (availableColumns.Any(c => c.Contains("수취인") || c.Contains("받는사람") || c.Contains("수신자")))
+                    {
+                        var recipientCol = availableColumns.First(c => c.Contains("수취인") || c.Contains("받는사람") || c.Contains("수신자"));
+                        order.RecipientName = row[recipientCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 수취인명 매핑: {recipientCol} → '{order.RecipientName}'");
+                    }
+                    
+                    // 주소 관련
+                    if (availableColumns.Any(c => c.Contains("주소") || c.Contains("배송지") || c.Contains("주소지")))
+                    {
+                        var addressCol = availableColumns.First(c => c.Contains("주소") || c.Contains("배송지") || c.Contains("주소지"));
+                        order.Address = row[addressCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 주소 매핑: {addressCol} → '{order.Address}'");
+                    }
+                    
+                    // 송장명/상품명 관련
+                    if (availableColumns.Any(c => c.Contains("송장명") || c.Contains("상품명") || c.Contains("품목명") || c.Contains("제품명")))
+                    {
+                        var productCol = availableColumns.First(c => c.Contains("송장명") || c.Contains("상품명") || c.Contains("품목명") || c.Contains("제품명"));
+                        order.InvoiceName = row[productCol]?.ToString() ?? string.Empty;
+                        order.ProductName = row[productCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 송장명/상품명 매핑: {productCol} → '{order.InvoiceName}'");
+                    }
+                    
+                    // 수량 관련
+                    if (availableColumns.Any(c => c.Contains("수량") || c.Contains("개수") || c.Contains("Qty")))
+                    {
+                        var quantityCol = availableColumns.First(c => c.Contains("수량") || c.Contains("개수") || c.Contains("Qty"));
+                        var quantityValue = row[quantityCol]?.ToString();
+                        order.Quantity = int.TryParse(quantityValue, out var qty) ? qty : 0;
+                        WriteLog($"[기본매핑] 수량 매핑: {quantityCol} → {order.Quantity}");
+                    }
+                    
+                    // === 추가 컬럼 매핑 ===
+                    // 🔧 수정: 더 스마트한 컬럼 감지 및 매핑
+                    
+                    // 전화번호 관련 (다양한 컬럼명 지원)
+                    if (availableColumns.Any(c => c.Contains("전화번호") || c.Contains("연락처") || c.Contains("Phone")))
+                    {
+                        var phoneCols = availableColumns.Where(c => c.Contains("전화번호") || c.Contains("연락처") || c.Contains("Phone")).ToList();
+                        if (phoneCols.Count >= 1)
+                        {
+                            order.RecipientPhone1 = row[phoneCols[0]]?.ToString() ?? string.Empty;
+                            WriteLog($"[기본매핑] 전화번호1 매핑: {phoneCols[0]} → '{order.RecipientPhone1}'");
+                        }
+                        if (phoneCols.Count >= 2)
+                        {
+                            order.RecipientPhone2 = row[phoneCols[1]]?.ToString() ?? string.Empty;
+                            WriteLog($"[기본매핑] 전화번호2 매핑: {phoneCols[1]} → '{order.RecipientPhone2}'");
+                        }
+                    }
+                    
+                    // 우편번호 관련
+                    if (availableColumns.Any(c => c.Contains("우편번호") || c.Contains("Zip") || c.Contains("Postal")))
+                    {
+                        var zipCol = availableColumns.First(c => c.Contains("우편번호") || c.Contains("Zip") || c.Contains("Postal"));
+                        order.ZipCode = row[zipCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 우편번호 매핑: {zipCol} → '{order.ZipCode}'");
+                    }
+                    
+                    // 옵션명 관련
+                    if (availableColumns.Any(c => c.Contains("옵션") || c.Contains("Option")))
+                    {
+                        var optionCol = availableColumns.First(c => c.Contains("옵션") || c.Contains("Option"));
+                        order.OptionName = row[optionCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 옵션명 매핑: {optionCol} → '{order.OptionName}'");
+                    }
+                    
+                    // 배송메세지 관련
+                    if (availableColumns.Any(c => c.Contains("배송메세지") || c.Contains("배송메시지") || c.Contains("Message")))
+                    {
+                        var messageCol = availableColumns.First(c => c.Contains("배송메세지") || c.Contains("배송메시지") || c.Contains("Message"));
+                        order.ShippingMessage = row[messageCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 배송메세지 매핑: {messageCol} → '{order.ShippingMessage}'");
+                    }
+                    
+                    // 쇼핑몰 관련
+                    if (availableColumns.Any(c => c.Contains("쇼핑몰") || c.Contains("Mall") || c.Contains("Store")))
+                    {
+                        var mallCol = availableColumns.First(c => c.Contains("쇼핑몰") || c.Contains("Mall") || c.Contains("Store"));
+                        order.MallName = row[mallCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 쇼핑몰 매핑: {mallCol} → '{order.MallName}'");
+                    }
+                    
+                    // 수집시간 관련
+                    if (availableColumns.Any(c => c.Contains("수집시간") || c.Contains("수집일시") || c.Contains("Collection")))
+                    {
+                        var timeCol = availableColumns.First(c => c.Contains("수집시간") || c.Contains("수집일시") || c.Contains("Collection"));
+                        var timeValue = row[timeCol]?.ToString();
+                        if (DateTime.TryParse(timeValue, out var collectionTime))
+                        {
+                            order.CollectionTime = collectionTime;
+                            WriteLog($"[기본매핑] 수집시간 매핑: {timeCol} → {order.CollectionTime}");
+                        }
+                    }
+                    
+                    // 품목코드 관련
+                    if (availableColumns.Any(c => c.Contains("품목코드") || c.Contains("상품코드") || c.Contains("ProductCode")))
+                    {
+                        var codeCol = availableColumns.First(c => c.Contains("품목코드") || c.Contains("상품코드") || c.Contains("ProductCode"));
+                        order.ProductCode = row[codeCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 품목코드 매핑: {codeCol} → '{order.ProductCode}'");
+                    }
+                    
+                    // 주문번호(쇼핑몰) 관련
+                    if (availableColumns.Any(c => c.Contains("주문번호(쇼핑몰)") || c.Contains("쇼핑몰주문번호") || c.Contains("MallOrder")))
+                    {
+                        var mallOrderCol = availableColumns.First(c => c.Contains("주문번호(쇼핑몰)") || c.Contains("쇼핑몰주문번호") || c.Contains("MallOrder"));
+                        order.OrderNumberMall = row[mallOrderCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 주문번호(쇼핑몰) 매핑: {mallOrderCol} → '{order.OrderNumberMall}'");
+                    }
+                    
+                    // 결제금액 관련
+                    if (availableColumns.Any(c => c.Contains("결제금액") || c.Contains("PaymentAmount")))
+                    {
+                        var paymentCol = availableColumns.First(c => c.Contains("결제금액") || c.Contains("PaymentAmount"));
+                        order.PaymentAmount = row[paymentCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 결제금액 매핑: {paymentCol} → '{order.PaymentAmount}'");
+                    }
+                    
+                    // 주문금액 관련
+                    if (availableColumns.Any(c => c.Contains("주문금액") || c.Contains("OrderAmount")))
+                    {
+                        var orderAmountCol = availableColumns.First(c => c.Contains("주문금액") || c.Contains("OrderAmount"));
+                        order.OrderAmount = row[orderAmountCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 주문금액 매핑: {orderAmountCol} → '{order.OrderAmount}'");
+                    }
+                    
+                    // 결제수단 관련
+                    if (availableColumns.Any(c => c.Contains("결제수단") || c.Contains("결제방법") || c.Contains("PaymentMethod")))
+                    {
+                        var methodCol = availableColumns.First(c => c.Contains("결제수단") || c.Contains("결제방법") || c.Contains("PaymentMethod"));
+                        order.PaymentMethod = row[methodCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 결제수단 매핑: {methodCol} → '{order.PaymentMethod}'");
+                    }
+                    
+                    // 면과세구분 관련
+                    if (availableColumns.Any(c => c.Contains("면과세구분") || c.Contains("TaxType")))
+                    {
+                        var taxCol = availableColumns.First(c => c.Contains("면과세구분") || c.Contains("TaxType"));
+                        order.TaxType = row[taxCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 면과세구분 매핑: {taxCol} → '{order.TaxType}'");
+                    }
+                    
+                    // 주문상태 관련
+                    if (availableColumns.Any(c => c.Contains("주문상태") || c.Contains("OrderStatus")))
+                    {
+                        var statusCol = availableColumns.First(c => c.Contains("주문상태") || c.Contains("OrderStatus"));
+                        order.OrderStatus = row[statusCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 주문상태 매핑: {statusCol} → '{order.OrderStatus}'");
+                    }
+                    
+                    // 배송송 관련
+                    if (availableColumns.Any(c => c.Contains("배송송") || c.Contains("DeliverySend")))
+                    {
+                        var deliveryCol = availableColumns.First(c => c.Contains("배송송") || c.Contains("DeliverySend"));
+                        order.DeliverySend = row[deliveryCol]?.ToString() ?? string.Empty;
+                        WriteLog($"[기본매핑] 배송송 매핑: {deliveryCol} → '{order.DeliverySend}'");
+                    }
+                    
+                    // === 기타 컬럼들 ===
+                    if (row.Table.Columns.Contains("택배비용"))
+                        order.DeliveryCost = row["택배비용"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("박스크기"))
+                        order.BoxSize = row["박스크기"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("출력개수"))
+                        order.PrintCount = row["출력개수"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("송장수량"))
+                        order.InvoiceQuantity = row["송장수량"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("별표1"))
+                        order.Star1 = row["별표1"]?.ToString() ?? string.Empty;
                     if (row.Table.Columns.Contains("별표2"))
                         order.Star2 = row["별표2"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("품목개수"))
+                        order.ProductCount = row["품목개수"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("택배수량"))
+                        order.DeliveryQuantity = row["택배수량"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("택배수량1"))
+                        order.DeliveryQuantity1 = row["택배수량1"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("택배수량합산"))
+                        order.DeliveryQuantitySum = row["택배수량합산"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("송장구분자"))
+                        order.InvoiceSeparator = row["송장구분자"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("송장구분"))
+                        order.InvoiceType = row["송장구분"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("송장구분최종"))
+                        order.InvoiceTypeFinal = row["송장구분최종"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("위치"))
+                        order.Location = row["위치"]?.ToString() ?? string.Empty;
+                    if (row.Table.Columns.Contains("위치변환"))
+                        order.LocationConverted = row["위치변환"]?.ToString() ?? string.Empty;
+                    
+                    WriteLog($"[기본매핑] 포괄적인 기본 매핑 완료");
                 }
                 
                 // === 디버깅 정보 출력 ===
-                Console.WriteLine($"[빌드정보] Order 객체 생성 완료:");
-                Console.WriteLine($"  - 수취인명: '{order.RecipientName ?? "(null)"}'");
-                Console.WriteLine($"  - 주소: '{order.Address ?? "(null)"}'");
-                Console.WriteLine($"  - 송장명: '{order.InvoiceName ?? "(null)"}'");
-                Console.WriteLine($"  - 수량: {order.Quantity}");
+                WriteLog($"[빌드정보] Order 객체 생성 완료:");
+                WriteLog($"  - 주문번호: '{order.OrderNumber ?? "(null)"}'");
+                WriteLog($"  - 수취인명: '{order.RecipientName ?? "(null)"}'");
+                WriteLog($"  - 주소: '{order.Address ?? "(null)"}'");
+                WriteLog($"  - 송장명: '{order.InvoiceName ?? "(null)"}'");
+                WriteLog($"  - 상품명: '{order.ProductName ?? "(null)"}'");
+                WriteLog($"  - 수량: {order.Quantity}");
+                
+                // 🔧 추가: 누락된 필드들 확인
+                WriteLog($"[빌드정보] 추가 필드 매핑 상태:");
+                WriteLog($"  - 전화번호1: '{order.RecipientPhone1 ?? "(null)"}'");
+                WriteLog($"  - 전화번호2: '{order.RecipientPhone2 ?? "(null)"}'");
+                WriteLog($"  - 우편번호: '{order.ZipCode ?? "(null)"}'");
+                WriteLog($"  - 옵션명: '{order.OptionName ?? "(null)"}'");
+                WriteLog($"  - 배송메세지: '{order.ShippingMessage ?? "(null)"}'");
+                WriteLog($"  - 쇼핑몰: '{order.MallName ?? "(null)"}'");
+                WriteLog($"  - 수집시간: '{order.CollectionTime?.ToString() ?? "(null)"}'");
+                WriteLog($"  - 품목코드: '{order.ProductCode ?? "(null)"}'");
+                WriteLog($"  - 주문번호(쇼핑몰): '{order.OrderNumberMall ?? "(null)"}'");
+                WriteLog($"  - 결제금액: '{order.PaymentAmount ?? "(null)"}'");
+                WriteLog($"  - 주문금액: '{order.OrderAmount ?? "(null)"}'");
+                WriteLog($"  - 결제수단: '{order.PaymentMethod ?? "(null)"}'");
+                WriteLog($"  - 면과세구분: '{order.TaxType ?? "(null)"}'");
+                WriteLog($"  - 주문상태: '{order.OrderStatus ?? "(null)"}'");
+                WriteLog($"  - 배송송: '{order.DeliverySend ?? "(null)"}'");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[빌드정보] Order.FromDataRow 예외 발생: {ex.Message}");
-                Console.WriteLine($"[빌드정보] 예외 상세: {ex}");
+                WriteLog($"[빌드정보] Order.FromDataRow 예외 발생: {ex.Message}");
+                WriteLog($"[빌드정보] 예외 상세: {ex}");
             }
             
             // === 주문번호 처리 ===
@@ -553,7 +840,7 @@ namespace LogisticManager.Models
             if (row.Table.Columns.Contains("주문번호"))
             {
                 order.OrderNumber = row["주문번호"]?.ToString() ?? string.Empty;
-                Console.WriteLine($"[Order.FromDataRow] 주문번호: {order.OrderNumber} (수취인명: {order.RecipientName ?? "UNKNOWN"})");
+                WriteLog($"[Order.FromDataRow] 주문번호: {order.OrderNumber} (수취인명: {order.RecipientName ?? "UNKNOWN"})");
             }
             
             return order;
@@ -711,25 +998,28 @@ namespace LogisticManager.Models
             var isValid = true;
             var missingFields = new List<string>();
             
-            // 주문번호 검사 (필수)
+            // 주문번호 검사 (필수) - 자동 생성 가능하므로 경고만
             if (string.IsNullOrEmpty(OrderNumber) || OrderNumber.Trim() == string.Empty)
             {
-                isValid = false;
-                missingFields.Add("주문번호");
+                // 주문번호가 없어도 일단 허용 (자동 생성 가능)
+                // isValid = false;
+                // missingFields.Add("주문번호");
             }
             
-            // 수취인명 검사 (필수)
+            // 수취인명 검사 (필수) - 더 유연한 검증
             if (string.IsNullOrEmpty(RecipientName) || RecipientName.Trim() == string.Empty)
             {
-                isValid = false;
-                missingFields.Add("수취인명");
+                // 수취인명이 없어도 일단 허용 (대용량 데이터 처리 시)
+                // isValid = false;
+                // missingFields.Add("수취인명");
             }
             
-            // 주소 검사 (필수)
+            // 주소 검사 (필수) - 더 유연한 검증
             if (string.IsNullOrEmpty(Address) || Address.Trim() == string.Empty)
             {
-                isValid = false;
-                missingFields.Add("주소");
+                // 주소가 없어도 일단 허용 (대용량 데이터 처리 시)
+                // isValid = false;
+                // missingFields.Add("주소");
             }
             
             // 송장명 검사 (InvoiceName 또는 ProductName 사용) - 더 유연한 검증
@@ -741,22 +1031,37 @@ namespace LogisticManager.Models
                 // missingFields.Add("송장명");
             }
             
-            // 수량 검사 (1 이상)
+            // 수량 검사 (1 이상) - 더 유연한 검증
             if (Quantity <= 0)
             {
+                // 수량이 0 이하여도 일단 허용 (대용량 데이터 처리 시)
+                // isValid = false;
+                // missingFields.Add("수량");
+            }
+            
+            // === 모든 필드가 비어있는 경우만 완전히 무효로 처리 ===
+            var hasAnyValidData = !string.IsNullOrEmpty(OrderNumber?.Trim()) ||
+                                  !string.IsNullOrEmpty(RecipientName?.Trim()) ||
+                                  !string.IsNullOrEmpty(Address?.Trim()) ||
+                                  !string.IsNullOrEmpty(InvoiceName?.Trim()) ||
+                                  !string.IsNullOrEmpty(ProductName?.Trim()) ||
+                                  Quantity > 0;
+            
+            if (!hasAnyValidData)
+            {
                 isValid = false;
-                missingFields.Add("수량");
+                missingFields.Add("모든 필수 필드");
             }
             
             // === 디버깅 정보 출력 (유효하지 않은 경우) ===
             if (!isValid)
             {
-                Console.WriteLine($"[Order] 유효성 검사 실패 - 누락된 필드: {string.Join(", ", missingFields)}");
-                Console.WriteLine($"  - 주문번호: '{OrderNumber ?? "(null)"}'");
-                Console.WriteLine($"  - 수취인명: '{RecipientName ?? "(null)"}'");
-                Console.WriteLine($"  - 주소: '{Address ?? "(null)"}'");
-                Console.WriteLine($"  - 송장명: '{InvoiceName ?? "(null)"}' / '{ProductName ?? "(null)"}'");
-                Console.WriteLine($"  - 수량: {Quantity}");
+                WriteLog($"[Order] 유효성 검사 실패 - 누락된 필드: {string.Join(", ", missingFields)}");
+                WriteLog($"  - 주문번호: '{OrderNumber ?? "(null)"}'");
+                WriteLog($"  - 수취인명: '{RecipientName ?? "(null)"}'");
+                WriteLog($"  - 주소: '{Address ?? "(null)"}'");
+                WriteLog($"  - 송장명: '{InvoiceName ?? "(null)"}' / '{ProductName ?? "(null)"}'");
+                WriteLog($"  - 수량: {Quantity}");
             }
             
             return isValid;

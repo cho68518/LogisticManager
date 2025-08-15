@@ -6,6 +6,8 @@ using System.Text.RegularExpressions;
 using System.Collections.Generic; // Added for Dictionary
 using System.IO; // Added for MemoryStream and StreamWriter/StreamReader
 using System.Security.Cryptography.Pkcs; // Added for CryptoStream
+using LogisticManager.Constants;
+using LogisticManager.Services;
 
 namespace LogisticManager.Services
 {
@@ -346,7 +348,7 @@ namespace LogisticManager.Services
             // settings.json에서 직접 데이터베이스 설정 읽기
             var (server, database, user, password, port) = LoadDatabaseSettingsFromJson();
             
-            var connectionString = $"Server={server};Database={database};User Id={user};Password={password};Port={port};CharSet=utf8;Convert Zero Datetime=True;Allow User Variables=True;";
+            var connectionString = string.Format(DatabaseConstants.CONNECTION_STRING_TEMPLATE, server, database, user, password, port);
             
             Console.WriteLine($"🔗 SecurityService: 연결 문자열 생성 완료 (서버: {server}, DB: {database}, 사용자: {user})");
             
@@ -361,51 +363,93 @@ namespace LogisticManager.Services
         {
             try
             {
-                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DatabaseConstants.SETTINGS_FILE_NAME);
                 
-                if (File.Exists(settingsPath))
+                // 설정 파일 경로 검증
+                var (pathValid, pathMessage) = SettingsValidationService.ValidateSettingsFilePath(settingsPath);
+                if (!pathValid)
                 {
-                    var jsonContent = File.ReadAllText(settingsPath);
-                    if (!string.IsNullOrEmpty(jsonContent))
-                    {
-                        Console.WriteLine($"📄 SecurityService: settings.json 파일 내용: {jsonContent}");
-                        
-                        var settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
-                        if (settings != null)
-                        {
-                            var server = settings.GetValueOrDefault("DB_SERVER", "gramwonlogis2.mycafe24.com");
-                            var database = settings.GetValueOrDefault("DB_NAME", "gramwonlogis2");
-                            var user = settings.GetValueOrDefault("DB_USER", "gramwonlogis2");
-                            var password = settings.GetValueOrDefault("DB_PASSWORD", "jung5516!");
-                            var port = settings.GetValueOrDefault("DB_PORT", "3306");
-                            
-                            Console.WriteLine($"✅ SecurityService: settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.");
-                            return (server, database, user, password, port);
-                        }
-                        else
-                        {
-                            Console.WriteLine("❌ SecurityService: settings.json 파싱 실패");
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("⚠️ SecurityService: settings.json 파일이 비어있음");
-                    }
+                    Console.WriteLine($"❌ {pathMessage}");
+                    Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_NOT_FOUND);
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_SETTINGS_FILE_COMPLETELY_MISSING);
                 }
-                else
+                
+                var jsonContent = File.ReadAllText(settingsPath);
+                if (string.IsNullOrEmpty(jsonContent))
                 {
-                    Console.WriteLine($"⚠️ SecurityService: settings.json 파일이 존재하지 않음: {settingsPath}");
+                    Console.WriteLine("⚠️ SecurityService: settings.json 파일이 비어있음");
+                    Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_READ_FAILED);
+                    throw new InvalidOperationException("설정 파일이 비어있습니다.");
                 }
+                
+                Console.WriteLine($"📄 SecurityService: settings.json 파일 내용: {jsonContent}");
+                
+                var settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
+                if (settings == null)
+                {
+                    Console.WriteLine("❌ SecurityService: settings.json 파싱 실패");
+                    Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_PARSE_FAILED);
+                    throw new InvalidOperationException("설정 파일 파싱에 실패했습니다.");
+                }
+                
+                // 설정값 추출 (null 체크 포함)
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_SERVER, out var server) || string.IsNullOrWhiteSpace(server))
+                {
+                    Console.WriteLine("❌ SecurityService: DB_SERVER 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_NAME, out var database) || string.IsNullOrWhiteSpace(database))
+                {
+                    Console.WriteLine("❌ SecurityService: DB_NAME 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_USER, out var user) || string.IsNullOrWhiteSpace(user))
+                {
+                    Console.WriteLine("❌ SecurityService: DB_USER 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_PASSWORD, out var password) || string.IsNullOrEmpty(password))
+                {
+                    Console.WriteLine("❌ SecurityService: DB_PASSWORD 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_PORT, out var port) || string.IsNullOrWhiteSpace(port))
+                {
+                    Console.WriteLine("❌ SecurityService: DB_PORT 설정값이 누락되었습니다.");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                // 설정값 엄격한 검증 (이제 null이 아님을 보장)
+                var (isValid, validationMessages) = SettingsValidationService.ValidateDatabaseSettings(server, database, user, password, port);
+                if (!isValid)
+                {
+                    Console.WriteLine("❌ SecurityService: 설정값 유효성 검증 실패:");
+                    foreach (var message in validationMessages)
+                    {
+                        Console.WriteLine($"   {message}");
+                    }
+                    
+                    // 필수값이 누락된 경우 애플리케이션 중단
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                }
+                
+                Console.WriteLine($"✅ SecurityService: settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.");
+                Console.WriteLine(DatabaseConstants.SUCCESS_SETTINGS_LOADED);
+                return (server, database, user, password, port);
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"❌ SecurityService: settings.json 읽기 실패: {ex.Message}");
+                Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_READ_FAILED);
+                throw new InvalidOperationException($"설정 파일 읽기 실패: {ex.Message}", ex);
             }
-            
-            // 기본값 반환
-            Console.WriteLine("🔄 SecurityService: 기본값을 사용합니다.");
-            return ("gramwonlogis2.mycafe24.com", "gramwonlogis2", "gramwonlogis2", "jung5516!", "3306");
         }
+        
+
         
         /// <summary>
         /// 모든 필수 환경 변수가 설정되어 있는지 확인하는 메서드

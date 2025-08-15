@@ -69,7 +69,7 @@ BEGIN
     /*--=============================================================
     -- 배송메세지에서 별표지우기
     --=============================================================*/
-    UPDATE 송장출력_사방넷원본변환_Dev
+    UPDATE 송장출력_사방넷원본변환
        SET 배송메세지 = REPLACE(배송메세지, '★', '')
      WHERE 배송메세지 LIKE '%★%';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 배송메세지 별표 제거', ROW_COUNT());

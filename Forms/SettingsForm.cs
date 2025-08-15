@@ -8,6 +8,7 @@ using System.Collections.Generic; // Added for List
 using System.Drawing; // Added for Color, Point, Size, Font
 using System.IO; // Added for Path and File
 using System.Threading.Tasks; // Added for Task
+using LogisticManager.Constants;
 
 namespace LogisticManager.Forms
 {
@@ -1417,11 +1418,36 @@ namespace LogisticManager.Forms
                     var settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
                     if (settings != null)
                     {
-                        var server = settings.GetValueOrDefault("DB_SERVER", "gramwonlogis2.mycafe24.com");
-                        var database = settings.GetValueOrDefault("DB_NAME", "gramwonlogis2");
-                        var user = settings.GetValueOrDefault("DB_USER", "gramwonlogis2");
-                        var password = settings.GetValueOrDefault("DB_PASSWORD", "jung5516!");
-                        var port = settings.GetValueOrDefault("DB_PORT", "3306");
+                                                        // 설정값 추출 (null 체크 포함)
+                        if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_SERVER, out var server) || string.IsNullOrWhiteSpace(server))
+                        {
+                            Console.WriteLine("❌ SettingsForm: DB_SERVER 설정값이 누락되었습니다.");
+                            throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                        }
+                        
+                        if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_NAME, out var database) || string.IsNullOrWhiteSpace(database))
+                        {
+                            Console.WriteLine("❌ SettingsForm: DB_NAME 설정값이 누락되었습니다.");
+                            throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                        }
+                        
+                        if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_USER, out var user) || string.IsNullOrWhiteSpace(user))
+                        {
+                            Console.WriteLine("❌ SettingsForm: DB_USER 설정값이 누락되었습니다.");
+                            throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                        }
+                        
+                        if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_PASSWORD, out var password) || string.IsNullOrEmpty(password))
+                        {
+                            Console.WriteLine("❌ SettingsForm: DB_PASSWORD 설정값이 누락되었습니다.");
+                            throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                        }
+                        
+                        if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_PORT, out var port) || string.IsNullOrWhiteSpace(port))
+                        {
+                            Console.WriteLine("❌ SettingsForm: DB_PORT 설정값이 누락되었습니다.");
+                            throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+                        }
                         
                         Console.WriteLine($"✅ SettingsForm: settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.");
                         return (server, database, user, password, port);
@@ -1441,9 +1467,9 @@ namespace LogisticManager.Forms
                 Console.WriteLine($"❌ SettingsForm: settings.json 읽기 실패: {ex.Message}");
             }
             
-            // 기본값 반환
-            Console.WriteLine("🔄 SettingsForm: 기본값을 사용합니다.");
-            return ("gramwonlogis2.mycafe24.com", "gramwonlogis2", "gramwonlogis2", "jung5516!", "3306");
+            // 기본값 사용 금지 - 설정 파일이 올바르지 않으면 예외 발생
+            Console.WriteLine("❌ SettingsForm: 설정 파일이 올바르지 않습니다.");
+            throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
         }
     }
 } 

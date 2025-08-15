@@ -1,283 +1,371 @@
-using System.ComponentModel.DataAnnotations;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.IO; // Added for file logging
 
 namespace LogisticManager.Models
 {
     /// <summary>
-    /// 송장 데이터 전송 객체 (DTO) - 데이터베이스와 애플리케이션 간 데이터 전송용
+    /// 송장 데이터 전송 객체 (Data Transfer Object)
     /// 
-    /// 📋 주요 기능:
-    /// - 송장 데이터의 구조화된 표현
-    /// - 데이터 검증 (Data Annotations 사용)
-    /// - 타입 안전성 보장
-    /// - null 안전성 처리
+    /// 주요 기능:
+    /// - 송장 관련 데이터를 데이터베이스와 주고받기 위한 중간 형식
+    /// - Order 객체로부터 InvoiceDto 생성
+    /// - 데이터 유효성 검사
+    /// - 데이터베이스 컬럼과 1:1 매핑
     /// 
-    /// 💡 사용법:
-    /// var invoiceDto = new InvoiceDto { RecipientName = "홍길동", ... };
+    /// 데이터 구조:
+    /// - 수취인 정보: 이름, 전화번호, 주소, 우편번호
+    /// - 상품 정보: 옵션명, 수량, 상품명, 상품코드
+    /// - 주문 정보: 주문번호, 매장명, 수집시간, 쇼핑몰 주문번호
+    /// - 결제 정보: 결제금액, 주문금액, 결제수단, 면과세구분
+    /// - 배송 정보: 배송비용, 박스크기, 배송수량, 배송타입
+    /// - 송장 정보: 출력개수, 송장수량, 송장구분, 위치정보
+    /// - 메시지 필드: msg1~msg6 (송장 출력용)
+    /// 
+    /// 사용 목적:
+    /// - 송장 데이터의 일관된 구조 제공
+    /// - 데이터베이스 CRUD 작업의 표준화
+    /// - 송장 생성 및 관리 시스템의 핵심 데이터 모델
     /// </summary>
     public class InvoiceDto
     {
-        #region 기본 정보
-
-        /// <summary>수취인명 (필수)</summary>
-        [Required(ErrorMessage = "수취인명은 필수입니다.")]
-        [MaxLength(100, ErrorMessage = "수취인명은 100자를 초과할 수 없습니다.")]
-        public string RecipientName { get; set; } = string.Empty;
-
-        /// <summary>전화번호1 (필수)</summary>
-        [Required(ErrorMessage = "전화번호는 필수입니다.")]
-        [MaxLength(20, ErrorMessage = "전화번호는 20자를 초과할 수 없습니다.")]
-        public string Phone1 { get; set; } = string.Empty;
-
-        /// <summary>전화번호2 (선택)</summary>
-        [MaxLength(20, ErrorMessage = "전화번호2는 20자를 초과할 수 없습니다.")]
-        public string Phone2 { get; set; } = string.Empty;
-
-        /// <summary>우편번호 (필수)</summary>
-        [Required(ErrorMessage = "우편번호는 필수입니다.")]
-        [MaxLength(10, ErrorMessage = "우편번호는 10자를 초과할 수 없습니다.")]
-        public string ZipCode { get; set; } = string.Empty;
-
-        /// <summary>주소 (필수)</summary>
-        [Required(ErrorMessage = "주소는 필수입니다.")]
-        [MaxLength(500, ErrorMessage = "주소는 500자를 초과할 수 없습니다.")]
-        public string Address { get; set; } = string.Empty;
-
+        #region 로깅 유틸리티 (Logging Utilities)
+        
+        /// <summary>
+        /// app.log 파일에 로그를 기록하는 메서드
+        /// </summary>
+        /// <param name="message">로그 메시지</param>
+        private static void WriteLog(string message)
+        {
+            try
+            {
+                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+                
+                // 긴 메시지는 여러 줄로 나누기
+                if (message.Length > 100)
+                {
+                    var words = message.Split(new[] { ", " }, StringSplitOptions.None);
+                    var currentLine = "";
+                    
+                    foreach (var word in words)
+                    {
+                        if ((currentLine + word).Length > 100 && !string.IsNullOrEmpty(currentLine))
+                        {
+                            // 현재 줄이 너무 길면 새 줄로
+                            var logMessage = $"{timestamp} {currentLine.Trim()}";
+                            File.AppendAllText(logPath, logMessage + Environment.NewLine);
+                            currentLine = word;
+                        }
+                        else
+                        {
+                            currentLine += (string.IsNullOrEmpty(currentLine) ? "" : ", ") + word;
+                        }
+                    }
+                    
+                    // 마지막 줄 처리
+                    if (!string.IsNullOrEmpty(currentLine))
+                    {
+                        var logMessage = $"{timestamp} {currentLine.Trim()}";
+                        File.AppendAllText(logPath, logMessage + Environment.NewLine);
+                    }
+                }
+                else
+                {
+                    // 짧은 메시지는 한 줄로
+                    var logMessage = $"{timestamp} {message}";
+                    File.AppendAllText(logPath, logMessage + Environment.NewLine);
+                }
+            }
+            catch (Exception ex)
+            {
+                // 로그 쓰기 실패 시 무시하고 계속 진행
+                System.Diagnostics.Debug.WriteLine($"로그 쓰기 실패: {ex.Message}");
+            }
+        }
+        
         #endregion
 
-        #region 주문 정보
+        #region 메시지 필드 (테이블: msg1~msg6)
+        /// <summary>메시지 1</summary>
+        public string? Msg1 { get; set; }
+        
+        /// <summary>메시지 2</summary>
+        public string? Msg2 { get; set; }
+        
+        /// <summary>메시지 3</summary>
+        public string? Msg3 { get; set; }
+        
+        /// <summary>메시지 4</summary>
+        public string? Msg4 { get; set; }
+        
+        /// <summary>메시지 5</summary>
+        public string? Msg5 { get; set; }
+        
+        /// <summary>메시지 6</summary>
+        public string? Msg6 { get; set; }
+        #endregion
 
-        /// <summary>옵션명</summary>
-        [MaxLength(200, ErrorMessage = "옵션명은 200자를 초과할 수 없습니다.")]
-        public string OptionName { get; set; } = string.Empty;
-
-        /// <summary>수량</summary>
-        [Range(1, int.MaxValue, ErrorMessage = "수량은 1 이상이어야 합니다.")]
-        public int Quantity { get; set; } = 1;
-
-        /// <summary>배송메세지 (특이사항)</summary>
-        [MaxLength(500, ErrorMessage = "배송메세지는 500자를 초과할 수 없습니다.")]
-        public string SpecialNote { get; set; } = string.Empty;
-
-        /// <summary>주문번호 (필수)</summary>
-        [Required(ErrorMessage = "주문번호는 필수입니다.")]
-        [MaxLength(100, ErrorMessage = "주문번호는 100자를 초과할 수 없습니다.")]
-        public string OrderNumber { get; set; } = string.Empty;
-
-        /// <summary>쇼핑몰 (매장명)</summary>
-        [MaxLength(100, ErrorMessage = "쇼핑몰명은 100자를 초과할 수 없습니다.")]
-        public string StoreName { get; set; } = string.Empty;
-
-        /// <summary>별표1</summary>
-        [MaxLength(50)]
-        public string Star1 { get; set; } = string.Empty;
-
-        /// <summary>별표2</summary>
-        [MaxLength(50)]
-        public string Star2 { get; set; } = string.Empty;
-
+        #region 수취인 정보
+        /// <summary>수취인명</summary>
+        public string? RecipientName { get; set; }
+        
+        /// <summary>전화번호1</summary>
+        public string? Phone1 { get; set; }
+        
+        /// <summary>전화번호2</summary>
+        public string? Phone2 { get; set; }
+        
+        /// <summary>우편번호</summary>
+        public string? ZipCode { get; set; }
+        
+        /// <summary>주소</summary>
+        public string? Address { get; set; }
         #endregion
 
         #region 상품 정보
-
-        /// <summary>수집시간</summary>
-        public DateTime CollectedAt { get; set; } = DateTime.Now;
-
-        /// <summary>송장명 (품목명)</summary>
-        [MaxLength(200, ErrorMessage = "송장명은 200자를 초과할 수 없습니다.")]
-        public string ProductName { get; set; } = string.Empty;
-
+        /// <summary>옵션명</summary>
+        public string? OptionName { get; set; }
+        
+        /// <summary>수량</summary>
+        public int? Quantity { get; set; }
+        
+        /// <summary>송장명</summary>
+        public string? ProductName { get; set; }
+        
         /// <summary>품목코드</summary>
-        [MaxLength(50, ErrorMessage = "품목코드는 50자를 초과할 수 없습니다.")]
-        public string ProductCode { get; set; } = string.Empty;
+        public string? ProductCode { get; set; }
+        
+        /// <summary>품목개수</summary>
+        public string? ProductCount { get; set; }
+        #endregion
 
+        #region 주문 정보
+        /// <summary>배송메세지</summary>
+        public string? SpecialNote { get; set; }
+        
+        /// <summary>주문번호</summary>
+        public string? OrderNumber { get; set; }
+        
+        /// <summary>쇼핑몰</summary>
+        public string? StoreName { get; set; }
+        
+        /// <summary>수집시간</summary>
+        public DateTime? CollectedAt { get; set; }
+        
         /// <summary>주문번호(쇼핑몰)</summary>
-        [MaxLength(100, ErrorMessage = "주문번호(쇼핑몰)는 100자를 초과할 수 없습니다.")]
-        public string OrderNumberMall { get; set; } = string.Empty;
-
-        #endregion
-
-        #region 결제 정보
-
-        /// <summary>결제금액</summary>
-        [Range(0, double.MaxValue, ErrorMessage = "결제금액은 0 이상이어야 합니다.")]
-        public decimal PaymentAmount { get; set; }
-
+        public string? OrderNumberMall { get; set; }
+        
         /// <summary>주문금액</summary>
-        [Range(0, double.MaxValue, ErrorMessage = "주문금액은 0 이상이어야 합니다.")]
-        public decimal OrderAmount { get; set; }
-
+        public string? OrderAmount { get; set; }
+        
+        /// <summary>결제금액</summary>
+        public string? PaymentAmount { get; set; }
+        
         /// <summary>결제수단</summary>
-        [MaxLength(255, ErrorMessage = "결제수단은 255자를 초과할 수 없습니다.")]
-        public string PaymentMethod { get; set; } = string.Empty;
-
-        /// <summary>면과세구분 (가격카테고리)</summary>
-        [MaxLength(50, ErrorMessage = "면과세구분은 50자를 초과할 수 없습니다.")]
-        public string TaxType { get; set; } = string.Empty;
-
-        /// <summary>주문상태 (처리상태)</summary>
-        [MaxLength(50, ErrorMessage = "주문상태는 50자를 초과할 수 없습니다.")]
-        public string OrderStatus { get; set; } = string.Empty;
-
-        /// <summary>배송송 (배송타입)</summary>
-        [MaxLength(50, ErrorMessage = "배송송은 50자를 초과할 수 없습니다.")]
-        public string ShippingType { get; set; } = string.Empty;
-
+        public string? PaymentMethod { get; set; }
+        
+        /// <summary>면과세구분</summary>
+        public string? TaxType { get; set; }
+        
+        /// <summary>주문상태</summary>
+        public string? OrderStatus { get; set; }
         #endregion
 
-        #region 생성 메서드
+        #region 배송 정보
+        /// <summary>택배비용</summary>
+        public string? DeliveryCost { get; set; }
+        
+        /// <summary>박스크기</summary>
+        public string? BoxSize { get; set; }
+        
+        /// <summary>택배수량</summary>
+        public string? DeliveryQuantity { get; set; }
+        
+        /// <summary>택배수량1</summary>
+        public string? DeliveryQuantity1 { get; set; }
+        
+        /// <summary>택배수량합산</summary>
+        public string? DeliveryQuantitySum { get; set; }
+        
+        /// <summary>배송송</summary>
+        public string? ShippingType { get; set; }
+        #endregion
 
+        #region 송장 정보
+        /// <summary>출력개수</summary>
+        public string? PrintCount { get; set; }
+        
+        /// <summary>송장수량</summary>
+        public string? InvoiceQuantity { get; set; }
+        
+        /// <summary>송장구분자</summary>
+        public string? InvoiceSeparator { get; set; }
+        
+        /// <summary>송장구분</summary>
+        public string? InvoiceType { get; set; }
+        
+        /// <summary>송장구분최종</summary>
+        public string? InvoiceTypeFinal { get; set; }
+        #endregion
+
+        #region 위치 정보
+        /// <summary>위치</summary>
+        public string? Location { get; set; }
+        
+        /// <summary>위치변환</summary>
+        public string? LocationConverted { get; set; }
+        #endregion
+
+        #region 기타 정보
+        /// <summary>별표1</summary>
+        public string? Star1 { get; set; }
+        
+        /// <summary>별표2</summary>
+        public string? Star2 { get; set; }
+        #endregion
+
+        #region 정적 팩토리 메서드
         /// <summary>
-        /// Order 모델에서 InvoiceDto로 변환하는 팩토리 메서드
-        /// 
-        /// 📋 기능:
-        /// - Order 모델의 데이터를 InvoiceDto로 안전하게 변환
-        /// - null 안전성 보장
-        /// - 타입 변환 처리
-        /// 
-        /// 💡 사용법:
-        /// var dto = InvoiceDto.FromOrder(order);
+        /// Order 객체로부터 InvoiceDto를 생성하는 정적 팩토리 메서드
         /// </summary>
-        /// <param name="order">변환할 Order 모델</param>
-        /// <returns>변환된 InvoiceDto</returns>
+        /// <param name="order">주문 객체</param>
+        /// <returns>생성된 InvoiceDto</returns>
         public static InvoiceDto FromOrder(Order order)
         {
-            // 디버깅을 위한 로그 추가
-            Console.WriteLine($"[InvoiceDto.FromOrder] Order 변환 시작");
-            Console.WriteLine($"  - RecipientPhone1: '{order.RecipientPhone1 ?? "(null)"}'");
-            Console.WriteLine($"  - RecipientPhone2: '{order.RecipientPhone2 ?? "(null)"}'");
-            Console.WriteLine($"  - ZipCode: '{order.ZipCode ?? "(null)"}'");
-            Console.WriteLine($"  - OptionName: '{order.OptionName ?? "(null)"}'");
-            
-            var dto = new InvoiceDto
+            if (order == null)
             {
+                throw new ArgumentNullException(nameof(order), "주문 객체가 null일 수 없습니다.");
+            }
+
+            return new InvoiceDto
+            {
+                // 수취인 정보
                 RecipientName = order.RecipientName ?? string.Empty,
-                Phone1 = order.RecipientPhone1 ?? order.RecipientPhone ?? string.Empty,
+                Phone1 = order.RecipientPhone1 ?? string.Empty,
                 Phone2 = order.RecipientPhone2 ?? string.Empty,
                 ZipCode = order.ZipCode ?? string.Empty,
                 Address = order.Address ?? string.Empty,
+                
+                // 상품 정보
                 OptionName = order.OptionName ?? string.Empty,
-                Quantity = order.Quantity > 0 ? order.Quantity : 1,
-                SpecialNote = order.ShippingMessage ?? order.SpecialNote ?? string.Empty,
+                Quantity = order.Quantity,
+                ProductName = order.InvoiceName ?? string.Empty,
+                ProductCode = order.ProductCode ?? string.Empty,
+                
+                // 주문 정보
+                SpecialNote = order.ShippingMessage ?? string.Empty,
                 OrderNumber = order.OrderNumber ?? string.Empty,
-                StoreName = order.MallName ?? order.StoreName ?? string.Empty,
+                StoreName = order.MallName ?? string.Empty,
+                CollectedAt = order.CollectionTime ?? DateTime.Now, // 수집시간이 있으면 사용, 없으면 현재 시간
+                OrderNumberMall = order.OrderNumberMall ?? string.Empty,
+                OrderAmount = order.OrderAmount ?? string.Empty,
+                PaymentAmount = order.PaymentAmount ?? string.Empty,
+                PaymentMethod = order.PaymentMethod ?? string.Empty,
+                TaxType = order.TaxType ?? string.Empty,
+                OrderStatus = order.OrderStatus ?? order.ProcessingStatus ?? string.Empty,
+                
+                // 배송 정보
+                DeliveryCost = order.DeliveryCost ?? string.Empty,
+                BoxSize = order.BoxSize ?? string.Empty,
+                DeliveryQuantity = order.DeliveryQuantity ?? string.Empty,
+                DeliveryQuantity1 = order.DeliveryQuantity1 ?? string.Empty,
+                DeliveryQuantitySum = order.DeliveryQuantitySum ?? string.Empty,
+                ShippingType = order.DeliverySend ?? order.ShippingType ?? string.Empty,
+                
+                // 송장 정보
+                PrintCount = order.PrintCount ?? "1",
+                InvoiceQuantity = order.InvoiceQuantity ?? "1",
+                InvoiceSeparator = order.InvoiceSeparator ?? string.Empty,
+                InvoiceType = order.InvoiceType ?? string.Empty,
+                InvoiceTypeFinal = order.InvoiceTypeFinal ?? string.Empty,
+                
+                // 위치 정보
+                Location = order.Location ?? "기본위치",
+                LocationConverted = order.LocationConverted ?? string.Empty,
+                
+                // 기타 정보
+                ProductCount = order.ProductCount ?? string.Empty,
                 Star1 = order.Star1 ?? string.Empty,
                 Star2 = order.Star2 ?? string.Empty,
-                CollectedAt = order.CollectionTime ?? DateTime.Now,
-                ProductName = order.InvoiceName ?? order.ProductName ?? string.Empty,
-                ProductCode = order.ProductCode ?? string.Empty,
-                OrderNumberMall = order.OrderNumberMall ?? order.OrderNumber ?? string.Empty,
-                PaymentAmount = decimal.TryParse(order.PaymentAmount, out var paymentAmount) ? paymentAmount : 0,
-                OrderAmount = decimal.TryParse(order.OrderAmount, out var orderAmount) ? orderAmount : 0,
-                PaymentMethod = order.PaymentMethod ?? string.Empty,
-                TaxType = order.TaxType ?? order.PriceCategory ?? string.Empty,
-                OrderStatus = order.OrderStatus ?? order.ProcessingStatus ?? string.Empty,
-                ShippingType = order.DeliverySend ?? order.ShippingType ?? string.Empty
+                
+                // 메시지 필드
+                Msg1 = string.Empty,
+                Msg2 = string.Empty,
+                Msg3 = string.Empty,
+                Msg4 = string.Empty,
+                Msg5 = string.Empty,
+                Msg6 = string.Empty
             };
-
-            // 별표2 최종 보정 로직 (안전망)
-            // - 메모리 변환 또는 매핑 단계에서 누락되었을 경우를 대비해 주소를 재검사하여 '제주' 세팅
-            // - 주소에 '제주특별' 또는 '제주 특별'이 포함되면 별표2를 '제주'로 설정
-            try
-            {
-                if (string.IsNullOrWhiteSpace(dto.Star2))
-                {
-                    var addr = dto.Address?.Trim() ?? string.Empty;
-                    if (addr.Contains("제주특별", StringComparison.OrdinalIgnoreCase) ||
-                        addr.Contains("제주 특별", StringComparison.OrdinalIgnoreCase))
-                    {
-                        dto.Star2 = "제주";
-                    }
-                }
-            }
-            catch
-            {
-                // 보정 중 예외는 무시 (핵심 저장 로직 방해 금지)
-            }
-
-            return dto;
         }
-
         #endregion
 
         #region 검증 메서드
-
         /// <summary>
         /// DTO 데이터 유효성 검사
-        /// 
-        /// 📋 기능:
-        /// - 필수 필드 검증 (더 유연한 검증)
-        /// - 데이터 형식 검증
-        /// - 비즈니스 규칙 검증
-        /// 
-        /// 💡 사용법:
-        /// if (dto.IsValid()) { ... }
         /// </summary>
         /// <returns>유효성 검사 결과</returns>
         public bool IsValid()
         {
-            // === 기본 필수 필드 검증 (더 유연한 검증) ===
-            var isValid = true;
-            var missingFields = new List<string>();
+            // === 모든 필드가 비어있는 경우만 완전히 무효로 처리 ===
+            var hasAnyValidData = !string.IsNullOrWhiteSpace(RecipientName) ||
+                                  !string.IsNullOrWhiteSpace(Address) ||
+                                  !string.IsNullOrWhiteSpace(OrderNumber) ||
+                                  !string.IsNullOrWhiteSpace(ProductName) ||
+                                  Quantity > 0 ||
+                                  !string.IsNullOrWhiteSpace(ProductCode) ||
+                                  !string.IsNullOrWhiteSpace(Phone1) ||
+                                  !string.IsNullOrWhiteSpace(Phone2) ||
+                                  !string.IsNullOrWhiteSpace(ZipCode) ||
+                                  !string.IsNullOrWhiteSpace(OptionName) ||
+                                  !string.IsNullOrWhiteSpace(SpecialNote) ||
+                                  !string.IsNullOrWhiteSpace(StoreName) ||
+                                  !string.IsNullOrWhiteSpace(OrderNumberMall) ||
+                                  !string.IsNullOrWhiteSpace(OrderAmount) ||
+                                  !string.IsNullOrWhiteSpace(PaymentAmount) ||
+                                  !string.IsNullOrWhiteSpace(PaymentMethod) ||
+                                  !string.IsNullOrWhiteSpace(TaxType) ||
+                                  !string.IsNullOrWhiteSpace(OrderStatus) ||
+                                  !string.IsNullOrWhiteSpace(DeliveryCost) ||
+                                  !string.IsNullOrWhiteSpace(BoxSize) ||
+                                  !string.IsNullOrWhiteSpace(DeliveryQuantity) ||
+                                  !string.IsNullOrWhiteSpace(DeliveryQuantity1) ||
+                                  !string.IsNullOrWhiteSpace(DeliveryQuantitySum) ||
+                                  !string.IsNullOrWhiteSpace(ShippingType) ||
+                                  !string.IsNullOrWhiteSpace(PrintCount) ||
+                                  !string.IsNullOrWhiteSpace(InvoiceQuantity) ||
+                                  !string.IsNullOrWhiteSpace(InvoiceSeparator) ||
+                                  !string.IsNullOrWhiteSpace(InvoiceType) ||
+                                  !string.IsNullOrWhiteSpace(InvoiceTypeFinal) ||
+                                  !string.IsNullOrWhiteSpace(Location) ||
+                                  !string.IsNullOrWhiteSpace(LocationConverted) ||
+                                  !string.IsNullOrWhiteSpace(ProductCount) ||
+                                  !string.IsNullOrWhiteSpace(Star1) ||
+                                  !string.IsNullOrWhiteSpace(Star2) ||
+                                  !string.IsNullOrWhiteSpace(Msg1) ||
+                                  !string.IsNullOrWhiteSpace(Msg2) ||
+                                  !string.IsNullOrWhiteSpace(Msg3) ||
+                                  !string.IsNullOrWhiteSpace(Msg4) ||
+                                  !string.IsNullOrWhiteSpace(Msg5) ||
+                                  !string.IsNullOrWhiteSpace(Msg6);
             
-            // 수취인명 검사 (필수)
-            if (string.IsNullOrWhiteSpace(RecipientName))
+            if (!hasAnyValidData)
             {
-                isValid = false;
-                missingFields.Add("수취인명");
+                WriteLog($"[InvoiceDto] 유효성 검사 실패 - 모든 필드가 비어있음");
+                return false;
             }
             
-            // 전화번호1 검사 (필수) - 더 유연한 검증
-            if (string.IsNullOrWhiteSpace(Phone1))
-            {
-                // 전화번호가 없어도 일단 허용 (대용량 데이터 처리 시)
-                // isValid = false;
-                // missingFields.Add("전화번호1");
-            }
+            // === 디버깅 정보 출력 ===
+            WriteLog($"[InvoiceDto] 유효성 검사 통과 - 데이터 존재");
+            WriteLog($"  - 수취인명: '{RecipientName ?? "(null)"}'");
+            WriteLog($"  - 주소: '{Address ?? "(null)"}'");
+            WriteLog($"  - 주문번호: '{OrderNumber ?? "(null)"}'");
+            WriteLog($"  - 상품명: '{ProductName ?? "(null)"}'");
+            WriteLog($"  - 수량: {Quantity}");
             
-            // 우편번호 검사 (선택) - 더 유연한 검증
-            if (string.IsNullOrWhiteSpace(ZipCode))
-            {
-                // 우편번호가 없어도 일단 허용
-                // isValid = false;
-                // missingFields.Add("우편번호");
-            }
-            
-            // 주소 검사 (필수)
-            if (string.IsNullOrWhiteSpace(Address))
-            {
-                isValid = false;
-                missingFields.Add("주소");
-            }
-            
-            // 주문번호 검사 (필수)
-            if (string.IsNullOrWhiteSpace(OrderNumber))
-            {
-                isValid = false;
-                missingFields.Add("주문번호");
-            }
-            
-            // 수량 검사 (1 이상)
-            if (Quantity <= 0)
-            {
-                isValid = false;
-                missingFields.Add("수량");
-            }
-            
-            // === 디버깅 정보 출력 (유효하지 않은 경우) ===
-            if (!isValid)
-            {
-                Console.WriteLine($"[InvoiceDto] 유효성 검사 실패 - 누락된 필드: {string.Join(", ", missingFields)}");
-                Console.WriteLine($"  - 수취인명: '{RecipientName ?? "(null)"}'");
-                Console.WriteLine($"  - 전화번호1: '{Phone1 ?? "(null)"}'");
-                Console.WriteLine($"  - 주소: '{Address ?? "(null)"}'");
-                Console.WriteLine($"  - 주문번호: '{OrderNumber ?? "(null)"}'");
-                Console.WriteLine($"  - 수량: {Quantity}");
-            }
-            
-            return isValid;
+            return true;
         }
-
         #endregion
     }
 }

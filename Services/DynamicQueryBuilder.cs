@@ -85,7 +85,7 @@ namespace LogisticManager.Services
         /// - JSON 파싱 오류 시 기본 설정 사용
         /// </summary>
         /// <param name="useReflectionFallback">리플렉션 폴백 사용 여부 (기본값: true)</param>
-        public DynamicQueryBuilder(bool useReflectionFallback = true)
+        public DynamicQueryBuilder(bool useReflectionFallback = false)
         {
             _useReflectionFallback = useReflectionFallback;
             // 프로젝트 루트 디렉토리에서 설정 파일 찾기
@@ -140,13 +140,19 @@ namespace LogisticManager.Services
                 throw new ArgumentException("엔티티 객체는 null일 수 없습니다.", nameof(entity));
 
             Console.WriteLine($"🔍 DynamicQueryBuilder: 테이블 '{tableName}'에 대한 INSERT 쿼리 생성 시작");
+            Console.WriteLine($"[DEBUG] 전달받은 테이블명: {tableName}");
+            Console.WriteLine($"[DEBUG] 로드된 테이블 매핑 수: {_tableMappings.Count}");
+            Console.WriteLine($"[DEBUG] 사용 가능한 테이블들: {string.Join(", ", _tableMappings.Keys)}");
 
             // === 2단계: 설정 기반 매핑 시도 ===
             if (_tableMappings.TryGetValue(tableName, out var mapping))
             {
                 Console.WriteLine($"✅ 설정 기반 매핑 발견 - 테이블: {tableName}");
+                Console.WriteLine($"[DEBUG] 매핑된 컬럼 수: {mapping.Columns.Count}");
                 return BuildFromMapping(tableName, entity, mapping);
             }
+
+            Console.WriteLine($"❌ 테이블 '{tableName}'에 대한 매핑을 찾을 수 없음");
 
             // === 3단계: 리플렉션 기반 폴백 ===
             if (_useReflectionFallback)
@@ -447,6 +453,13 @@ namespace LogisticManager.Services
                 }
 
                 Console.WriteLine($"✅ 테이블 매핑 설정 로드 완료 - {mappings.Count}개 테이블");
+                
+                // 로드된 테이블명들 출력
+                foreach (var tableName in mappings.Keys)
+                {
+                    Console.WriteLine($"  📋 테이블: {tableName}");
+                }
+                
                 return mappings;
             }
             catch (Exception ex)
