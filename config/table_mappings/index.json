@@ -1,0 +1,90 @@
+{
+  "version": "1.0",
+  "description": "테이블별 컬럼 매핑 파일 인덱스",
+  "created_date": "2025-08-17",
+  "last_updated": "2025-08-17",
+  
+  "table_mappings": {
+    "송장출력_사방넷원본변환": {
+      "file_path": "송장출력_사방넷원본변환.json",
+      "description": "사방넷 원본 데이터 변환 테이블",
+      "is_active": true,
+      "processing_order": 1,
+      "columns_count": 41,
+      "primary_key": "",
+      "required_fields": []
+    },
+    "송장출력_특수출력_합포장변경": {
+      "file_path": "송장출력_특수출력_합포장변경.json",
+      "description": "합포장 변경 정보 테이블",
+      "is_active": true,
+      "processing_order": 2,
+      "columns_count": 14,
+      "primary_key": "",
+      "required_fields": []
+    },
+    "송장출력_톡딜불가": {
+      "file_path": "송장출력_톡딜불가.json",
+      "description": "톡딜 불가 상품 정보 테이블",
+      "is_active": true,
+      "processing_order": 3,
+      "columns_count": 9,
+      "primary_key": "",
+      "required_fields": []
+    },
+    "송장출력_특수출력_감천분리출고": {
+      "file_path": "송장출력_특수출력_감천분리출고.json",
+      "description": "감천분리출고 정보 테이블",
+      "is_active": true,
+      "processing_order": 4,
+      "columns_count": 4,
+      "primary_key": "",
+      "required_fields": []
+    },
+    "별표송장": {
+      "file_path": "별표송장.json",
+      "description": "별표송장 정보 테이블",
+      "is_active": true,
+      "processing_order": 5,
+      "columns_count": 6,
+      "primary_key": "",
+      "required_fields": []
+    },
+    "송장출력_메세지": {
+      "file_path": "송장출력_메세지.json",
+      "description": "송장출력 메시지 정보 테이블",
+      "is_active": true,
+      "processing_order": 6,
+      "columns_count": 7,
+      "primary_key": "쇼핑몰",
+      "required_fields": ["쇼핑몰"]
+    }
+  },
+  
+  "metadata": {
+    "total_tables": 6,
+    "active_tables": 6,
+    "total_columns": 81,
+    "last_sync": "2025-08-17 22:03:00",
+    "sync_status": "completed"
+  },
+  
+  "file_structure": {
+    "base_path": "config/table_mappings/",
+    "file_extension": ".json",
+    "naming_convention": "테이블명.json",
+    "version_control": true,
+    "backup_enabled": true
+  },
+  
+  "validation_rules": {
+    "description": "테이블별 매핑 파일 검증 규칙",
+    "rules": [
+      "모든 필수 필드는 required: true로 설정",
+      "Primary Key는 고유해야 함",
+      "데이터 타입은 표준 SQL 타입 사용",
+      "검증 규칙은 적절한 범위와 형식으로 설정",
+      "비즈니스 규칙은 명확하게 문서화"
+    ]
+  }
+}

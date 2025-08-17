@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using LogisticManager.Models;
 using System.Linq; // Added for .Where() and .ToList()
+using LogisticManager.Services;
 
 namespace LogisticManager.Services
 {
@@ -88,12 +89,14 @@ namespace LogisticManager.Services
         public DynamicQueryBuilder(bool useReflectionFallback = false)
         {
             _useReflectionFallback = useReflectionFallback;
-            // 프로젝트 루트 디렉토리에서 설정 파일 찾기
-            _configPath = Path.Combine(Directory.GetCurrentDirectory(), "table_mappings.json");
+            // 테이블별 매핑 파일이 있는 폴더 경로 설정 (프로젝트 루트에서 찾기)
+            _configPath = Path.Combine(GetProjectRootDirectory(), "config", "table_mappings");
             _tableMappings = LoadTableMappings();
             
-            Console.WriteLine($"🔧 DynamicQueryBuilder 초기화 완료 - 설정 파일: {_configPath}");
-            Console.WriteLine($"📊 로드된 테이블 매핑 수: {_tableMappings.Count}개");
+            var initLog = $"🔧 DynamicQueryBuilder 초기화 완료 - 매핑 폴더: {_configPath}";
+            var countLog = $"📊 로드된 테이블 매핑 수: {_tableMappings.Count}개";
+            LogManagerService.LogInfo(initLog);
+            LogManagerService.LogInfo(countLog);
         }
 
         #endregion
@@ -139,25 +142,33 @@ namespace LogisticManager.Services
             if (entity == null)
                 throw new ArgumentException("엔티티 객체는 null일 수 없습니다.", nameof(entity));
 
-            Console.WriteLine($"🔍 DynamicQueryBuilder: 테이블 '{tableName}'에 대한 INSERT 쿼리 생성 시작");
-            Console.WriteLine($"[DEBUG] 전달받은 테이블명: {tableName}");
-            Console.WriteLine($"[DEBUG] 로드된 테이블 매핑 수: {_tableMappings.Count}");
-            Console.WriteLine($"[DEBUG] 사용 가능한 테이블들: {string.Join(", ", _tableMappings.Keys)}");
+            var startLog = $"🔍 DynamicQueryBuilder: 테이블 '{tableName}'에 대한 INSERT 쿼리 생성 시작";
+            var debugLog1 = $"[DEBUG] 전달받은 테이블명: {tableName}";
+            var debugLog2 = $"[DEBUG] 로드된 테이블 매핑 수: {_tableMappings.Count}";
+            var debugLog3 = $"[DEBUG] 사용 가능한 테이블들: {string.Join(", ", _tableMappings.Keys)}";
+            LogManagerService.LogInfo(startLog);
+            LogManagerService.LogDebug(debugLog1);
+            LogManagerService.LogDebug(debugLog2);
+            LogManagerService.LogDebug(debugLog3);
 
             // === 2단계: 설정 기반 매핑 시도 ===
             if (_tableMappings.TryGetValue(tableName, out var mapping))
             {
-                Console.WriteLine($"✅ 설정 기반 매핑 발견 - 테이블: {tableName}");
-                Console.WriteLine($"[DEBUG] 매핑된 컬럼 수: {mapping.Columns.Count}");
+                var mappingFoundLog = $"✅ 설정 기반 매핑 발견 - 테이블: {tableName}";
+                var columnCountLog = $"[DEBUG] 매핑된 컬럼 수: {mapping.Columns.Count}";
+                LogManagerService.LogInfo(mappingFoundLog);
+                LogManagerService.LogDebug(columnCountLog);
                 return BuildFromMapping(tableName, entity, mapping);
             }
 
-            Console.WriteLine($"❌ 테이블 '{tableName}'에 대한 매핑을 찾을 수 없음");
+            var notFoundLog = $"❌ 테이블 '{tableName}'에 대한 매핑을 찾을 수 없음";
+            LogManagerService.LogWarning(notFoundLog);
 
             // === 3단계: 리플렉션 기반 폴백 ===
             if (_useReflectionFallback)
             {
-                Console.WriteLine($"🔄 리플렉션 기반 폴백 사용 - 테이블: {tableName}");
+                var fallbackLog = $"🔄 리플렉션 기반 폴백 사용 - 테이블: {tableName}";
+                LogManagerService.LogInfo(fallbackLog);
                 // [사용 목적]
                 // - 테이블 매핑 설정(table_mappings.json)이 없는 경우, 엔티티의 public 속성을 자동으로 DB 컬럼에 매핑하여 INSERT 쿼리를 생성한다.
                 // - 신규 엔티티 타입, 임시 테이블, 테스트 데이터 등 매핑 미정의 상황에서 기본 INSERT 기능을 제공한다.
@@ -247,19 +258,22 @@ namespace LogisticManager.Services
             if (entity == null)
                 throw new ArgumentException("엔티티 객체는 null일 수 없습니다.", nameof(entity));
 
-            Console.WriteLine($"🔍 DynamicQueryBuilder: 테이블 '{tableName}'에 대한 UPDATE 쿼리 생성 시작");
+            var updateStartLog = $"🔍 DynamicQueryBuilder: 테이블 '{tableName}'에 대한 UPDATE 쿼리 생성 시작";
+            LogManagerService.LogInfo(updateStartLog);
 
             // === 2단계: 설정 기반 매핑 시도 ===
             if (_tableMappings.TryGetValue(tableName, out var mapping))
             {
-                Console.WriteLine($"✅ 설정 기반 매핑 발견 - 테이블: {tableName}");
+                var updateMappingFoundLog = $"✅ 설정 기반 매핑 발견 - 테이블: {tableName}";
+                LogManagerService.LogInfo(updateMappingFoundLog);
                 return BuildUpdateFromMapping(tableName, entity, mapping, whereClause);
             }
 
             // === 3단계: 리플렉션 기반 폴백 ===
             if (_useReflectionFallback)
             {
-                Console.WriteLine($"🔄 리플렉션 기반 폴백 사용 - 테이블: {tableName}");
+                var fallbackLog = $"🔄 리플렉션 기반 폴백 사용 - 테이블: {tableName}";
+                LogManagerService.LogInfo(fallbackLog);
                 return BuildUpdateFromReflection<T>(tableName, entity, whereClause);
             }
 
@@ -310,19 +324,21 @@ namespace LogisticManager.Services
             if (entity == null)
                 throw new ArgumentException("엔티티 객체는 null일 수 없습니다.", nameof(entity));
 
-            Console.WriteLine($"🔍 DynamicQueryBuilder: 테이블 '{tableName}'에 대한 DELETE 쿼리 생성 시작");
+            LogManagerService.LogInfo($"🔍 DynamicQueryBuilder: 테이블 '{tableName}'에 대한 DELETE 쿼리 생성 시작");
 
             // === 2단계: 설정 기반 매핑 시도 ===
             if (_tableMappings.TryGetValue(tableName, out var mapping))
             {
-                Console.WriteLine($"✅ 설정 기반 매핑 발견 - 테이블: {tableName}");
+                var deleteMappingFoundLog = $"✅ 설정 기반 매핑 발견 - 테이블: {tableName}";
+                LogManagerService.LogInfo(deleteMappingFoundLog);
                 return BuildDeleteFromMapping(tableName, entity, mapping, whereClause);
             }
 
             // === 3단계: 리플렉션 기반 폴백 ===
             if (_useReflectionFallback)
             {
-                Console.WriteLine($"🔄 리플렉션 기반 폴백 사용 - 테이블: {tableName}");
+                var fallbackLog = $"🔄 리플렉션 기반 폴백 사용 - 테이블: {tableName}";
+                LogManagerService.LogInfo(fallbackLog);
                 return BuildDeleteFromReflection<T>(tableName, entity, whereClause);
             }
 
@@ -388,7 +404,7 @@ namespace LogisticManager.Services
             if (string.IsNullOrWhiteSpace(tableName))
                 throw new ArgumentException("테이블명은 비어있을 수 없습니다.", nameof(tableName));
 
-            Console.WriteLine($"🔍 DynamicQueryBuilder: 테이블 '{tableName}'에 대한 TRUNCATE 쿼리 생성 시작");
+            LogManagerService.LogInfo($"🔍 DynamicQueryBuilder: 테이블 '{tableName}'에 대한 TRUNCATE 쿼리 생성 시작");
 
             // === 2단계: 테이블명 보안 검증 ===
             if (!IsValidTableName(tableName))
@@ -400,12 +416,14 @@ namespace LogisticManager.Services
             // === 3단계: 설정 기반 매핑 확인 (선택사항) ===
             if (_tableMappings.TryGetValue(tableName, out var mapping))
             {
-                Console.WriteLine($"✅ 설정 기반 매핑 발견 - 테이블: {tableName}");
+                var truncateMappingFoundLog = $"✅ 설정 기반 매핑 발견 - 테이블: {tableName}";
+                LogManagerService.LogInfo(truncateMappingFoundLog);
                 return BuildTruncateFromMapping(tableName, mapping);
             }
 
             // === 4단계: 기본 TRUNCATE 쿼리 생성 ===
-            Console.WriteLine($"🔄 기본 TRUNCATE 쿼리 생성 - 테이블: {tableName}");
+            var defaultTruncateLog = $"🔄 기본 TRUNCATE 쿼리 생성 - 테이블: {tableName}";
+            LogManagerService.LogInfo(defaultTruncateLog);
             return BuildTruncateFromReflection(tableName);
         }
 
@@ -432,39 +450,56 @@ namespace LogisticManager.Services
         {
             try
             {
-                if (!File.Exists(_configPath))
+                if (!Directory.Exists(_configPath))
                 {
-                    Console.WriteLine($"⚠️ 설정 파일이 존재하지 않음: {_configPath}");
+                    var dirNotFoundLog = $"⚠️ 매핑 폴더가 존재하지 않음: {_configPath}";
+                    LogManagerService.LogWarning(dirNotFoundLog);
                     return new Dictionary<string, DynamicTableMapping>();
                 }
 
-                var jsonContent = File.ReadAllText(_configPath);
-                if (string.IsNullOrWhiteSpace(jsonContent))
+                var mappings = new Dictionary<string, DynamicTableMapping>();
+                var jsonFiles = Directory.GetFiles(_configPath, "*.json");
+
+                foreach (var jsonFile in jsonFiles)
                 {
-                    Console.WriteLine("⚠️ 설정 파일이 비어있음");
-                    return new Dictionary<string, DynamicTableMapping>();
+                    try
+                    {
+                        var fileName = Path.GetFileNameWithoutExtension(jsonFile);
+                        if (fileName == "index" || fileName == "README") continue; // 인덱스 파일 제외
+
+                        var jsonContent = File.ReadAllText(jsonFile, Encoding.UTF8);
+                        if (string.IsNullOrWhiteSpace(jsonContent))
+                        {
+                            var emptyFileLog = $"⚠️ 매핑 파일이 비어있음: {fileName}";
+                            LogManagerService.LogWarning(emptyFileLog);
+                            continue;
+                        }
+
+                        // 테이블별 매핑 파일을 DynamicTableMapping 형식으로 변환
+                        var tableMapping = ConvertTableMappingFile(jsonContent, fileName);
+                        if (tableMapping != null)
+                        {
+                            mappings[fileName] = tableMapping;
+                            var tableLog = $"  📋 테이블 로드: {fileName} ({tableMapping.Columns.Count}개 컬럼)";
+                            LogManagerService.LogInfo(tableLog);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        var fileErrorLog = $"⚠️ 매핑 파일 로드 실패 ({Path.GetFileName(jsonFile)}): {ex.Message}";
+                        LogManagerService.LogWarning(fileErrorLog);
+                    }
                 }
 
-                var mappings = JsonConvert.DeserializeObject<Dictionary<string, DynamicTableMapping>>(jsonContent);
-                if (mappings == null)
-                {
-                    Console.WriteLine("⚠️ JSON 역직렬화 실패 - 빈 딕셔너리 사용");
-                    return new Dictionary<string, DynamicTableMapping>();
-                }
-
-                Console.WriteLine($"✅ 테이블 매핑 설정 로드 완료 - {mappings.Count}개 테이블");
-                
-                // 로드된 테이블명들 출력
-                foreach (var tableName in mappings.Keys)
-                {
-                    Console.WriteLine($"  📋 테이블: {tableName}");
-                }
+                var loadCompleteLog = $"✅ 테이블 매핑 설정 로드 완료 - {mappings.Count}개 테이블";
+                LogManagerService.LogInfo(loadCompleteLog);
                 
                 return mappings;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ 테이블 매핑 설정 로드 실패: {ex.Message}");
+                var loadFailLog = $"❌ 테이블 매핑 설정 로드 실패: {ex.Message}";
+                LogManagerService.LogError(loadFailLog);
                 return new Dictionary<string, DynamicTableMapping>();
             }
         }
@@ -493,13 +528,11 @@ namespace LogisticManager.Services
             var parameters = new List<string>();
             var paramDict = new Dictionary<string, object>();
 
-            var startLog = $"[DynamicQueryBuilder] 설정 기반 쿼리 생성 시작 - 테이블: {tableName}";
+                                                        var startLog = $"[DynamicQueryBuilder] 설정 기반 쿼리 생성 시작 - 테이블: {tableName}";
             var columnCountLog = $"[DynamicQueryBuilder] 매핑된 컬럼 수: {mapping.Columns.Count}";
             
-            Console.WriteLine(startLog);
-            Console.WriteLine(columnCountLog);
-            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {startLog}\n");
-            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {columnCountLog}\n");
+            LogManagerService.LogInfo(startLog);
+            LogManagerService.LogDebug(columnCountLog);
 
             foreach (var column in mapping.Columns)
             {
@@ -507,21 +540,25 @@ namespace LogisticManager.Services
                 if (column.ExcludeFromInsert)
                 {
                     var excludeLog = $"[DynamicQueryBuilder] INSERT에서 제외: {column.PropertyName} (excludeFromInsert=true)";
-                    Console.WriteLine(excludeLog);
-                    File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {excludeLog}\n");
+                    LogManagerService.LogDebug(excludeLog);
                     continue;
                 }
 
                 var value = GetPropertyValue(entity, column.PropertyName);
                 
                 // 모든 컬럼을 포함 (null이어도 포함)
-                columns.Add($"`{column.DatabaseColumn}`");
+                // 특수문자가 포함된 컬럼명은 백틱으로 감싸기
+                var safeColumnName = GetSafeColumnName(column.DatabaseColumn);
+                columns.Add(safeColumnName);
                 parameters.Add($"@{column.PropertyName}");
                 paramDict[$"@{column.PropertyName}"] = value ?? DBNull.Value;
                 
+                // 디버깅: 컬럼명 변환 로그 추가
+                var debugLog = $"[DynamicQueryBuilder] 컬럼명 변환: '{column.DatabaseColumn}' → '{safeColumnName}'";
+                LogManagerService.LogDebug(debugLog);
+                
                 var mappingLog = $"[DynamicQueryBuilder] 컬럼 매핑: {column.PropertyName} → {column.DatabaseColumn} = {value ?? "(null)"}";
-                Console.WriteLine(mappingLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {mappingLog}\n");
+                LogManagerService.LogDebug(mappingLog);
             }
 
             if (columns.Count == 0)
@@ -530,17 +567,16 @@ namespace LogisticManager.Services
             }
 
             var columnList = string.Join(", ", columns);
-            Console.WriteLine($"[DynamicQueryBuilder] 컬럼 목록: {columnList}");
+            var columnListLog = $"[DynamicQueryBuilder] 컬럼 목록: {columnList}";
+            LogManagerService.LogDebug(columnListLog);
             
             var sql = $"INSERT INTO {tableName} ({columnList}) VALUES ({string.Join(", ", parameters)})";
             
             var sqlLog = $"[DynamicQueryBuilder] 생성된 SQL: {sql}";
             var paramLog = $"[DynamicQueryBuilder] 매개변수: {string.Join(", ", paramDict.Select(p => $"{p.Key}={p.Value}"))}";
             
-            Console.WriteLine(sqlLog);
-            Console.WriteLine(paramLog);
-            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {sqlLog}\n");
-            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paramLog}\n");
+            LogManagerService.LogDebug(sqlLog);
+            LogManagerService.LogDebug(paramLog);
             
             return (sql, paramDict);
         }
@@ -600,7 +636,8 @@ namespace LogisticManager.Services
                     {string.Join(", ", parameters)}
                 )";
 
-            Console.WriteLine($"✅ 리플렉션 기반 쿼리 생성 완료 - {columns.Count}개 컬럼");
+            var reflectionCompleteLog = $"✅ 리플렉션 기반 쿼리 생성 완료 - {columns.Count}개 컬럼";
+            LogManagerService.LogInfo(reflectionCompleteLog);
             return (sql, paramDict);
         }
 
@@ -637,12 +674,14 @@ namespace LogisticManager.Services
                 // 필수 필드가 null인 경우 건너뛰기
                 if (column.IsRequired && value == null)
                 {
-                    Console.WriteLine($"⚠️ 필수 필드 '{column.PropertyName}'이 null입니다. 건너뜁니다.");
+                    var requiredFieldNullLog = $"⚠️ 필수 필드 '{column.PropertyName}'이 null입니다. 건너뜁니다.";
+                    LogManagerService.LogWarning(requiredFieldNullLog);
                     continue;
                 }
 
                 var parameterName = $"@{column.PropertyName}";
-                setClauses.Add($"`{column.DatabaseColumn}` = {parameterName}");
+                var safeColumnName = GetSafeColumnName(column.DatabaseColumn);
+                setClauses.Add($"{safeColumnName} = {parameterName}");
                 paramDict[parameterName] = value ?? DBNull.Value;
             }
 
@@ -658,7 +697,8 @@ namespace LogisticManager.Services
                 sql += $" WHERE {whereClause}";
             }
 
-            Console.WriteLine($"✅ 설정 기반 UPDATE 쿼리 생성 완료 - {setClauses.Count}개 컬럼");
+            var updateCompleteLog = $"✅ 설정 기반 UPDATE 쿼리 생성 완료 - {setClauses.Count}개 컬럼";
+            LogManagerService.LogInfo(updateCompleteLog);
             return (sql, paramDict);
         }
 
@@ -715,7 +755,8 @@ namespace LogisticManager.Services
                 sql += $" WHERE {whereClause}";
             }
 
-            Console.WriteLine($"✅ 리플렉션 기반 UPDATE 쿼리 생성 완료 - {setClauses.Count}개 컬럼");
+            var reflectionUpdateCompleteLog = $"✅ 리플렉션 기반 UPDATE 쿼리 생성 완료 - {setClauses.Count}개 컬럼";
+            LogManagerService.LogInfo(reflectionUpdateCompleteLog);
             return (sql, paramDict);
         }
 
@@ -758,7 +799,8 @@ namespace LogisticManager.Services
                 sql += $" WHERE {whereClause}";
             }
 
-            Console.WriteLine($"✅ 설정 기반 DELETE 쿼리 생성 완료");
+            var deleteCompleteLog = $"✅ 설정 기반 DELETE 쿼리 생성 완료";
+            LogManagerService.LogInfo(deleteCompleteLog);
             return (sql, paramDict);
         }
 
@@ -808,7 +850,8 @@ namespace LogisticManager.Services
                 sql += $" WHERE {whereClause}";
             }
 
-            Console.WriteLine($"✅ 리플렉션 기반 DELETE 쿼리 생성 완료");
+            var reflectionDeleteCompleteLog = $"✅ 리플렉션 기반 DELETE 쿼리 생성 완료";
+            LogManagerService.LogInfo(reflectionDeleteCompleteLog);
             return (sql, paramDict);
         }
 
@@ -834,7 +877,8 @@ namespace LogisticManager.Services
                 var property = entity.GetType().GetProperty(propertyName);
                 if (property == null)
                 {
-                    Console.WriteLine($"⚠️ 속성 '{propertyName}'을 찾을 수 없습니다.");
+                    var propertyNotFoundLog = $"⚠️ 속성 '{propertyName}'을 찾을 수 없습니다.";
+                    LogManagerService.LogWarning(propertyNotFoundLog);
                     return null;
                 }
 
@@ -842,7 +886,8 @@ namespace LogisticManager.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ 속성 '{propertyName}' 값 읽기 실패: {ex.Message}");
+                var propertyReadFailLog = $"❌ 속성 '{propertyName}' 값 읽기 실패: {ex.Message}";
+                LogManagerService.LogError(propertyReadFailLog);
                 return null;
             }
         }
@@ -851,20 +896,116 @@ namespace LogisticManager.Services
         /// 속성명을 컬럼명으로 변환
         /// 
         /// 변환 규칙:
-        /// 1. 기본 변환 규칙 적용 (카멜케이스 → 스네이크케이스)
-        /// 2. 특수문자 처리
+        /// 1. 한글 컬럼명 매핑 우선 적용
+        /// 2. 기본 변환 규칙 적용 (카멜케이스 → 스네이크케이스)
+        /// 3. 특수문자 처리
         /// 
         /// 변환 예시:
-        /// - RecipientName → recipient_name
-        /// - OrderNumber → order_number
-        /// - ProductCode → product_code
+        /// - RecipientName → 수취인명 (한글 매핑)
+        /// - OrderNumber → 주문번호 (한글 매핑)
+        /// - ProductCode → 상품코드 (한글 매핑)
         /// </summary>
         /// <param name="property">속성 정보</param>
         /// <returns>컬럼명</returns>
         private string GetColumnName(PropertyInfo property)
         {
+            // 한글 컬럼명 매핑 우선 적용
+            var koreanColumnName = GetKoreanColumnName(property.Name);
+            if (!string.IsNullOrEmpty(koreanColumnName))
+            {
+                return koreanColumnName;
+            }
+
             // 기본 변환 규칙 적용 (카멜케이스 → 스네이크케이스)
             return ConvertToSnakeCase(property.Name);
+        }
+
+        /// <summary>
+        /// 영문 속성명을 실제 데이터베이스 컬럼명으로 변환
+        /// 
+        /// 매핑 규칙 (실제 DB 컬럼명 기준):
+        /// - RecipientName → 수취인명
+        /// - OrderNumber → 주문번호
+        /// - ProductCode → 품목코드
+        /// - Phone1 → 전화번호1
+        /// - Phone2 → 전화번호2
+        /// - ZipCode → 우편번호
+        /// - Address → 주소
+        /// - OptionName → 옵션명
+        /// - Quantity → 수량
+        /// - ProductName → 송장명
+        /// - ProductCount → 품목개수
+        /// - SpecialNote → 배송메세지
+        /// - StoreName → 쇼핑몰
+        /// - CollectedAt → 수집시간
+        /// - OrderAmount → 주문금액
+        /// - PaymentAmount → 결제금액
+        /// - PaymentMethod → 결제수단
+        /// - TaxType → 면과세구분
+        /// - OrderStatus → 주문상태
+        /// - DeliveryCost → 택배비용
+        /// - BoxSize → 박스크기
+        /// - DeliveryQuantity → 택배수량
+        /// - ShippingType → 배송송
+        /// - PrintCount → 출력개수
+        /// - InvoiceQuantity → 송장수량
+        /// - InvoiceSeparator → 송장구분자
+        /// - InvoiceType → 송장구분
+        /// - InvoiceTypeFinal → 송장구분최종
+        /// - Location → 위치
+        /// - LocationConverted → 위치변환
+        /// - Star1 → 별표1
+        /// - Star2 → 별표2
+        /// - OrderNumberMall → 주문번호(쇼핑몰)
+        /// - DeliveryQuantity1 → 택배수량1
+        /// - DeliveryQuantitySum → 택배수량합산
+        /// </summary>
+        /// <param name="propertyName">영문 속성명</param>
+        /// <returns>실제 DB 컬럼명 또는 빈 문자열</returns>
+        private string GetKoreanColumnName(string propertyName)
+        {
+            return propertyName switch
+            {
+                // 한글 컬럼명 (확인됨)
+                "RecipientName" => "수취인명",
+                "OrderNumber" => "주문번호",
+                "ProductCode" => "품목코드",
+                "Phone1" => "전화번호1",
+                "Phone2" => "전화번호2",
+                "ZipCode" => "우편번호",
+                "Address" => "주소",
+                "OptionName" => "옵션명",
+                "Quantity" => "수량",
+                
+                // 영문 컬럼명 (추정)
+                "ProductName" => "송장명",
+                "ProductCount" => "품목개수",
+                "SpecialNote" => "배송메세지",
+                "StoreName" => "쇼핑몰",
+                "CollectedAt" => "수집시간",
+                "OrderAmount" => "주문금액",
+                "PaymentAmount" => "결제금액",
+                "PaymentMethod" => "결제수단",
+                "TaxType" => "면과세구분",
+                "OrderStatus" => "주문상태",
+                "DeliveryCost" => "택배비용",
+                "BoxSize" => "박스크기",
+                "DeliveryQuantity" => "택배수량",
+                "ShippingType" => "배송송",
+                "PrintCount" => "출력개수",
+                "InvoiceQuantity" => "송장수량",
+                "InvoiceSeparator" => "송장구분자",
+                "InvoiceType" => "송장구분",
+                "InvoiceTypeFinal" => "송장구분최종",
+                "Location" => "위치",
+                "LocationConverted" => "위치변환",
+                "Star1" => "별표1",
+                "Star2" => "별표2",
+                "OrderNumberMall" => "주문번호(쇼핑몰)",
+                "DeliveryQuantity1" => "택배수량1",
+                "DeliveryQuantitySum" => "택배수량합산",
+                _ => string.Empty
+            };
         }
 
         /// <summary>
@@ -921,6 +1062,29 @@ namespace LogisticManager.Services
                 .FirstOrDefault(p => p.Name == mapping.PrimaryKey);
 
             return primaryKeyProperty?.Name ?? string.Empty;
+        }
+
+        /// <summary>
+        /// 컬럼명을 안전한 SQL 형식으로 변환
+        /// 
+        /// 변환 규칙:
+        /// 1. 모든 컬럼명을 백틱(`)으로 감싸기 (안전성 보장)
+        /// 2. 특수문자(괄호, 공백, 하이픈 등)가 포함된 컬럼명도 안전하게 처리
+        /// 
+        /// 변환 예시:
+        /// - 주문번호(쇼핑몰) → `주문번호(쇼핑몰)`
+        /// - 수취인명 → `수취인명`
+        /// - msg1 → `msg1`
+        /// </summary>
+        /// <param name="columnName">원본 컬럼명</param>
+        /// <returns>안전한 SQL 컬럼명</returns>
+        private string GetSafeColumnName(string columnName)
+        {
+            if (string.IsNullOrEmpty(columnName))
+                return columnName;
+
+            // 모든 컬럼명을 백틱으로 감싸기 (안전성 보장)
+            return $"`{columnName}`";
         }
 
         /// <summary>
@@ -996,6 +1160,166 @@ namespace LogisticManager.Services
         }
 
         #endregion
+
+        /// <summary>
+        /// 테이블별 매핑 파일을 DynamicTableMapping 형식으로 변환
+        /// </summary>
+        /// <param name="jsonContent">JSON 파일 내용</param>
+        /// <param name="tableName">테이블명</param>
+        /// <returns>DynamicTableMapping 객체</returns>
+        private static DynamicTableMapping? ConvertTableMappingFile(string jsonContent, string tableName)
+        {
+            try
+            {
+                var jsonElement = JsonConvert.DeserializeObject<dynamic>(jsonContent);
+                if (jsonElement == null) return null;
+
+                var tableMapping = new DynamicTableMapping
+                {
+                    TableName = tableName,
+                    Columns = new List<DynamicColumnMapping>()
+                };
+
+                // columns 속성에서 컬럼 정보 추출
+                if (jsonElement.columns != null)
+                {
+                    foreach (var column in jsonElement.columns)
+                    {
+                        var columnMapping = new DynamicColumnMapping
+                        {
+                            PropertyName = GetPropertyNameFromColumnName(column.Name), // 엑셀 컬럼명을 영문 속성명으로 변환
+                            DatabaseColumn = column.Value.db_column ?? column.Name, // DB 컬럼명
+                            DataType = column.Value.data_type ?? "VARCHAR",
+                            IsRequired = column.Value.required ?? false,
+                            ExcludeFromInsert = false,
+                            ExcludeFromUpdate = false,
+                            IsAutoIncrement = false,
+                            IsPrimaryKey = false
+                        };
+
+                        tableMapping.Columns.Add(columnMapping);
+                    }
+                }
+
+                return tableMapping;
+            }
+            catch (Exception ex)
+            {
+                LogManagerService.LogError($"[ConvertTableMappingFile] 변환 실패 ({tableName}): {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 프로젝트 루트 디렉토리를 찾는 메서드
+        /// </summary>
+        /// <returns>프로젝트 루트 디렉토리 경로</returns>
+        private static string GetProjectRootDirectory()
+        {
+            try
+            {
+                // 현재 실행 디렉토리에서 시작하여 프로젝트 루트를 찾기
+                var currentDir = Directory.GetCurrentDirectory();
+                
+                // bin\Debug\net8.0-windows\win-x64 같은 하위 폴더들을 거슬러 올라가기
+                while (!string.IsNullOrEmpty(currentDir))
+                {
+                    // config 폴더가 있는지 확인
+                    var configPath = Path.Combine(currentDir, "config");
+                    if (Directory.Exists(configPath))
+                    {
+                        return currentDir;
+                    }
+                    
+                    // 상위 디렉토리로 이동
+                    var parentDir = Directory.GetParent(currentDir);
+                    if (parentDir == null)
+                    {
+                        break;
+                    }
+                    currentDir = parentDir.FullName;
+                }
+                
+                // 프로젝트 루트를 찾지 못한 경우 현재 실행 디렉토리 반환
+                return Directory.GetCurrentDirectory();
+            }
+            catch (Exception)
+            {
+                // 오류 발생 시 현재 실행 디렉토리 반환
+                return Directory.GetCurrentDirectory();
+            }
+        }
+
+        /// <summary>
+        /// 엑셀 컬럼명을 영문 속성명으로 변환
+        /// </summary>
+        /// <param name="columnName">엑셀 컬럼명</param>
+        /// <returns>영문 속성명</returns>
+        private static string GetPropertyNameFromColumnName(string columnName)
+        {
+            return columnName switch
+            {
+                // 기본 메시지 필드
+                "msg1" => "Msg1",
+                "msg2" => "Msg2",
+                "msg3" => "Msg3",
+                "msg4" => "Msg4",
+                "msg5" => "Msg5",
+                "msg6" => "Msg6",
+                
+                // 수취인 정보
+                "수취인명" => "RecipientName",
+                "전화번호1" => "Phone1",
+                "전화번호2" => "Phone2",
+                "우편번호" => "ZipCode",
+                "주소" => "Address",
+                
+                // 상품 정보
+                "옵션명" => "OptionName",
+                "수량" => "Quantity",
+                "송장명" => "ProductName",
+                "품목코드" => "ProductCode",
+                "품목개수" => "ProductCount",
+                
+                // 주문 정보
+                "배송메세지" => "SpecialNote",
+                "주문번호" => "OrderNumber",
+                "쇼핑몰" => "StoreName",
+                "수집시간" => "CollectedAt",
+                "주문번호(쇼핑몰)" => "OrderNumberMall",
+                "주문금액" => "OrderAmount",
+                "결제금액" => "PaymentAmount",
+                "결제수단" => "PaymentMethod",
+                "면과세구분" => "TaxType",
+                "주문상태" => "OrderStatus",
+                
+                // 배송 정보
+                "택배비용" => "DeliveryCost",
+                "박스크기" => "BoxSize",
+                "택배수량" => "DeliveryQuantity",
+                "택배수량1" => "DeliveryQuantity1",
+                "택배수량합산" => "DeliveryQuantitySum",
+                "배송송" => "ShippingType",
+                
+                // 송장 정보
+                "출력개수" => "PrintCount",
+                "송장수량" => "InvoiceQuantity",
+                "송장구분자" => "InvoiceSeparator",
+                "송장구분" => "InvoiceType",
+                "송장구분최종" => "InvoiceTypeFinal",
+                
+                // 위치 정보
+                "위치" => "Location",
+                "위치변환" => "LocationConverted",
+                
+                // 기타
+                "별표1" => "Star1",
+                "별표2" => "Star2",
+                
+                // 기본값: 원본 컬럼명 사용
+                _ => columnName
+            };
+        }
     }
 
     /// <summary>

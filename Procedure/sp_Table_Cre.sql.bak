@@ -16,6 +16,7 @@ BEGIN
     TRUNCATE TABLE gramwonlogis2.송장출력_관리자;
     TRUNCATE TABLE gramwonlogis2.송장출력_관리자_배송메세지;
     TRUNCATE TABLE gramwonlogis2.송장출력_관리자_이름;
+	TRUNCATE TABLE gramwonlogis2.별표송장;
 
 END $$
 

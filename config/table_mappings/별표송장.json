@@ -1,0 +1,96 @@
+{
+  "version": "1.0",
+  "description": "별표송장 테이블 컬럼 매핑",
+  "created_date": "2025-08-17",
+  "last_updated": "2025-08-17",
+  
+  "table_info": {
+    "table_name": "별표송장",
+    "description": "별표송장 정보 테이블",
+    "is_active": true,
+    "processing_order": 5
+  },
+  
+  "columns": {
+    "품번코드": {
+      "db_column": "품번코드",
+      "data_type": "varchar(255)",
+      "required": false,
+      "description": "품번 코드",
+      "excel_column_index": 1,
+      "validation": {
+        "max_length": 255
+      }
+    },
+    "상품명": {
+      "db_column": "상품명",
+      "data_type": "varchar(255)",
+      "required": false,
+      "description": "상품명",
+      "excel_column_index": 2,
+      "validation": {
+        "max_length": 255
+      }
+    },
+    "적요": {
+      "db_column": "적요",
+      "data_type": "varchar(255)",
+      "required": false,
+      "description": "적요",
+      "excel_column_index": 3,
+      "validation": {
+        "max_length": 255
+      }
+    },
+    "배송메세지": {
+      "db_column": "배송메세지",
+      "data_type": "varchar(255)",
+      "required": false,
+      "description": "배송 메시지",
+      "excel_column_index": 4,
+      "validation": {
+        "max_length": 255
+      }
+    },
+    "수취인명": {
+      "db_column": "수취인명",
+      "data_type": "varchar(255)",
+      "required": false,
+      "description": "수취인명",
+      "excel_column_index": 5,
+      "validation": {
+        "max_length": 255
+      }
+    },
+    "내용": {
+      "db_column": "내용",
+      "data_type": "varchar(255)",
+      "required": false,
+      "description": "내용",
+      "excel_column_index": 6,
+      "validation": {
+        "max_length": 255
+      }
+    }
+  },
+  
+  "business_rules": {
+    "description": "별표송장 처리 규칙",
+    "rules": [
+      "모든 컬럼은 varchar(255) 타입",
+      "품번코드와 상품명으로 상품 식별",
+      "배송메세지와 수취인명은 배송 정보",
+      "데이터 검증 후 처리"
+    ]
+  },
+  
+  "data_quality": {
+    "description": "데이터 품질 관리 규칙",
+    "rules": [
+      "데이터 타입 검증",
+      "범위 값 검증",
+      "형식 검증",
+      "허용 값 검증"
+    ]
+  }
+}

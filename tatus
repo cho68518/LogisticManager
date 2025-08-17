@@ -1,5 +1,10 @@
-[33m366e2b6[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m  단일 실행 파일 생성 및 GitHub 계정 변경
-[33mbaeedf0[m  대규모 리팩토링 및 기능 개선 완료
-[33mef0c3b0[m  최적화 및 개선사항 적용
-[33m81f6b72[m feat: 전체 프로젝트 상세한 한글 주석 추가 및 코드 구조 개선
-[33m416c0c3[m  송장 처리 자동화 시스템 완성 - 주요 기능: Excel 파일 처리, 출고지별 분류, Dropbox 업로드, 카카오워크 알림 - UI 개선: 모던한 디자인, 반응형 레이아웃, 설정 화면 - API 설정 탭 숨김 처리 - 최종 README.md 작성 완료
+[33mdbf9086[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m  대규모 리팩토링 및 기능 개선 완료
+[33m15f031f[m 프로시저 오류 처리 개선 및 C# 코드 최적화
+[33mce78fd6[m 프로시저 로깅 디버깅 강화 - DatabaseService 직접 사용 시 상세한 디버깅 정보 추가 및 StoredProcedure 타입으로 실행 방식 개선
+[33m889d7b0[m 프로시저 로깅 시스템 개선 - sp_SeoulProcessF 프로시저 실행 결과를 상세하게 파싱하여 단계별 처리 건수 표시
+[33m9feb0be[m 프로시저 로깅 시스템 구현 완료 - sp_ProcessStarInvoice 프로시저 실행 결과를 app.log 파일에 상세 로깅하는 시스템 추가
+[33ma6f3e4e[m fix: 별표송장 테이블 상품명 컬럼 매핑 수정
+[33m5469964[m fix: 별표송장 테이블 컬럼 매핑 문제 해결 및 디버깅 로깅 개선
+[33m084fd19[m feat: 로그 관리 시스템 개선 및 새로운 모델/프로시저 추가
+[33mc781f6a[m Update LogisticManager project - Add all source files and latest changes
+[33m6dbb686[m  DatabaseService 및 InvoiceProcessor 개선 - null 참조 문제 해결

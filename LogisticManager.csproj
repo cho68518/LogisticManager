@@ -41,9 +41,9 @@
   <ItemGroup>
     <!-- 필요한 설정 파일들만 포함 -->
     <EmbeddedResource Include="App.config" />
-    <EmbeddedResource Include="column_mapping.json" />
-    <EmbeddedResource Include="table_mappings.json" />
-    <EmbeddedResource Include="settings.json" />
+    <EmbeddedResource Include="config\column_mapping.json" />
+    <EmbeddedResource Include="config\table_mappings.json" />
+    <EmbeddedResource Include="config\settings.json" />
   </ItemGroup>
 
   <ItemGroup>

@@ -5,142 +5,179 @@ DROP PROCEDURE IF EXISTS sp_MergePacking$$
 CREATE PROCEDURE sp_MergePacking()
 BEGIN
     /*--================================================================================
-	-- ì†¡ìž¥ì¶œë ¥_íŠ¹ìˆ˜ì¶œë ¥_í•©í¬ìž¥ (í•©í¬ìž¥ ì²˜ë¦¬)
+	-- ÇÕÆ÷Àå Ã³¸®
+    -- °¢ ´Ü°èº° Ã³¸®µÈ ÇàÀÇ ¼ö¸¦ ¹ÝÈ¯ÇÏµµ·Ï ¼öÁ¤
     --================================================================================*/
-    -- ì˜¤ë¥˜ ì²˜ë¦¬ìš© ë³€ìˆ˜ë“¤ (EXIT HANDLERì—ì„œ ì‚¬ìš©)
-    DECLARE error_info TEXT DEFAULT '';
-    DECLARE error_code INT DEFAULT 0;
-	
-    -- ì˜¤ë¥˜ ë°œìƒ ì‹œ ìžë™ ë¡¤ë°±, ìƒì„¸í•œ ì˜¤ë¥˜ ë©”ì‹œì§€ë¥¼ ë°˜í™˜
+    -- DECLARE ¹®Àº ´Ù¸¥ ½ÇÇà¹®º¸´Ù Ç×»ó ¸ÕÀú ¿Í¾ß ÇÕ´Ï´Ù.
+    DECLARE v_sqlstate CHAR(5);
+    DECLARE v_error_no INT;
+    DECLARE v_error_message TEXT;
+
+    -- ¿À·ù ¹ß»ý ½Ã ÀÚµ¿À¸·Î ·Ñ¹éÇÏ°í »ó¼¼ÇÑ ¿À·ù ¸Þ½ÃÁö¸¦ ¹ÝÈ¯ÇÏ´Â ÄÚµå ºí·Ï
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-		-- MySQL ì˜¤ë¥˜ ì •ë³´ ìˆ˜ì§‘
-		GET DIAGNOSTICS CONDITION 1
-			error_code = MYSQL_ERRNO,
-			error_info = MESSAGE_TEXT;
+        -- ¹ß»ýÇÑ ¿À·ùÀÇ »ó¼¼ Á¤º¸¸¦ °¡Á®¿É´Ï´Ù.
+        GET DIAGNOSTICS CONDITION 1
+            v_sqlstate = RETURNED_SQLSTATE,
+            v_error_no = MYSQL_ERRNO,
+            v_error_message = MESSAGE_TEXT;
 
+        -- Æ®·£Àè¼ÇÀ» ·Ñ¹éÇÕ´Ï´Ù.
         ROLLBACK;
+
+        -- ÀÓ½Ã Å×ÀÌºíÀÌ Á¸ÀçÇÏ¸é »èÁ¦ÇÕ´Ï´Ù.
         DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
-        SELECT 'ì˜¤ë¥˜ê°€ ë°œìƒí•˜ì—¬ ëª¨ë“  ìž‘ì—…ì´ ë¡¤ë°±ë˜ì—ˆìŠµë‹ˆë‹¤.' AS ErrorMessage,
-		        error_code AS MySQLErrorCode,
-                error_info AS MySQLErrorMessage;
+
+        -- »ó¼¼ÇÑ ¿À·ù ¸Þ½ÃÁö¸¦ ¹ÝÈ¯ÇÕ´Ï´Ù.
+        SELECT CONCAT(
+            'Error (SQLSTATE: ', v_sqlstate, ', Error No: ', v_error_no, '): ', v_error_message, 
+            ' | The transaction was rolled back.'
+        ) AS ErrorMessage;
     END;
 
+    -- DECLARE ¹®µéÀÌ ¸ðµÎ ³¡³­ ÈÄ ÀÓ½Ã Å×ÀÌºí »ý¼º ¹× ±âÅ¸ ·ÎÁ÷À» ½ÃÀÛÇÕ´Ï´Ù.
     CREATE TEMPORARY TABLE IF NOT EXISTS sp_execution_log (
 		StepID INT AUTO_INCREMENT PRIMARY KEY,
 		OperationDescription VARCHAR(255),
 		AffectedRows INT
 	);
-	
-    -- íŠ¸ëžœìž­ì…˜ ì‹œìž‘
+
+    -- Æ®·£Àè¼Ç ½ÃÀÛ
     START TRANSACTION;
 
-    -- ìž„ì‹œ ë¡œê·¸ í…Œì´ë¸” ì´ˆê¸°í™”
+    -- ÀÓ½Ã ·Î±× Å×ÀÌºí ÃÊ±âÈ­
     TRUNCATE TABLE sp_execution_log;
-	
-    -- ëŒ€ì²´ì½”ë“œ1ì´ ìžˆëŠ” ë°ì´í„° ì²˜ë¦¬
-    INSERT INTO ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ (
-        msg1, msg2, msg3, msg4, msg5, msg6, íƒë°°ë¹„ìš©, ì „í™”ë²ˆí˜¸1, ì „í™”ë²ˆí˜¸2, ìš°íŽ¸ë²ˆí˜¸, ì£¼ì†Œ,
-        ìˆ˜ëŸ‰, ë°°ì†¡ë©”ì„¸ì§€, ì£¼ë¬¸ë²ˆí˜¸, ì‡¼í•‘ëª°, ìˆ˜ì§‘ì‹œê°„, ì†¡ìž¥ëª…, 
-        í’ˆëª©ì½”ë“œ, ì˜µì…˜ëª…, ë°•ìŠ¤í¬ê¸°, ì¶œë ¥ê°œìˆ˜, ì†¡ìž¥ìˆ˜ëŸ‰, 
-        ë³„í‘œ1, ë³„í‘œ2, í’ˆëª©ê°œìˆ˜, íƒë°°ìˆ˜ëŸ‰, íƒë°°ìˆ˜ëŸ‰1, íƒë°°ìˆ˜ëŸ‰í•©ì‚°,
-        ì†¡ìž¥êµ¬ë¶„ìž, ì†¡ìž¥êµ¬ë¶„, ì†¡ìž¥êµ¬ë¶„ìµœì¢…, ìœ„ì¹˜, ìœ„ì¹˜ë³€í™˜, `ì£¼ë¬¸ë²ˆí˜¸(ì‡¼í•‘ëª°)`, ê²°ì œê¸ˆì•¡, ì£¼ë¬¸ê¸ˆì•¡, 
-        ê²°ì œìˆ˜ë‹¨, ë©´ê³¼ì„¸êµ¬ë¶„, ì£¼ë¬¸ìƒíƒœ, ë°°ì†¡ì†¡
+
+    -- ´ëÃ¼ÄÚµå1ÀÌ ÀÖ´Â µ¥ÀÌÅÍ Ã³¸®
+    INSERT INTO ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ (
+        msg1, msg2, msg3, msg4, msg5, msg6, ÅÃ¹èºñ¿ë, ÀüÈ­¹øÈ£1, ÀüÈ­¹øÈ£2, ¿ìÆí¹øÈ£, ÁÖ¼Ò,
+        ¼ö·®, ¹è¼Û¸Þ¼¼Áö, ÁÖ¹®¹øÈ£, ¼îÇÎ¸ô, ¼öÁý½Ã°£, ¼ÛÀå¸í, 
+        Ç°¸ñÄÚµå, ¿É¼Ç¸í, ¹Ú½ºÅ©±â, Ãâ·Â°³¼ö, ¼ÛÀå¼ö·®, 
+        º°Ç¥1, º°Ç¥2, Ç°¸ñ°³¼ö, ÅÃ¹è¼ö·®, ÅÃ¹è¼ö·®1, ÅÃ¹è¼ö·®ÇÕ»ê,
+        ¼ÛÀå±¸ºÐÀÚ, ¼ÛÀå±¸ºÐ, ¼ÛÀå±¸ºÐÃÖÁ¾, À§Ä¡, À§Ä¡º¯È¯, `ÁÖ¹®¹øÈ£(¼îÇÎ¸ô)`, °áÁ¦±Ý¾×, ÁÖ¹®±Ý¾×, 
+        °áÁ¦¼ö´Ü, ¸é°ú¼¼±¸ºÐ, ÁÖ¹®»óÅÂ, ¹è¼Û¼Û
     )
     SELECT
         dev.msg1, dev.msg2, dev.msg3, dev.msg4, dev.msg5, dev.msg6, 
-        dev.íƒë°°ë¹„ìš©, dev.ì „í™”ë²ˆí˜¸1, dev.ì „í™”ë²ˆí˜¸2, dev.ìš°íŽ¸ë²ˆí˜¸, dev.ì£¼ì†Œ,
-        (dev.ìˆ˜ëŸ‰ * CAST(spec.ëŒ€ì²´1ìˆ˜ëŸ‰ AS DECIMAL(10,2))), dev.ë°°ì†¡ë©”ì„¸ì§€, dev.ì£¼ë¬¸ë²ˆí˜¸, dev.ì‡¼í•‘ëª°, dev.ìˆ˜ì§‘ì‹œê°„, dev.ì†¡ìž¥ëª…, 
-        spec.ëŒ€ì²´ì½”ë“œ1, spec.ëŒ€ì²´ì½”ë“œ1í’ˆëª©ëª…, 
+        dev.ÅÃ¹èºñ¿ë, dev.ÀüÈ­¹øÈ£1, dev.ÀüÈ­¹øÈ£2, dev.¿ìÆí¹øÈ£, dev.ÁÖ¼Ò,
+        (dev.¼ö·® * CAST(spec.´ëÃ¼1¼ö·® AS DECIMAL(10,2))) AS ¼ö·®, dev.¹è¼Û¸Þ¼¼Áö, dev.ÁÖ¹®¹øÈ£, dev.¼îÇÎ¸ô, dev.¼öÁý½Ã°£, dev.¼ÛÀå¸í, 
+        spec.´ëÃ¼ÄÚµå1, spec.´ëÃ¼ÄÚµå1Ç°¸ñ¸í, 
         NULL, NULL, NULL,
-        dev.ë³„í‘œ1, dev.ë³„í‘œ2, dev.í’ˆëª©ê°œìˆ˜, dev.íƒë°°ìˆ˜ëŸ‰, dev.íƒë°°ìˆ˜ëŸ‰1, dev.íƒë°°ìˆ˜ëŸ‰í•©ì‚°,
-        dev.ì†¡ìž¥êµ¬ë¶„ìž, dev.ì†¡ìž¥êµ¬ë¶„, dev.ì†¡ìž¥êµ¬ë¶„ìµœì¢…, dev.ìœ„ì¹˜, dev.ìœ„ì¹˜ë³€í™˜, dev.`ì£¼ë¬¸ë²ˆí˜¸(ì‡¼í•‘ëª°)`, dev.ê²°ì œê¸ˆì•¡, dev.ì£¼ë¬¸ê¸ˆì•¡, 
-        dev.ê²°ì œìˆ˜ë‹¨, dev.ë©´ê³¼ì„¸êµ¬ë¶„, dev.ì£¼ë¬¸ìƒíƒœ, dev.ë°°ì†¡ì†¡
-    FROM ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ dev
-    JOIN ì†¡ìž¥ì¶œë ¥_íŠ¹ìˆ˜ì¶œë ¥_í•©í¬ìž¥ë³€ê²½ spec ON dev.í’ˆëª©ì½”ë“œ = spec.í’ˆëª©ì½”ë“œ
-    WHERE spec.ëŒ€ì²´ì½”ë“œ1 IS NOT NULL AND spec.ëŒ€ì²´ì½”ë“œ1 != '';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ëŒ€ì²´ì½”ë“œ1 ì²˜ë¦¬', ROW_COUNT());
-	
-    -- ëŒ€ì²´ì½”ë“œ2ê°€ ìžˆëŠ” ë°ì´í„° ì²˜ë¦¬
-    INSERT INTO ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ (
-        msg1, msg2, msg3, msg4, msg5, msg6, íƒë°°ë¹„ìš©, ì „í™”ë²ˆí˜¸1, ì „í™”ë²ˆí˜¸2, ìš°íŽ¸ë²ˆí˜¸, ì£¼ì†Œ,
-        ìˆ˜ëŸ‰, ë°°ì†¡ë©”ì„¸ì§€, ì£¼ë¬¸ë²ˆí˜¸, ì‡¼í•‘ëª°, ìˆ˜ì§‘ì‹œê°„, ì†¡ìž¥ëª…, 
-        í’ˆëª©ì½”ë“œ, ì˜µì…˜ëª…, ë°•ìŠ¤í¬ê¸°, ì¶œë ¥ê°œìˆ˜, ì†¡ìž¥ìˆ˜ëŸ‰, 
-        ë³„í‘œ1, ë³„í‘œ2, í’ˆëª©ê°œìˆ˜, íƒë°°ìˆ˜ëŸ‰, íƒë°°ìˆ˜ëŸ‰1, íƒë°°ìˆ˜ëŸ‰í•©ì‚°,
-        ì†¡ìž¥êµ¬ë¶„ìž, ì†¡ìž¥êµ¬ë¶„, ì†¡ìž¥êµ¬ë¶„ìµœì¢…, ìœ„ì¹˜, ìœ„ì¹˜ë³€í™˜, `ì£¼ë¬¸ë²ˆí˜¸(ì‡¼í•‘ëª°)`, ê²°ì œê¸ˆì•¡, ì£¼ë¬¸ê¸ˆì•¡, 
-        ê²°ì œìˆ˜ë‹¨, ë©´ê³¼ì„¸êµ¬ë¶„, ì£¼ë¬¸ìƒíƒœ, ë°°ì†¡ì†¡
+        dev.º°Ç¥1, dev.º°Ç¥2, dev.Ç°¸ñ°³¼ö, dev.ÅÃ¹è¼ö·®, dev.ÅÃ¹è¼ö·®1, dev.ÅÃ¹è¼ö·®ÇÕ»ê,
+        dev.¼ÛÀå±¸ºÐÀÚ, dev.¼ÛÀå±¸ºÐ, dev.¼ÛÀå±¸ºÐÃÖÁ¾, dev.À§Ä¡, dev.À§Ä¡º¯È¯, dev.`ÁÖ¹®¹øÈ£(¼îÇÎ¸ô)`, dev.°áÁ¦±Ý¾×, dev.ÁÖ¹®±Ý¾×, 
+        dev.°áÁ¦¼ö´Ü, dev.¸é°ú¼¼±¸ºÐ, dev.ÁÖ¹®»óÅÂ, dev.¹è¼Û¼Û
+    FROM ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ dev
+    JOIN ¼ÛÀåÃâ·Â_Æ¯¼öÃâ·Â_ÇÕÆ÷Àåº¯°æ spec ON dev.Ç°¸ñÄÚµå = spec.Ç°¸ñÄÚµå
+    WHERE spec.´ëÃ¼ÄÚµå1 IS NOT NULL AND spec.´ëÃ¼ÄÚµå1 != '';
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ´ëÃ¼ÄÚµå1 Ã³¸®', ROW_COUNT());
+
+    -- ´ëÃ¼ÄÚµå2°¡ ÀÖ´Â µ¥ÀÌÅÍ Ã³¸®
+    INSERT INTO ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ (
+        msg1, msg2, msg3, msg4, msg5, msg6, ÅÃ¹èºñ¿ë, ÀüÈ­¹øÈ£1, ÀüÈ­¹øÈ£2, ¿ìÆí¹øÈ£, ÁÖ¼Ò,
+        ¼ö·®, ¹è¼Û¸Þ¼¼Áö, ÁÖ¹®¹øÈ£, ¼îÇÎ¸ô, ¼öÁý½Ã°£, ¼ÛÀå¸í, 
+        Ç°¸ñÄÚµå, ¿É¼Ç¸í, ¹Ú½ºÅ©±â, Ãâ·Â°³¼ö, ¼ÛÀå¼ö·®, 
+        º°Ç¥1, º°Ç¥2, Ç°¸ñ°³¼ö, ÅÃ¹è¼ö·®, ÅÃ¹è¼ö·®1, ÅÃ¹è¼ö·®ÇÕ»ê,
+        ¼ÛÀå±¸ºÐÀÚ, ¼ÛÀå±¸ºÐ, ¼ÛÀå±¸ºÐÃÖÁ¾, À§Ä¡, À§Ä¡º¯È¯, `ÁÖ¹®¹øÈ£(¼îÇÎ¸ô)`, °áÁ¦±Ý¾×, ÁÖ¹®±Ý¾×, 
+        °áÁ¦¼ö´Ü, ¸é°ú¼¼±¸ºÐ, ÁÖ¹®»óÅÂ, ¹è¼Û¼Û
     )
     SELECT
         dev.msg1, dev.msg2, dev.msg3, dev.msg4, dev.msg5, dev.msg6, 
-        dev.íƒë°°ë¹„ìš©, dev.ì „í™”ë²ˆí˜¸1, dev.ì „í™”ë²ˆí˜¸2, dev.ìš°íŽ¸ë²ˆí˜¸, dev.ì£¼ì†Œ,
-        (dev.ìˆ˜ëŸ‰ * CAST(spec.ëŒ€ì²´2ìˆ˜ëŸ‰ AS DECIMAL(10,2))), dev.ë°°ì†¡ë©”ì„¸ì§€, dev.ì£¼ë¬¸ë²ˆí˜¸, dev.ì‡¼í•‘ëª°, dev.ìˆ˜ì§‘ì‹œê°„, dev.ì†¡ìž¥ëª…, 
-        spec.ëŒ€ì²´ì½”ë“œ2, spec.ëŒ€ì²´ì½”ë“œ2í’ˆëª©ëª…, 
+        dev.ÅÃ¹èºñ¿ë, dev.ÀüÈ­¹øÈ£1, dev.ÀüÈ­¹øÈ£2, dev.¿ìÆí¹øÈ£, dev.ÁÖ¼Ò,
+        (dev.¼ö·® * CAST(spec.´ëÃ¼2¼ö·® AS DECIMAL(10,2))) AS ¼ö·®, dev.¹è¼Û¸Þ¼¼Áö, dev.ÁÖ¹®¹øÈ£, dev.¼îÇÎ¸ô, dev.¼öÁý½Ã°£, dev.¼ÛÀå¸í, 
+        spec.´ëÃ¼ÄÚµå2, spec.´ëÃ¼ÄÚµå2Ç°¸ñ¸í, 
         NULL, NULL, NULL,
-        dev.ë³„í‘œ1, dev.ë³„í‘œ2, dev.í’ˆëª©ê°œìˆ˜, dev.íƒë°°ìˆ˜ëŸ‰, dev.íƒë°°ìˆ˜ëŸ‰1, dev.íƒë°°ìˆ˜ëŸ‰í•©ì‚°,
-        dev.ì†¡ìž¥êµ¬ë¶„ìž, dev.ì†¡ìž¥êµ¬ë¶„, dev.ì†¡ìž¥êµ¬ë¶„ìµœì¢…, dev.ìœ„ì¹˜, dev.ìœ„ì¹˜ë³€í™˜, dev.`ì£¼ë¬¸ë²ˆí˜¸(ì‡¼í•‘ëª°)`, 0, 0,
-        dev.ê²°ì œìˆ˜ë‹¨, dev.ë©´ê³¼ì„¸êµ¬ë¶„, dev.ì£¼ë¬¸ìƒíƒœ, dev.ë°°ì†¡ì†¡
-    FROM ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ dev
-    JOIN ì†¡ìž¥ì¶œë ¥_íŠ¹ìˆ˜ì¶œë ¥_í•©í¬ìž¥ë³€ê²½ spec ON dev.í’ˆëª©ì½”ë“œ = spec.í’ˆëª©ì½”ë“œ
-    WHERE spec.ëŒ€ì²´ì½”ë“œ2 IS NOT NULL AND spec.ëŒ€ì²´ì½”ë“œ2 != '';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ëŒ€ì²´ì½”ë“œ2 ì²˜ë¦¬', ROW_COUNT());
-	
-    -- ëŒ€ì²´ì½”ë“œ3ì´ ìžˆëŠ” ë°ì´í„° ì²˜ë¦¬
-    INSERT INTO ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ (
-        msg1, msg2, msg3, msg4, msg5, msg6, íƒë°°ë¹„ìš©, ì „í™”ë²ˆí˜¸1, ì „í™”ë²ˆí˜¸2, ìš°íŽ¸ë²ˆí˜¸, ì£¼ì†Œ,
-        ìˆ˜ëŸ‰, ë°°ì†¡ë©”ì„¸ì§€, ì£¼ë¬¸ë²ˆí˜¸, ì‡¼í•‘ëª°, ìˆ˜ì§‘ì‹œê°„, ì†¡ìž¥ëª…, 
-        í’ˆëª©ì½”ë“œ, ì˜µì…˜ëª…, ë°•ìŠ¤í¬ê¸°, ì¶œë ¥ê°œìˆ˜, ì†¡ìž¥ìˆ˜ëŸ‰, 
-        ë³„í‘œ1, ë³„í‘œ2, í’ˆëª©ê°œìˆ˜, íƒë°°ìˆ˜ëŸ‰, íƒë°°ìˆ˜ëŸ‰1, íƒë°°ìˆ˜ëŸ‰í•©ì‚°,
-        ì†¡ìž¥êµ¬ë¶„ìž, ì†¡ìž¥êµ¬ë¶„, ì†¡ìž¥êµ¬ë¶„ìµœì¢…, ìœ„ì¹˜, ìœ„ì¹˜ë³€í™˜, `ì£¼ë¬¸ë²ˆí˜¸(ì‡¼í•‘ëª°)`, ê²°ì œê¸ˆì•¡, ì£¼ë¬¸ê¸ˆì•¡, 
-        ê²°ì œìˆ˜ë‹¨, ë©´ê³¼ì„¸êµ¬ë¶„, ì£¼ë¬¸ìƒíƒœ, ë°°ì†¡ì†¡
+        dev.º°Ç¥1, dev.º°Ç¥2, dev.Ç°¸ñ°³¼ö, dev.ÅÃ¹è¼ö·®, dev.ÅÃ¹è¼ö·®1, dev.ÅÃ¹è¼ö·®ÇÕ»ê,
+        dev.¼ÛÀå±¸ºÐÀÚ, dev.¼ÛÀå±¸ºÐ, dev.¼ÛÀå±¸ºÐÃÖÁ¾, dev.À§Ä¡, dev.À§Ä¡º¯È¯, dev.`ÁÖ¹®¹øÈ£(¼îÇÎ¸ô)`, 0, 0,
+        dev.°áÁ¦¼ö´Ü, dev.¸é°ú¼¼±¸ºÐ, dev.ÁÖ¹®»óÅÂ, dev.¹è¼Û¼Û
+    FROM ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ dev
+    JOIN ¼ÛÀåÃâ·Â_Æ¯¼öÃâ·Â_ÇÕÆ÷Àåº¯°æ spec ON dev.Ç°¸ñÄÚµå = spec.Ç°¸ñÄÚµå
+    WHERE spec.´ëÃ¼ÄÚµå2 IS NOT NULL AND spec.´ëÃ¼ÄÚµå2 != '';
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ´ëÃ¼ÄÚµå2 Ã³¸®', ROW_COUNT());
+
+    -- ´ëÃ¼ÄÚµå3ÀÌ ÀÖ´Â µ¥ÀÌÅÍ Ã³¸®
+    INSERT INTO ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ (
+        msg1, msg2, msg3, msg4, msg5, msg6, ÅÃ¹èºñ¿ë, ÀüÈ­¹øÈ£1, ÀüÈ­¹øÈ£2, ¿ìÆí¹øÈ£, ÁÖ¼Ò,
+        ¼ö·®, ¹è¼Û¸Þ¼¼Áö, ÁÖ¹®¹øÈ£, ¼îÇÎ¸ô, ¼öÁý½Ã°£, ¼ÛÀå¸í, 
+        Ç°¸ñÄÚµå, ¿É¼Ç¸í, ¹Ú½ºÅ©±â, Ãâ·Â°³¼ö, ¼ÛÀå¼ö·®, 
+        º°Ç¥1, º°Ç¥2, Ç°¸ñ°³¼ö, ÅÃ¹è¼ö·®, ÅÃ¹è¼ö·®1, ÅÃ¹è¼ö·®ÇÕ»ê,
+        ¼ÛÀå±¸ºÐÀÚ, ¼ÛÀå±¸ºÐ, ¼ÛÀå±¸ºÐÃÖÁ¾, À§Ä¡, À§Ä¡º¯È¯, `ÁÖ¹®¹øÈ£(¼îÇÎ¸ô)`, °áÁ¦±Ý¾×, ÁÖ¹®±Ý¾×, 
+        °áÁ¦¼ö´Ü, ¸é°ú¼¼±¸ºÐ, ÁÖ¹®»óÅÂ, ¹è¼Û¼Û
     )
     SELECT
         dev.msg1, dev.msg2, dev.msg3, dev.msg4, dev.msg5, dev.msg6, 
-        dev.íƒë°°ë¹„ìš©, dev.ì „í™”ë²ˆí˜¸1, dev.ì „í™”ë²ˆí˜¸2, dev.ìš°íŽ¸ë²ˆí˜¸, dev.ì£¼ì†Œ,
-        (dev.ìˆ˜ëŸ‰ * CAST(spec.ëŒ€ì²´3ìˆ˜ëŸ‰ AS DECIMAL(10,2))), dev.ë°°ì†¡ë©”ì„¸ì§€, dev.ì£¼ë¬¸ë²ˆí˜¸, dev.ì‡¼í•‘ëª°, dev.ìˆ˜ì§‘ì‹œê°„, dev.ì†¡ìž¥ëª…, 
-        spec.ëŒ€ì²´ì½”ë“œ3, spec.ëŒ€ì²´ì½”ë“œ3í’ˆëª©ëª…,
+        dev.ÅÃ¹èºñ¿ë, dev.ÀüÈ­¹øÈ£1, dev.ÀüÈ­¹øÈ£2, dev.¿ìÆí¹øÈ£, dev.ÁÖ¼Ò,
+        (dev.¼ö·® * CAST(spec.´ëÃ¼3¼ö·® AS DECIMAL(10,2))) AS ¼ö·®, dev.¹è¼Û¸Þ¼¼Áö, dev.ÁÖ¹®¹øÈ£, dev.¼îÇÎ¸ô, dev.¼öÁý½Ã°£, dev.¼ÛÀå¸í, 
+        spec.´ëÃ¼ÄÚµå3, spec.´ëÃ¼ÄÚµå3Ç°¸ñ¸í,
         NULL, NULL, NULL,
-        dev.ë³„í‘œ1, dev.ë³„í‘œ2, dev.í’ˆëª©ê°œìˆ˜, dev.íƒë°°ìˆ˜ëŸ‰, dev.íƒë°°ìˆ˜ëŸ‰1, dev.íƒë°°ìˆ˜ëŸ‰í•©ì‚°,
-        dev.ì†¡ìž¥êµ¬ë¶„ìž, dev.ì†¡ìž¥êµ¬ë¶„, dev.ì†¡ìž¥êµ¬ë¶„ìµœì¢…, dev.ìœ„ì¹˜, dev.ìœ„ì¹˜ë³€í™˜, dev.`ì£¼ë¬¸ë²ˆí˜¸(ì‡¼í•‘ëª°)`, 0, 0, 
-        dev.ê²°ì œìˆ˜ë‹¨, dev.ë©´ê³¼ì„¸êµ¬ë¶„, dev.ì£¼ë¬¸ìƒíƒœ, dev.ë°°ì†¡ì†¡
-    FROM ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ dev
-    JOIN ì†¡ìž¥ì¶œë ¥_íŠ¹ìˆ˜ì¶œë ¥_í•©í¬ìž¥ë³€ê²½ spec ON dev.í’ˆëª©ì½”ë“œ = spec.í’ˆëª©ì½”ë“œ
-    WHERE spec.ëŒ€ì²´ì½”ë“œ3 IS NOT NULL AND spec.ëŒ€ì²´ì½”ë“œ3 != '';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ëŒ€ì²´ì½”ë“œ3 ì²˜ë¦¬', ROW_COUNT());
-	
-    -- ëŒ€ì²´ì½”ë“œ4ê°€ ìžˆëŠ” ë°ì´í„° ì²˜ë¦¬
-    INSERT INTO ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ (
-        msg1, msg2, msg3, msg4, msg5, msg6, íƒë°°ë¹„ìš©, ì „í™”ë²ˆí˜¸1, ì „í™”ë²ˆí˜¸2, ìš°íŽ¸ë²ˆí˜¸, ì£¼ì†Œ,
-        ìˆ˜ëŸ‰, ë°°ì†¡ë©”ì„¸ì§€, ì£¼ë¬¸ë²ˆí˜¸, ì‡¼í•‘ëª°, ìˆ˜ì§‘ì‹œê°„, ì†¡ìž¥ëª…, 
-        í’ˆëª©ì½”ë“œ, ì˜µì…˜ëª…, ë°•ìŠ¤í¬ê¸°, ì¶œë ¥ê°œìˆ˜, ì†¡ìž¥ìˆ˜ëŸ‰, 
-        ë³„í‘œ1, ë³„í‘œ2, í’ˆëª©ê°œìˆ˜, íƒë°°ìˆ˜ëŸ‰, íƒë°°ìˆ˜ëŸ‰1, íƒë°°ìˆ˜ëŸ‰í•©ì‚°,
-        ì†¡ìž¥êµ¬ë¶„ìž, ì†¡ìž¥êµ¬ë¶„, ì†¡ìž¥êµ¬ë¶„ìµœì¢…, ìœ„ì¹˜, ìœ„ì¹˜ë³€í™˜, `ì£¼ë¬¸ë²ˆí˜¸(ì‡¼í•‘ëª°)`, ê²°ì œê¸ˆì•¡, ì£¼ë¬¸ê¸ˆì•¡, 
-        ê²°ì œìˆ˜ë‹¨, ë©´ê³¼ì„¸êµ¬ë¶„, ì£¼ë¬¸ìƒíƒœ, ë°°ì†¡ì†¡
+        dev.º°Ç¥1, dev.º°Ç¥2, dev.Ç°¸ñ°³¼ö, dev.ÅÃ¹è¼ö·®, dev.ÅÃ¹è¼ö·®1, dev.ÅÃ¹è¼ö·®ÇÕ»ê,
+        dev.¼ÛÀå±¸ºÐÀÚ, dev.¼ÛÀå±¸ºÐ, dev.¼ÛÀå±¸ºÐÃÖÁ¾, dev.À§Ä¡, dev.À§Ä¡º¯È¯, dev.`ÁÖ¹®¹øÈ£(¼îÇÎ¸ô)`, 0, 0, 
+        dev.°áÁ¦¼ö´Ü, dev.¸é°ú¼¼±¸ºÐ, dev.ÁÖ¹®»óÅÂ, dev.¹è¼Û¼Û
+    FROM ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ dev
+    JOIN ¼ÛÀåÃâ·Â_Æ¯¼öÃâ·Â_ÇÕÆ÷Àåº¯°æ spec ON dev.Ç°¸ñÄÚµå = spec.Ç°¸ñÄÚµå
+    WHERE spec.´ëÃ¼ÄÚµå3 IS NOT NULL AND spec.´ëÃ¼ÄÚµå3 != '';
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ´ëÃ¼ÄÚµå3 Ã³¸®', ROW_COUNT());
+
+    -- ´ëÃ¼ÄÚµå4°¡ ÀÖ´Â µ¥ÀÌÅÍ Ã³¸®
+    INSERT INTO ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ (
+        msg1, msg2, msg3, msg4, msg5, msg6, ÅÃ¹èºñ¿ë, ÀüÈ­¹øÈ£1, ÀüÈ­¹øÈ£2, ¿ìÆí¹øÈ£, ÁÖ¼Ò,
+        ¼ö·®, ¹è¼Û¸Þ¼¼Áö, ÁÖ¹®¹øÈ£, ¼îÇÎ¸ô, ¼öÁý½Ã°£, ¼ÛÀå¸í, 
+        Ç°¸ñÄÚµå, ¿É¼Ç¸í, ¹Ú½ºÅ©±â, Ãâ·Â°³¼ö, ¼ÛÀå¼ö·®, 
+        º°Ç¥1, º°Ç¥2, Ç°¸ñ°³¼ö, ÅÃ¹è¼ö·®, ÅÃ¹è¼ö·®1, ÅÃ¹è¼ö·®ÇÕ»ê,
+        ¼ÛÀå±¸ºÐÀÚ, ¼ÛÀå±¸ºÐ, ¼ÛÀå±¸ºÐÃÖÁ¾, À§Ä¡, À§Ä¡º¯È¯, `ÁÖ¹®¹øÈ£(¼îÇÎ¸ô)`, °áÁ¦±Ý¾×, ÁÖ¹®±Ý¾×, 
+        °áÁ¦¼ö´Ü, ¸é°ú¼¼±¸ºÐ, ÁÖ¹®»óÅÂ, ¹è¼Û¼Û
     )
     SELECT
         dev.msg1, dev.msg2, dev.msg3, dev.msg4, dev.msg5, dev.msg6, 
-        dev.íƒë°°ë¹„ìš©, dev.ì „í™”ë²ˆí˜¸1, dev.ì „í™”ë²ˆí˜¸2, dev.ìš°íŽ¸ë²ˆí˜¸, dev.ì£¼ì†Œ,
-        (dev.ìˆ˜ëŸ‰ * CAST(spec.ëŒ€ì²´4ìˆ˜ëŸ‰ AS DECIMAL(10,2))), dev.ë°°ì†¡ë©”ì„¸ì§€, dev.ì£¼ë¬¸ë²ˆí˜¸, dev.ì‡¼í•‘ëª°, dev.ìˆ˜ì§‘ì‹œê°„, dev.ì†¡ìž¥ëª…, 
-        spec.ëŒ€ì²´ì½”ë“œ4, spec.ëŒ€ì²´ì½”ë“œ4í’ˆëª©ëª…,
+        dev.ÅÃ¹èºñ¿ë, dev.ÀüÈ­¹øÈ£1, dev.ÀüÈ­¹øÈ£2, dev.¿ìÆí¹øÈ£, dev.ÁÖ¼Ò,
+        (dev.¼ö·® * CAST(spec.´ëÃ¼4¼ö·® AS DECIMAL(10,2))) AS ¼ö·®, dev.¹è¼Û¸Þ¼¼Áö, dev.ÁÖ¹®¹øÈ£, dev.¼îÇÎ¸ô, dev.¼öÁý½Ã°£, dev.¼ÛÀå¸í, 
+        spec.´ëÃ¼ÄÚµå4, spec.´ëÃ¼ÄÚµå4Ç°¸ñ¸í,
         NULL, NULL, NULL,
-        dev.ë³„í‘œ1, dev.ë³„í‘œ2, dev.í’ˆëª©ê°œìˆ˜, dev.íƒë°°ìˆ˜ëŸ‰, dev.íƒë°°ìˆ˜ëŸ‰1, dev.íƒë°°ìˆ˜ëŸ‰í•©ì‚°,
-        dev.ì†¡ìž¥êµ¬ë¶„ìž, dev.ì†¡ìž¥êµ¬ë¶„, dev.ì†¡ìž¥êµ¬ë¶„ìµœì¢…, dev.ìœ„ì¹˜, dev.ìœ„ì¹˜ë³€í™˜, dev.`ì£¼ë¬¸ë²ˆí˜¸(ì‡¼í•‘ëª°)`, 0, 0, 
-        dev.ê²°ì œìˆ˜ë‹¨, dev.ë©´ê³¼ì„¸êµ¬ë¶„, dev.ì£¼ë¬¸ìƒíƒœ, dev.ë°°ì†¡ì†¡
-    FROM ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ dev
-    JOIN ì†¡ìž¥ì¶œë ¥_íŠ¹ìˆ˜ì¶œë ¥_í•©í¬ìž¥ë³€ê²½ spec ON dev.í’ˆëª©ì½”ë“œ = spec.í’ˆëª©ì½”ë“œ
-    WHERE spec.ëŒ€ì²´ì½”ë“œ4 IS NOT NULL AND spec.ëŒ€ì²´ì½”ë“œ4 != '';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ëŒ€ì²´ì½”ë“œ4 ì²˜ë¦¬', ROW_COUNT());
-	
-    -- ì›ë³¸ í•©í¬ìž¥ ì£¼ë¬¸ ë°ì´í„°ë¥¼ ì‚­ì œ
-    DELETE FROM ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜
-    WHERE í’ˆëª©ì½”ë“œ IN (SELECT í’ˆëª©ì½”ë“œ FROM ì†¡ìž¥ì¶œë ¥_íŠ¹ìˆ˜ì¶œë ¥_í•©í¬ìž¥ë³€ê²½);
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[DELETE] ì›ë³¸ ë°ì´í„°ì˜ ì£¼ë¬¸ ë°ì´í„° ì‚­ì œ', ROW_COUNT());
-	
+        dev.º°Ç¥1, dev.º°Ç¥2, dev.Ç°¸ñ°³¼ö, dev.ÅÃ¹è¼ö·®, dev.ÅÃ¹è¼ö·®1, dev.ÅÃ¹è¼ö·®ÇÕ»ê,
+        dev.¼ÛÀå±¸ºÐÀÚ, dev.¼ÛÀå±¸ºÐ, dev.¼ÛÀå±¸ºÐÃÖÁ¾, dev.À§Ä¡, dev.À§Ä¡º¯È¯, dev.`ÁÖ¹®¹øÈ£(¼îÇÎ¸ô)`, 0, 0, 
+        dev.°áÁ¦¼ö´Ü, dev.¸é°ú¼¼±¸ºÐ, dev.ÁÖ¹®»óÅÂ, dev.¹è¼Û¼Û
+    FROM ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ dev
+    JOIN ¼ÛÀåÃâ·Â_Æ¯¼öÃâ·Â_ÇÕÆ÷Àåº¯°æ spec ON dev.Ç°¸ñÄÚµå = spec.Ç°¸ñÄÚµå
+    WHERE spec.´ëÃ¼ÄÚµå4 IS NOT NULL AND spec.´ëÃ¼ÄÚµå4 != '';
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ´ëÃ¼ÄÚµå4 Ã³¸®', ROW_COUNT());
+
+    /*--================================================================================
+	-- ÇÕÆ÷Àå ÇØÁ¦ ÈÄ ÈÄ¼Ó Ã³¸®
+    --================================================================================*/
+    -- ³Ãµ¿ ·º À§Ä¡ ÀÔ·Â (Ç°¸ñµî·Ï Å×ÀÌºí ±â¹Ý)
+    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ dev
+	  JOIN Ç°¸ñµî·Ï p ON dev.Ç°¸ñÄÚµå = p.Ç°¸ñÄÚµå 
+	   SET dev.À§Ä¡ = p.Ç°¸ñ±×·ì2ÄÚµå;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] Ç°¸ñ À§Ä¡ Á¤º¸ ¾÷µ¥ÀÌÆ®', ROW_COUNT());
+
+    -- ÅÃ¹è ¹Ú½º/³¹°³ ±¸ºÐ
+    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯
+	   SET ÅÃ¹è¼ö·®1 = CASE WHEN CAST(ÅÃ¹è¼ö·® AS UNSIGNED) = 1 THEN '¹Ú½º' ELSE '³¹°³' END 
+	 WHERE ÅÃ¹è¼ö·® REGEXP '^[0-9]+$';
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ÅÃ¹è ¹Ú½º/³¹°³ ±¸ºÐ', ROW_COUNT());
+
+    -- Ãâ·Â°³¼ö, ÅÃ¹èºñ¿ë µî ±âº»°ª ¼³Á¤
+    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯
+       SET ÅÃ¹èºñ¿ë = IFNULL(ÅÃ¹èºñ¿ë, 2150), 
+           ¹Ú½ºÅ©±â = IFNULL(¹Ú½ºÅ©±â, '±Ø¼Ò'), 
+           Ãâ·Â°³¼ö = IFNULL(Ãâ·Â°³¼ö, 1)
+     WHERE Ç°¸ñÄÚµå IN (SELECT ´ëÃ¼ÄÚµå1 FROM ¼ÛÀåÃâ·Â_Æ¯¼öÃâ·Â_ÇÕÆ÷Àåº¯°æ WHERE ´ëÃ¼ÄÚµå1 IS NOT NULL AND ´ëÃ¼ÄÚµå1 != ''
+                      UNION SELECT ´ëÃ¼ÄÚµå2 FROM ¼ÛÀåÃâ·Â_Æ¯¼öÃâ·Â_ÇÕÆ÷Àåº¯°æ WHERE ´ëÃ¼ÄÚµå2 IS NOT NULL AND ´ëÃ¼ÄÚµå2 != ''
+                      UNION SELECT ´ëÃ¼ÄÚµå3 FROM ¼ÛÀåÃâ·Â_Æ¯¼öÃâ·Â_ÇÕÆ÷Àåº¯°æ WHERE ´ëÃ¼ÄÚµå3 IS NOT NULL AND ´ëÃ¼ÄÚµå3 != ''
+                      UNION SELECT ´ëÃ¼ÄÚµå4 FROM ¼ÛÀåÃâ·Â_Æ¯¼öÃâ·Â_ÇÕÆ÷Àåº¯°æ WHERE ´ëÃ¼ÄÚµå4 IS NOT NULL AND ´ëÃ¼ÄÚµå4 != '');
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] »õ·Î Ãß°¡µÈ Ç°¸ñ ±âº»°ª ¼³Á¤', ROW_COUNT());
+
+    -- ¿øº» ÇÕÆ÷Àå ÁÖ¹® µ¥ÀÌÅÍ¸¦ »èÁ¦
+    DELETE FROM ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯
+    WHERE Ç°¸ñÄÚµå IN (SELECT Ç°¸ñÄÚµå FROM ¼ÛÀåÃâ·Â_Æ¯¼öÃâ·Â_ÇÕÆ÷Àåº¯°æ);
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[DELETE] ¿øº» ÇÕÆ÷Àå µ¥ÀÌÅÍ(¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯) »èÁ¦', ROW_COUNT());
+    
+    -- ÀÛ¾÷ ¿Ï·á ÈÄ Ä¿¹Ô
     COMMIT;
 
-    -- ìµœì¢… ê²°ê³¼ë¥¼ SELECT ë¬¸ìœ¼ë¡œ ë°˜í™˜
+    -- ÃÖÁ¾ °á°ú¸¦ SELECT ¹®À¸·Î ¹ÝÈ¯
     SELECT StepID, OperationDescription, AffectedRows FROM sp_execution_log ORDER BY StepID;
 
-    -- í”„ë¡œì‹œì € ì¢…ë£Œ í›„ ìž„ì‹œ í…Œì´ë¸” ì‚­ì œ
+    -- ÇÁ·Î½ÃÀú Á¾·á Àü ÀÓ½Ã Å×ÀÌºí »èÁ¦
     DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
 
 END$$

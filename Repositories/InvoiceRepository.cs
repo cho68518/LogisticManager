@@ -77,8 +77,8 @@ namespace LogisticManager.Repositories
             _tableName = GetTableNameFromConfig();
             _queryBuilder = new DynamicQueryBuilder(useReflectionFallback: true);
             
-            Console.WriteLine($"✅ InvoiceRepository 초기화 완료 - 테이블: {_tableName}");
-            Console.WriteLine($"🔧 DynamicQueryBuilder 초기화 완료 - 하이브리드 모드 활성화");
+            //Console.WriteLine($"✅ InvoiceRepository 초기화 완료 - 테이블: {_tableName}");
+            //Console.WriteLine($"🔧 DynamicQueryBuilder 초기화 완료 - 하이브리드 모드 활성화");
         }
 
         /// <summary>
@@ -108,8 +108,8 @@ namespace LogisticManager.Repositories
             _tableName = tableName;
             _queryBuilder = new DynamicQueryBuilder(useReflectionFallback: true);
             
-            Console.WriteLine($"✅ InvoiceRepository 초기화 완료 - 테이블: {_tableName}");
-            Console.WriteLine($"🔧 DynamicQueryBuilder 초기화 완료 - 하이브리드 모드 활성화");
+            //Console.WriteLine($"✅ InvoiceRepository 초기화 완료 - 테이블: {_tableName}");
+            //Console.WriteLine($"🔧 DynamicQueryBuilder 초기화 완료 - 하이브리드 모드 활성화");
         }
 
         /// <summary>
@@ -148,10 +148,10 @@ namespace LogisticManager.Repositories
                     _ => "InvoiceTable.Name"
                 };
                 
-                Console.WriteLine($"[DEBUG] 선택된 설정 키: {configKey}");
+                //Console.WriteLine($"[DEBUG] 선택된 설정 키: {configKey}");
                 
                 var tableName = System.Configuration.ConfigurationManager.AppSettings[configKey];
-                Console.WriteLine($"[DEBUG] 설정에서 읽은 테이블명: {tableName ?? "(null)"}");
+                //Console.WriteLine($"[DEBUG] 설정에서 읽은 테이블명: {tableName ?? "(null)"}");
                 
                 if (!string.IsNullOrWhiteSpace(tableName))
                 {
@@ -161,7 +161,7 @@ namespace LogisticManager.Repositories
                 
                 // 기본 설정 시도
                 var defaultTableName = System.Configuration.ConfigurationManager.AppSettings["InvoiceTable.Name"];
-                Console.WriteLine($"[DEBUG] 기본 설정에서 읽은 테이블명: {defaultTableName ?? "(null)"}");
+                //Console.WriteLine($"[DEBUG] 기본 설정에서 읽은 테이블명: {defaultTableName ?? "(null)"}");
                 
                 if (!string.IsNullOrWhiteSpace(defaultTableName))
                 {
@@ -169,12 +169,12 @@ namespace LogisticManager.Repositories
                     return defaultTableName;
                 }
                 
-                Console.WriteLine($"⚠️ Configuration에서 테이블명을 찾을 수 없어 기본값 사용: {DEFAULT__tableName}");
+                //Console.WriteLine($"⚠️ Configuration에서 테이블명을 찾을 수 없어 기본값 사용: {DEFAULT__tableName}");
                 return DEFAULT__tableName;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.WriteLine($"❌ Configuration 읽기 실패, 기본값 사용: {DEFAULT__tableName} (오류: {ex.Message})");
+                //Console.WriteLine($"❌ Configuration 읽기 실패, 기본값 사용: {DEFAULT__tableName}");
                 return DEFAULT__tableName;
             }
         }
@@ -280,8 +280,7 @@ namespace LogisticManager.Repositories
                     if (batchQueries.Count > 0)
                     {
                         var batchLog = $"[InvoiceRepository] 배치 {i / batchSize + 1} 실행 시작 - 쿼리 수: {batchQueries.Count}";
-                        Console.WriteLine(batchLog);
-                        File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {batchLog}\n");
+                        LogManagerService.LogInfo($"{batchLog}");
                         
                         // === 첫 번째 쿼리 상세 로깅 ===
                         if (batchQueries.Count > 0)
@@ -290,10 +289,8 @@ namespace LogisticManager.Repositories
                             var sqlLog = $"[InvoiceRepository] 첫 번째 쿼리 SQL: {firstQuery.sql}";
                             var paramLog = $"[InvoiceRepository] 첫 번째 쿼리 매개변수: {string.Join(", ", firstQuery.parameters.Select(p => $"{p.Key}={p.Value}"))}";
                             
-                            Console.WriteLine(sqlLog);
-                            Console.WriteLine(paramLog);
-                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {sqlLog}\n");
-                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paramLog}\n");
+                            LogManagerService.LogInfo($"{sqlLog}");
+                            LogManagerService.LogInfo($"{paramLog}");
                         }
                         
                         // === 트랜잭션 단위 배치 실행 ===
@@ -302,15 +299,13 @@ namespace LogisticManager.Repositories
                         var success = await _databaseService.ExecuteParameterizedTransactionAsync(batchQueries);
                         
                         var resultLog = $"[InvoiceRepository] 배치 {i / batchSize + 1} 실행 결과: {(success ? "성공" : "실패")}";
-                        Console.WriteLine(resultLog);
-                        File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {resultLog}\n");
+                        LogManagerService.LogInfo($"{resultLog}");
                         
                         // === 배치 실행 결과 검증 ===
                         if (!success)
                         {
                             var failureLog = $"[InvoiceRepository] 배치 {i / batchSize + 1} 삽입 실패 - 상세 정보 로깅 완료";
-                            Console.WriteLine(failureLog);
-                            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {failureLog}\n");
+                            LogManagerService.LogError($"{failureLog}");
                             throw new InvalidOperationException($"배치 삽입 실패 (배치 {i / batchSize + 1})");
                         }
                         
@@ -375,32 +370,32 @@ namespace LogisticManager.Repositories
         {
             try
             {
-                Console.WriteLine($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 TRUNCATE 쿼리 생성 시작");
+                //Console.WriteLine($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 TRUNCATE 쿼리 생성 시작");
                 
                 // === 1단계: DynamicQueryBuilder를 사용한 하이브리드 TRUNCATE 쿼리 생성 ===
                 var (sql, parameters) = _queryBuilder.BuildTruncateQuery(tableName);
                 
-                Console.WriteLine($"✅ 하이브리드 TRUNCATE 쿼리 생성 완료 - 테이블: {tableName}");
+                //Console.WriteLine($"✅ 하이브리드 TRUNCATE 쿼리 생성 완료 - 테이블: {tableName}");
                 
                 // === 2단계: 매개변수화된 쿼리 실행 ===
                 var affectedRows = await _databaseService.ExecuteNonQueryAsync(sql, parameters);
                 
-                Console.WriteLine($"✅ TRUNCATE 쿼리 실행 완료 - 테이블: {tableName}");
+                //Console.WriteLine($"✅ TRUNCATE 쿼리 실행 완료 - 테이블: {tableName}");
                 return true; // TRUNCATE는 성공하면 항상 true
             }
             catch (ArgumentException ex)
             {
-                Console.WriteLine($"❌ 테이블 매핑 오류: {ex.Message}");
+                LogManagerService.LogInfo($"❌ 테이블 매핑 오류: {ex.Message}");
                 return false;
             }
             catch (InvalidOperationException ex)
             {
-                Console.WriteLine($"❌ 쿼리 생성 실패: {ex.Message}");
+                LogManagerService.LogInfo($"❌ 쿼리 생성 실패: {ex.Message}");
                 return false;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ 예상치 못한 오류: {ex.Message}");
+                LogManagerService.LogInfo($"❌ 예상치 못한 오류: {ex.Message}");
                 return false;
             }
         }
@@ -565,7 +560,7 @@ namespace LogisticManager.Repositories
             // === 1단계: 테이블명 및 입력 데이터 유효성 검사 ===
             if (!ValidateTableName(tableName))
             {
-                Console.WriteLine($"❌ AddStarToAddress 실패: 잘못된 테이블명: {tableName}");
+                LogManagerService.LogInfo($"❌ AddStarToAddress 실패: 잘못된 테이블명: {tableName}");
                 return 0;
             }
 
@@ -627,7 +622,7 @@ namespace LogisticManager.Repositories
         {
             if (!ValidateTableName(tableName))
             {
-                Console.WriteLine($"❌ ReplacePrefix 실패: 잘못된 테이블명: {tableName}");
+                LogManagerService.LogInfo($"❌ ReplacePrefix 실패: 잘못된 테이블명: {tableName}");
                 return 0;
             }
 
@@ -675,7 +670,7 @@ namespace LogisticManager.Repositories
         {
             if (!ValidateTableName(tableName))
             {
-                Console.WriteLine($"❌ UpdateField 실패: 잘못된 테이블명: {tableName}");
+                LogManagerService.LogInfo($"❌ UpdateField 실패: 잘못된 테이블명: {tableName}");
                 return 0;
             }
 
@@ -721,7 +716,7 @@ namespace LogisticManager.Repositories
         {
             if (!ValidateTableName(tableName))
             {
-                Console.WriteLine($"❌ RemoveCharacter 실패: 잘못된 테이블명: {tableName}");
+                LogManagerService.LogInfo($"❌ RemoveCharacter 실패: 잘못된 테이블명: {tableName}");
                 return 0;
             }
 
@@ -949,29 +944,29 @@ namespace LogisticManager.Repositories
         {
             try
             {
-                Console.WriteLine($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 INSERT 쿼리 생성 시작");
+                LogManagerService.LogInfo($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 INSERT 쿼리 생성 시작");
                 
                 // === 1단계: DynamicQueryBuilder를 사용한 하이브리드 쿼리 생성 ===
                 var (sql, parameters) = _queryBuilder.BuildInsertQuery(tableName, invoice);
                 
-                Console.WriteLine($"✅ 하이브리드 쿼리 생성 완료 - 테이블: {tableName}");
-                Console.WriteLine($"📊 생성된 컬럼 수: {parameters.Count}개");
+                LogManagerService.LogInfo($"✅ 하이브리드 쿼리 생성 완료 - 테이블: {tableName}");
+                LogManagerService.LogInfo($"📊 생성된 컬럼 수: {parameters.Count}개");
                 
                 return (sql, parameters);
             }
             catch (ArgumentException ex)
             {
-                Console.WriteLine($"❌ 테이블 매핑 오류: {ex.Message}");
+                LogManagerService.LogInfo($"❌ 테이블 매핑 오류: {ex.Message}");
                 throw;
             }
             catch (InvalidOperationException ex)
             {
-                Console.WriteLine($"❌ 쿼리 생성 실패: {ex.Message}");
+                LogManagerService.LogInfo($"❌ 쿼리 생성 실패: {ex.Message}");
                 throw;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ 예상치 못한 오류: {ex.Message}");
+                LogManagerService.LogInfo($"❌ 예상치 못한 오류: {ex.Message}");
                 throw new InvalidOperationException($"테이블 '{tableName}'에 대한 INSERT 쿼리 생성 중 오류가 발생했습니다: {ex.Message}", ex);
             }
         }
@@ -995,12 +990,10 @@ namespace LogisticManager.Repositories
             var invoices = new List<InvoiceDto>();
             
             var debugLog = $"[DEBUG] DataTable 변환 시작 - 행 수: {dataTable.Rows.Count}";
-            Console.WriteLine(debugLog);
-            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {debugLog}\n");
+            LogManagerService.LogInfo($"{debugLog}");
             
             var columnLog = $"[DEBUG] DataTable 컬럼들: {string.Join(", ", dataTable.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}";
-            Console.WriteLine(columnLog);
-            File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {columnLog}\n");
+            LogManagerService.LogInfo($"{columnLog}");
             
             // === 2단계: DataTable의 각 행을 InvoiceDto 객체로 변환 ===
             foreach (DataRow row in dataTable.Rows)
@@ -1009,134 +1002,102 @@ namespace LogisticManager.Repositories
                 
                 // 원본 값 로깅
                 var originalValuesLog = $"[DEBUG] 원본 DataRow 값:";
-                Console.WriteLine(originalValuesLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {originalValuesLog}\n");
+                LogManagerService.LogInfo($"{originalValuesLog}");
                 
                 // 컬럼 존재 여부 확인
                 var columnExistsLog = $"[DEBUG] 컬럼 존재 여부 확인:";
-                Console.WriteLine(columnExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {columnExistsLog}\n");
+                LogManagerService.LogInfo($"{columnExistsLog}");
                 
                 var phone1ExistsLog = $"[DEBUG]   전화번호1 컬럼 존재: {dataTable.Columns.Contains("전화번호1")}";
-                Console.WriteLine(phone1ExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {phone1ExistsLog}\n");
+                LogManagerService.LogInfo($"{phone1ExistsLog}");
                 
                 var phone2ExistsLog = $"[DEBUG]   전화번호2 컬럼 존재: {dataTable.Columns.Contains("전화번호2")}";
-                Console.WriteLine(phone2ExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {phone2ExistsLog}\n");
+                LogManagerService.LogInfo($"{phone2ExistsLog}");
                 
                 var zipCodeExistsLog = $"[DEBUG]   우편번호 컬럼 존재: {dataTable.Columns.Contains("우편번호")}";
-                Console.WriteLine(zipCodeExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {zipCodeExistsLog}\n");
+                LogManagerService.LogInfo($"{zipCodeExistsLog}");
                 
                 var optionNameExistsLog = $"[DEBUG]   옵션명 컬럼 존재: {dataTable.Columns.Contains("옵션명")}";
-                Console.WriteLine(optionNameExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {optionNameExistsLog}\n");
+                LogManagerService.LogInfo($"{optionNameExistsLog}");
                 
                 var specialNoteExistsLog = $"[DEBUG]   배송메세지 컬럼 존재: {dataTable.Columns.Contains("배송메세지")}";
-                Console.WriteLine(specialNoteExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {specialNoteExistsLog}\n");
+                LogManagerService.LogInfo($"{specialNoteExistsLog}");
                 
                 var storeNameExistsLog = $"[DEBUG]   쇼핑몰 컬럼 존재: {dataTable.Columns.Contains("쇼핑몰")}";
-                Console.WriteLine(storeNameExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {storeNameExistsLog}\n");
+                LogManagerService.LogInfo($"{storeNameExistsLog}");
                 
                 var collectedAtExistsLog = $"[DEBUG]   수집시간 컬럼 존재: {dataTable.Columns.Contains("수집시간")}";
-                Console.WriteLine(collectedAtExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {collectedAtExistsLog}\n");
+                LogManagerService.LogInfo($"{collectedAtExistsLog}");
                 
                 var productCodeExistsLog = $"[DEBUG]   품목코드 컬럼 존재: {dataTable.Columns.Contains("품목코드")}";
-                Console.WriteLine(productCodeExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {productCodeExistsLog}\n");
+                LogManagerService.LogInfo($"{productCodeExistsLog}");
                 
                 var orderNumberMallExistsLog = $"[DEBUG]   주문번호(쇼핑몰) 컬럼 존재: {dataTable.Columns.Contains("주문번호(쇼핑몰)")}";
-                Console.WriteLine(orderNumberMallExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderNumberMallExistsLog}\n");
+                LogManagerService.LogInfo($"{orderNumberMallExistsLog}");
                 
                 var paymentAmountExistsLog = $"[DEBUG]   결제금액 컬럼 존재: {dataTable.Columns.Contains("결제금액")}";
-                Console.WriteLine(paymentAmountExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paymentAmountExistsLog}\n");
+                LogManagerService.LogInfo($"{paymentAmountExistsLog}");
                 
                 var orderAmountExistsLog = $"[DEBUG]   주문금액 컬럼 존재: {dataTable.Columns.Contains("주문금액")}";
-                Console.WriteLine(orderAmountExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderAmountExistsLog}\n");
+                LogManagerService.LogInfo($"{orderAmountExistsLog}");
                 
                 var paymentMethodExistsLog = $"[DEBUG]   결제수단 컬럼 존재: {dataTable.Columns.Contains("결제수단")}";
-                Console.WriteLine(paymentMethodExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paymentMethodExistsLog}\n");
+                LogManagerService.LogInfo($"{paymentMethodExistsLog}");
                 
                 var taxTypeExistsLog = $"[DEBUG]   면과세구분 컬럼 존재: {dataTable.Columns.Contains("면과세구분")}";
-                Console.WriteLine(taxTypeExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {taxTypeExistsLog}\n");
+                LogManagerService.LogInfo($"{taxTypeExistsLog}");
                 
                 var orderStatusExistsLog = $"[DEBUG]   주문상태 컬럼 존재: {dataTable.Columns.Contains("주문상태")}";
-                Console.WriteLine(orderStatusExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderStatusExistsLog}\n");
+                LogManagerService.LogInfo($"{orderStatusExistsLog}");
                 
                 var shippingTypeExistsLog = $"[DEBUG]   배송송 컬럼 존재: {dataTable.Columns.Contains("배송송")}";
-                Console.WriteLine(shippingTypeExistsLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {shippingTypeExistsLog}\n");
+                LogManagerService.LogInfo($"{shippingTypeExistsLog}");
                 
                 // 실제 값 읽기
                 var phone1Log = $"[DEBUG]   전화번호1: '{row["전화번호1"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(phone1Log);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {phone1Log}\n");
+                LogManagerService.LogInfo($"{phone1Log}");
                 
                 var phone2Log = $"[DEBUG]   전화번호2: '{row["전화번호2"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(phone2Log);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {phone2Log}\n");
+                LogManagerService.LogInfo($"{phone2Log}");
                 
                 var zipCodeLog = $"[DEBUG]   우편번호: '{row["우편번호"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(zipCodeLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {zipCodeLog}\n");
+                LogManagerService.LogInfo($"{zipCodeLog}");
                 
                 var optionNameLog = $"[DEBUG]   옵션명: '{row["옵션명"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(optionNameLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {optionNameLog}\n");
+                LogManagerService.LogInfo($"{optionNameLog}");
                 
                 var specialNoteLog = $"[DEBUG]   배송메세지: '{row["배송메세지"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(specialNoteLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {specialNoteLog}\n");
+                LogManagerService.LogInfo($"{specialNoteLog}");
                 
                 var storeNameLog = $"[DEBUG]   쇼핑몰: '{row["쇼핑몰"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(storeNameLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {storeNameLog}\n");
+                LogManagerService.LogInfo($"{storeNameLog}");
                 
-                var collectedAtLog = $"[DEBUG]   수집시간: '{row["수집시간"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(collectedAtLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {collectedAtLog}\n");
+                var collectedAtLog = $"[DEBUG]   수집시간: '{row["쇼핑몰"]?.ToString() ?? "NULL"}'";
+                LogManagerService.LogInfo($"{collectedAtLog}");
                 
                 var productCodeLog = $"[DEBUG]   품목코드: '{row["품목코드"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(productCodeLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {productCodeLog}\n");
+                LogManagerService.LogInfo($"{productCodeLog}");
                 
                 var orderNumberMallLog = $"[DEBUG]   주문번호(쇼핑몰): '{row["주문번호(쇼핑몰)"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(orderNumberMallLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderNumberMallLog}\n");
+                LogManagerService.LogInfo($"{orderNumberMallLog}");
                 
                 var paymentAmountLog = $"[DEBUG]   결제금액: '{row["결제금액"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(paymentAmountLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paymentAmountLog}\n");
+                LogManagerService.LogInfo($"{paymentAmountLog}");
                 
-                var orderAmountLog = $"[DEBUG]   주문금액: '{row["주문금액"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(orderAmountLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderAmountLog}\n");
+                var orderAmountLog = $"[DEBUG]   주문금액: '{row["주문번호"]?.ToString() ?? "NULL"}'";
+                LogManagerService.LogInfo($"{orderAmountLog}");
                 
                 var paymentMethodLog = $"[DEBUG]   결제수단: '{row["결제수단"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(paymentMethodLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paymentMethodLog}\n");
+                LogManagerService.LogInfo($"{paymentMethodLog}");
                 
                 var taxTypeLog = $"[DEBUG]   면과세구분: '{row["면과세구분"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(taxTypeLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {taxTypeLog}\n");
+                LogManagerService.LogInfo($"{taxTypeLog}");
                 
                 var orderStatusLog = $"[DEBUG]   주문상태: '{row["주문상태"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(orderStatusLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderStatusLog}\n");
+                LogManagerService.LogInfo($"{orderStatusLog}");
                 
                 var shippingTypeLog = $"[DEBUG]   배송송: '{row["배송송"]?.ToString() ?? "NULL"}'";
-                Console.WriteLine(shippingTypeLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {shippingTypeLog}\n");
+                LogManagerService.LogInfo($"{shippingTypeLog}");
                 
                 var invoice = new InvoiceDto
                 {
@@ -1188,72 +1149,55 @@ namespace LogisticManager.Repositories
                 
                 // 변환된 값 로깅
                 var convertedValuesLog = $"[DEBUG] 변환된 InvoiceDto 값:";
-                Console.WriteLine(convertedValuesLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {convertedValuesLog}\n");
+                LogManagerService.LogInfo($"{convertedValuesLog}");
                 
                 var phone1ConvertedLog = $"[DEBUG]   Phone1: '{invoice.Phone1}'";
-                Console.WriteLine(phone1ConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {phone1ConvertedLog}\n");
+                LogManagerService.LogInfo($"{phone1ConvertedLog}");
                 
                 var phone2ConvertedLog = $"[DEBUG]   Phone2: '{invoice.Phone2}'";
-                Console.WriteLine(phone2ConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {phone2ConvertedLog}\n");
+                LogManagerService.LogInfo($"{phone2ConvertedLog}");
                 
                 var zipCodeConvertedLog = $"[DEBUG]   ZipCode: '{invoice.ZipCode}'";
-                Console.WriteLine(zipCodeConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {zipCodeConvertedLog}\n");
+                LogManagerService.LogInfo($"{zipCodeConvertedLog}");
                 
                 var optionNameConvertedLog = $"[DEBUG]   OptionName: '{invoice.OptionName}'";
-                Console.WriteLine(optionNameConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {optionNameConvertedLog}\n");
+                LogManagerService.LogInfo($"{optionNameConvertedLog}");
                 
                 var specialNoteConvertedLog = $"[DEBUG]   SpecialNote: '{invoice.SpecialNote}'";
-                Console.WriteLine(specialNoteConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {specialNoteConvertedLog}\n");
+                LogManagerService.LogInfo($"{specialNoteConvertedLog}");
                 
                 var storeNameConvertedLog = $"[DEBUG]   StoreName: '{invoice.StoreName}'";
-                Console.WriteLine(storeNameConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {storeNameConvertedLog}\n");
+                LogManagerService.LogInfo($"{storeNameConvertedLog}");
                 
                 var collectedAtConvertedLog = $"[DEBUG]   CollectedAt: '{invoice.CollectedAt}'";
-                Console.WriteLine(collectedAtConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {collectedAtConvertedLog}\n");
+                LogManagerService.LogInfo($"{collectedAtConvertedLog}");
                 
                 var productCodeConvertedLog = $"[DEBUG]   ProductCode: '{invoice.ProductCode}'";
-                Console.WriteLine(productCodeConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {productCodeConvertedLog}\n");
+                LogManagerService.LogInfo($"{productCodeConvertedLog}");
                 
                 var orderNumberMallConvertedLog = $"[DEBUG]   OrderNumberMall: '{invoice.OrderNumberMall}'";
-                Console.WriteLine(orderNumberMallConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderNumberMallConvertedLog}\n");
+                LogManagerService.LogInfo($"{orderNumberMallConvertedLog}");
                 
                 var paymentAmountConvertedLog = $"[DEBUG]   PaymentAmount: '{invoice.PaymentAmount}'";
-                Console.WriteLine(paymentAmountConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paymentAmountConvertedLog}\n");
+                LogManagerService.LogInfo($"{paymentAmountConvertedLog}");
                 
                 var orderAmountConvertedLog = $"[DEBUG]   OrderAmount: '{invoice.OrderAmount}'";
-                Console.WriteLine(orderAmountConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderAmountConvertedLog}\n");
+                LogManagerService.LogInfo($"{orderAmountConvertedLog}");
                 
                 var paymentMethodConvertedLog = $"[DEBUG]   PaymentMethod: '{invoice.PaymentMethod}'";
-                Console.WriteLine(paymentMethodConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {paymentMethodConvertedLog}\n");
+                LogManagerService.LogInfo($"{paymentMethodConvertedLog}");
                 
                 var taxTypeConvertedLog = $"[DEBUG]   TaxType: '{invoice.TaxType}'";
-                Console.WriteLine(taxTypeConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {taxTypeConvertedLog}\n");
+                LogManagerService.LogInfo($"{taxTypeConvertedLog}");
                 
                 var orderStatusConvertedLog = $"[DEBUG]   OrderStatus: '{invoice.OrderStatus}'";
-                Console.WriteLine(orderStatusConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {orderStatusConvertedLog}\n");
+                LogManagerService.LogInfo($"{orderStatusConvertedLog}");
                 
                 var shippingTypeConvertedLog = $"[DEBUG]   ShippingType: '{invoice.ShippingType}'";
-                Console.WriteLine(shippingTypeConvertedLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {shippingTypeConvertedLog}\n");
+                LogManagerService.LogInfo($"{shippingTypeConvertedLog}");
                 
                 var separatorLog = $"[DEBUG] ========================================";
-                Console.WriteLine(separatorLog);
-                File.AppendAllText("app.log", $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {separatorLog}\n");
+                LogManagerService.LogInfo($"{separatorLog}");
                 
                 invoices.Add(invoice);
             }
@@ -1444,33 +1388,33 @@ namespace LogisticManager.Repositories
         {
             try
             {
-                Console.WriteLine($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 UPDATE 쿼리 생성 시작");
+                LogManagerService.LogInfo($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 UPDATE 쿼리 생성 시작");
                 
                 // === 1단계: DynamicQueryBuilder를 사용한 하이브리드 UPDATE 쿼리 생성 ===
                 var (sql, parameters) = _queryBuilder.BuildUpdateQuery(tableName, invoice, whereClause);
                 
-                Console.WriteLine($"✅ 하이브리드 UPDATE 쿼리 생성 완료 - 테이블: {tableName}");
-                Console.WriteLine($"📊 생성된 컬럼 수: {parameters.Count}개");
+                LogManagerService.LogInfo($"✅ 하이브리드 UPDATE 쿼리 생성 완료 - 테이블: {tableName}");
+                LogManagerService.LogInfo($"📊 생성된 컬럼 수: {parameters.Count}개");
                 
                 // === 2단계: 매개변수화된 쿼리 실행 ===
                 var affectedRows = await _databaseService.ExecuteNonQueryAsync(sql, parameters);
                 
-                Console.WriteLine($"✅ UPDATE 쿼리 실행 완료 - 영향받은 행 수: {affectedRows}개");
+                LogManagerService.LogInfo($"✅ UPDATE 쿼리 실행 완료 - 영향받은 행 수: {affectedRows}개");
                 return affectedRows;
             }
             catch (ArgumentException ex)
             {
-                Console.WriteLine($"❌ 테이블 매핑 오류: {ex.Message}");
+                LogManagerService.LogInfo($"❌ 테이블 매핑 오류: {ex.Message}");
                 throw;
             }
             catch (InvalidOperationException ex)
             {
-                Console.WriteLine($"❌ 쿼리 생성 실패: {ex.Message}");
+                LogManagerService.LogInfo($"❌ 쿼리 생성 실패: {ex.Message}");
                 throw;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ 예상치 못한 오류: {ex.Message}");
+                LogManagerService.LogInfo($"❌ 예상치 못한 오류: {ex.Message}");
                 throw new InvalidOperationException($"테이블 '{tableName}'에 대한 UPDATE 쿼리 실행 중 오류가 발생했습니다: {ex.Message}", ex);
             }
         }
@@ -1523,32 +1467,32 @@ namespace LogisticManager.Repositories
         {
             try
             {
-                Console.WriteLine($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 DELETE 쿼리 생성 시작");
+                LogManagerService.LogInfo($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 DELETE 쿼리 생성 시작");
                 
                 // === 1단계: DynamicQueryBuilder를 사용한 하이브리드 DELETE 쿼리 생성 ===
                 var (sql, parameters) = _queryBuilder.BuildDeleteQuery(tableName, invoice, whereClause);
                 
-                Console.WriteLine($"✅ 하이브리드 DELETE 쿼리 생성 완료 - 테이블: {tableName}");
+                LogManagerService.LogInfo($"✅ 하이브리드 DELETE 쿼리 생성 완료 - 테이블: {tableName}");
                 
                 // === 2단계: 매개변수화된 쿼리 실행 ===
                 var affectedRows = await _databaseService.ExecuteNonQueryAsync(sql, parameters);
                 
-                Console.WriteLine($"✅ DELETE 쿼리 실행 완료 - 영향받은 행 수: {affectedRows}개");
+                LogManagerService.LogInfo($"✅ DELETE 쿼리 실행 완료 - 영향받은 행 수: {affectedRows}개");
                 return affectedRows;
             }
             catch (ArgumentException ex)
             {
-                Console.WriteLine($"❌ 테이블 매핑 오류: {ex.Message}");
+                LogManagerService.LogInfo($"❌ 테이블 매핑 오류: {ex.Message}");
                 throw;
             }
             catch (InvalidOperationException ex)
             {
-                Console.WriteLine($"❌ 쿼리 생성 실패: {ex.Message}");
+                LogManagerService.LogInfo($"❌ 쿼리 생성 실패: {ex.Message}");
                 throw;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ 예상치 못한 오류: {ex.Message}");
+                LogManagerService.LogInfo($"❌ 예상치 못한 오류: {ex.Message}");
                 throw new InvalidOperationException($"테이블 '{tableName}'에 대한 DELETE 쿼리 실행 중 오류가 발생했습니다: {ex.Message}", ex);
             }
         }

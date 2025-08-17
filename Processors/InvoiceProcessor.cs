@@ -74,6 +74,56 @@ namespace LogisticManager.Processors
         private readonly FileService _fileService;
         
         /// <summary>
+        /// 공통 파일 처리 서비스 - 파일 관련 공통 기능
+        /// 
+        /// 📋 주요 기능:
+        /// - Excel 파일명 생성
+        /// - Dropbox 파일 업로드
+        /// - Dropbox 공유 링크 생성
+        /// - 파일 상태 확인
+        /// 
+        /// 🔗 의존성: FileCommonService
+        /// </summary>
+        private readonly FileCommonService _fileCommonService;
+        
+        /// <summary>
+        /// 공통 데이터베이스 서비스 - 데이터베이스 관련 공통 기능
+        /// 
+        /// 📋 주요 기능:
+        /// - 데이터 조회
+        /// - 연결 확인
+        /// - 테이블 존재 확인
+        /// - 배치 처리
+        /// 
+        /// 🔗 의존성: DatabaseCommonService
+        /// </summary>
+        private readonly DatabaseCommonService _databaseCommonService;
+        
+        /// <summary>
+        /// 공통 로깅 서비스 - 로깅 관련 공통 기능
+        /// 
+        /// 📋 주요 기능:
+        /// - 로그 파일 쓰기
+        /// - 다중 라인 로그 처리
+        /// - 로그 파일 상태 진단
+        /// 
+        /// 🔗 의존성: LoggingCommonService
+        /// </summary>
+        private readonly LoggingCommonService _loggingCommonService;
+        
+        /// <summary>
+        /// 공통 유틸리티 서비스 - 유틸리티 관련 공통 기능
+        /// 
+        /// 📋 주요 기능:
+        /// - 문자열 처리
+        /// - 예외 분류
+        /// - 오류 메시지 생성
+        /// 
+        /// 🔗 의존성: UtilityCommonService
+        /// </summary>
+        private readonly UtilityCommonService _utilityCommonService;
+        
+        /// <summary>
         /// 송장 데이터 저장소 - Repository 패턴 적용
         /// 
         /// 📋 주요 기능:
@@ -222,8 +272,15 @@ namespace LogisticManager.Processors
             // 진행률 콜백 설정
             _progress = progress;
             _progressReporter = progressReporter;
+            
+            // 공통 서비스 초기화
+            _fileCommonService = new FileCommonService();
+            _databaseCommonService = new DatabaseCommonService(databaseService);
+            _loggingCommonService = new LoggingCommonService();
+            _utilityCommonService = new UtilityCommonService();
+            
             //Console.WriteLine("✅ [초기화 완료] InvoiceProcessor 생성 성공");
-            Console.WriteLine("✅ 초기화 완료");
+            LogManagerService.LogInfo("✅ 초기화 완료");
             //Console.WriteLine("   🏗️  Repository 패턴: 활성화됨 (데이터 액세스 계층 분리)");
             //Console.WriteLine("   🚀 BatchProcessor: 활성화됨 (적응형 배치 처리)");
             //Console.WriteLine("   🔗 의존성 주입: 완료됨 (FileService, DatabaseService, ApiService)");
@@ -416,27 +473,27 @@ namespace LogisticManager.Processors
                 
                 // 송장출력 메세지 생성
                 finalProgress?.Report("📜 [4-1]  송장출력 메세지 처리");
-                Console.WriteLine("🔍 ProcessInvoiceMessageData 메서드 호출 시작...");
+                LogManagerService.LogInfo("🔍 ProcessInvoiceMessageData 메서드 호출 시작...");
                 finalProgressReporter?.Report(30);
                 await ProcessInvoiceMessageData(); // 📝 4-1송장출력 메세지 데이터 처리
-                Console.WriteLine("✅ ProcessInvoiceMessageData 메서드 호출 완료");
+                LogManagerService.LogInfo("✅ ProcessInvoiceMessageData 메서드 호출 완료");
 
                 
                 //합포장 처리 프로시져 호출
                 // 🎁 합포장 최적화 프로시저 호출 (ProcessMergePacking)
                 finalProgress?.Report("📜 [4-2]  합포장 최적화 처리");                
-                Console.WriteLine("🔍 ProcessMergePacking 메서드 호출 시작...");
+                LogManagerService.LogInfo("🔍 ProcessMergePacking 메서드 호출 시작...");
                 await ProcessMergePacking(); // 📝 4-2 합포장 최적화 프로시저 호출
                 finalProgressReporter?.Report(35);
-                Console.WriteLine("✅ ProcessMergePacking 메서드 호출 완료");
+                LogManagerService.LogInfo("✅ ProcessMergePacking 메서드 호출 완료");
 
                 // 송장분리처리 루틴 추가
                 // 감천 특별출고 처리 루틴
                 finalProgress?.Report("📜 [4-3]  감천 특별출고 처리");
-                Console.WriteLine("🔍 ProcessInvoiceSplit1 메서드 호출 시작...");
+                LogManagerService.LogInfo("🔍 ProcessInvoiceSplit1 메서드 호출 시작...");
                 await ProcessInvoiceSplit1(); // 📝 4-3 송장분리처리 루틴 호출
                 finalProgressReporter?.Report(40);
-                Console.WriteLine("✅ ProcessInvoiceSplit1 메서드 호출 완료");       
+                LogManagerService.LogInfo("✅ ProcessInvoiceSplit1 메서드 호출 완료");       
 
                 // 판매입력_이카운트자료 (테이블 -> 엑셀 생성)
                 // - 윈도우: Win + . (마침표) 키를 누르면 이모지 선택창이 나옵니다.
@@ -445,30 +502,30 @@ namespace LogisticManager.Processors
                 // - C# 문자열에 직접 유니코드 이모지를 넣어도 되고, \uXXXX 형식의 유니코드 이스케이프를 사용할 수도 있습니다.
                 // 예시: finalProgress?.Report("✅ 처리 완료!"); // 이모지는 위 방법으로 복사해서 붙여넣기
                 finalProgress?.Report("📜 [4-4]  판매입력_이카운트자료 생성 및 업로드 처리");
-                Console.WriteLine("🔍 ProcessSalesInputData 메서드 호출 시작...");
-                Console.WriteLine($"🔍 ProcessSalesInputData 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                LogManagerService.LogInfo("🔍 ProcessSalesInputData 메서드 호출 시작...");
+                LogManagerService.LogInfo($"🔍 ProcessSalesInputData 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 finalProgressReporter?.Report(45);
-                Console.WriteLine("🔍 ProcessSalesInputData 메서드 실행 중...");
+                LogManagerService.LogInfo("🔍 ProcessSalesInputData 메서드 실행 중...");
                 
                 try
                 {
                     var salesDataResult = await ProcessSalesInputData(); // 📝 4-4 판매입력_이카운트자료 엑셀 생성
-                    Console.WriteLine($"✅ ProcessSalesInputData 메서드 호출 완료 - 결과: {salesDataResult}");
-                    Console.WriteLine($"✅ ProcessSalesInputData 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                    LogManagerService.LogInfo($"✅ ProcessSalesInputData 메서드 호출 완료 - 결과: {salesDataResult}");
+                    LogManagerService.LogInfo($"✅ ProcessSalesInputData 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"❌ ProcessSalesInputData 실행 중 오류 발생: {ex.Message}");
-                    Console.WriteLine($"❌ ProcessSalesInputData 오류 상세: {ex.StackTrace}");
+                    LogManagerService.LogError($"❌ ProcessSalesInputData 실행 중 오류 발생: {ex.Message}");
+                    LogManagerService.LogError($"❌ ProcessSalesInputData 오류 상세: {ex.StackTrace}");
                     // 오류가 발생해도 전체 프로세스는 계속 진행
                 } 
 
                 // 톡딜불가 처리
                 finalProgress?.Report("📜 [4-5]  톡딜불가 처리");
-                Console.WriteLine("🔍 ProcessTalkDealUnavailable 메서드 호출 시작...");
+                LogManagerService.LogInfo("🔍 ProcessTalkDealUnavailable 메서드 호출 시작...");
                 await ProcessTalkDealUnavailable(); // 📝 4-5 톡딜불가 처리
                 finalProgressReporter?.Report(50);
-                Console.WriteLine("✅ ProcessTalkDealUnavailable 메서드 호출 완료");
+                LogManagerService.LogInfo("✅ ProcessTalkDealUnavailable 메서드 호출 완료");
 
                 // 송장출력관리 처리  
                 // 배송메세지에서 별표지우기 
@@ -500,10 +557,10 @@ namespace LogisticManager.Processors
                 // 개별작업2	(송장구분최종 업데이트)
 	            //   : 서울박스 중 서울 주소 → 서울박스
                 finalProgress?.Report("📜 [4-6]  송장출력관리 처리");
-                Console.WriteLine("🔍 ProcessInvoiceManagement 메서드 호출 시작...");
+                LogManagerService.LogInfo("🔍 ProcessInvoiceManagement 메서드 호출 시작...");
                 await ProcessInvoiceManagement(); // 📝 4-6 송장출력관리 처리
                 finalProgressReporter?.Report(55);
-                Console.WriteLine("✅ ProcessInvoiceManagement 메서드 호출 완료");
+                LogManagerService.LogInfo("✅ ProcessInvoiceManagement 메서드 호출 완료");
 
                 // 서울냉동처리
                 // (서울냉동) 서울서울낱개 분류
@@ -529,22 +586,32 @@ namespace LogisticManager.Processors
                 // (서울냉동) 송장출력_서울냉동에서 송장출력_서울냉동_최종으로 데이터 이동
                 // (서울냉동) 송장출력_서울냉동_최종 테이블 업데이트(택배비용, 박스크기, 출력개수 업데이트)                
                 finalProgress?.Report("❄️ [4-7] 서울냉동 처리");
-                Console.WriteLine("🔍 ProcessSeoulFrozenManagement 메서드 호출 시작...");
+                LogManagerService.LogInfo("🔍 ProcessSeoulFrozenManagement 메서드 호출 시작...");
                 await ProcessSeoulFrozenManagement(); // 📝 4-7 서울냉동 처리
                 finalProgressReporter?.Report(57);
-                Console.WriteLine("✅ ProcessSeoulFrozenManagement 메서드 호출 완료");
+                LogManagerService.LogInfo("✅ ProcessSeoulFrozenManagement 메서드 호출 완료");
+
+                // 서울냉동 최종파일 생성(업로드, 카카오워크)
+                finalProgress?.Report("📜 [4-8]  서울냉동 최종파일 생성 및 업로드 처리");
+                LogManagerService.LogInfo("🔍 ProcessSeoulFrozenFinalFile 메서드 호출 시작...");
+                LogManagerService.LogInfo($"🔍 ProcessSeoulFrozenFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                finalProgressReporter?.Report(59);
+                LogManagerService.LogInfo("🔍 ProcessSeoulFrozenFinalFile 메서드 실행 중...");
+                
+                try
+                {
+                    var salesDataResult = await ProcessSeoulFrozenFinalFile(); // 📝 4-8 서울냉동 최종파일 엑셀 생성
+                    LogManagerService.LogInfo($"✅ ProcessSeoulFrozenFinalFile 메서드 호출 완료 - 결과: {salesDataResult}");
+                    LogManagerService.LogInfo($"✅ ProcessSeoulFrozenFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                }
+                catch (Exception ex)
+                {
+                    LogManagerService.LogError($"❌ ProcessSeoulFrozenFinalFile 실행 중 오류 발생: {ex.Message}");
+                    LogManagerService.LogError($"❌ ProcessSeoulFrozenFinalFile 오류 상세: {ex.StackTrace}");
+                    // 오류가 발생해도 전체 프로세스는 계속 진행
+                } 
 
 
-
-
-
-
-                //await ProcessSpecialMarking(); // 🏷️ 지능형 별표 마킹
-                //await ProcessJejuMarking();    // 🏝️ 제주도 특수 지역 처리  
-                //await ProcessBoxMarking();     // 📦 박스 상품 최적화
-                //await ProcessMergePacking();   // 🎁 합포장 최적화
-                //await ProcessKakaoEvent();     // 🎯 카카오 이벤트 엔진
-                //await ProcessMessage();        // 💬 지능형 메시지 시스템
                 //finalProgressReporter?.Report(60);
                 //finalProgress?.Report("✅ [4단계 완료] 고급 특수 처리 완료 - 물류 최적화 적용됨");
 
@@ -669,9 +736,9 @@ namespace LogisticManager.Processors
                 _progressReporter?.Report(-1);
                 
                 // 상세 오류 정보 출력
-                Console.WriteLine($"🚨 시스템 장애 발생: {ex.GetType().Name} - {ex.Message}");
-                Console.WriteLine($"📂 파일 경로: {filePath ?? "Unknown"}");
-                Console.WriteLine($"🔍 근본 원인: {rootCause.Message}");
+                LogManagerService.LogError($"🚨 시스템 장애 발생: {ex.GetType().Name} - {ex.Message}");
+                LogManagerService.LogError($"📂 파일 경로: {filePath ?? "Unknown"}");
+                LogManagerService.LogError($"🔍 근본 원인: {rootCause.Message}");
                 
                 // 긴급 정리 작업
                 try
@@ -680,7 +747,7 @@ namespace LogisticManager.Processors
                 }
                 catch (Exception cleanupEx)
                 {
-                    Console.WriteLine($"⚠️ 긴급 정리 작업 실패: {cleanupEx.Message}");
+                    LogManagerService.LogWarning($"⚠️ 긴급 정리 작업 실패: {cleanupEx.Message}");
                 }
                 throw new InvalidOperationException(
                     $"전사 물류 시스템 처리 실패 - {errorCategory}: {userFriendlyMessage}", 
@@ -785,60 +852,60 @@ namespace LogisticManager.Processors
         /// <exception cref="Exception">데이터베이스 초기화 실패 시</exception>
         private async Task TruncateAndInsertOriginalDataOptimized(DataTable data, IProgress<string>? progress)
         {
-            // 로그 파일 경로
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            // 로그 파일 경로 (통합 로그 서비스 사용)
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log"); // 기존 호환성 유지
             
             try
             {
                 // 데이터베이스 연결 상태 확인
                 progress?.Report("🔍 데이터베이스 연결 상태 확인 중...");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 🔍 데이터베이스 연결 상태 확인 중...\n");
+                LogManagerService.LogInfo("🔍 데이터베이스 연결 상태 확인 중...");
                 
                 var isConnected = await CheckDatabaseConnectionAsync();
                 if (!isConnected)
                 {
                     var errorMessage = "데이터베이스에 연결할 수 없습니다. 연결 정보와 네트워크 상태를 확인해주세요.";
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ❌ {errorMessage}\n");
+                    LogManagerService.LogError($"❌ {errorMessage}");
                     throw new InvalidOperationException(errorMessage);
                 }
                 
                 progress?.Report("✅ 데이터베이스 연결 확인 완료");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ✅ 데이터베이스 연결 확인 완료\n");
+                LogManagerService.LogInfo("✅ 데이터베이스 연결 확인 완료");
 
                 // 데이터베이스 테이블 초기화
                 progress?.Report("🗄️ 데이터베이스 테이블 초기화 중... ");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 🗄️ 데이터베이스 테이블 초기화 중... \n");
+                LogManagerService.LogInfo("🗄️ 데이터베이스 테이블 초기화 중... ");
                 
                 var tableName = GetTableName("Tables.Invoice.Main");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 🔍 대상 테이블: {tableName}\n");
+                LogManagerService.LogInfo($"🔍 대상 테이블: {tableName}");
                 
                 // 테이블 존재 여부 확인
                 var tableExists = await CheckTableExistsAsync(tableName);
                 if (!tableExists)
                 {
                     progress?.Report($"⚠️ 테이블 '{tableName}'이 존재하지 않습니다.");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ⚠️ 테이블 '{tableName}'이 존재하지 않습니다.\n");
+                    LogManagerService.LogWarning($"⚠️ 테이블 '{tableName}'이 존재하지 않습니다.");
                     
                     progress?.Report("💡 테이블을 생성하거나 다른 테이블을 사용해주세요.");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 💡 테이블을 생성하거나 다른 테이블을 사용해주세요.\n");
+                    LogManagerService.LogInfo($"💡 테이블을 생성하거나 다른 테이블을 사용해주세요.");
                     
                     // 대체 테이블 시도
                     // 이미 위에서 작업대상 테이블명을 tableName 변수에 할당했으므로, 동일한 테이블명을 fallbackTableName에 재할당
                     var fallbackTableName = tableName;
                     progress?.Report($"🔄 대체 테이블 확인: {fallbackTableName}");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 🔄 대체 테이블 확인: {fallbackTableName}\n");
+                    LogManagerService.LogInfo($"🔄 대체 테이블 확인: {fallbackTableName}");
                     
                     var fallbackTableExists = await CheckTableExistsAsync(fallbackTableName);
                     if (!fallbackTableExists)
                     {
                         var errorMessage = $"대체 테이블 '{fallbackTableName}'도 존재하지 않습니다. 테이블을 생성해주세요.";
-                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ❌ {errorMessage}\n");
+                        LogManagerService.LogError($"❌ {errorMessage}");
                         throw new InvalidOperationException(errorMessage);
                     }
                     
                     tableName = fallbackTableName;
                     progress?.Report($"✅ 대체 테이블 사용: {tableName}");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ✅ 대체 테이블 사용: {tableName}\n");
+                    LogManagerService.LogInfo($"✅ 대체 테이블 사용: {tableName}");
                 }
                 
                 // 테이블 초기화 시도
@@ -847,56 +914,56 @@ namespace LogisticManager.Processors
                     var truncateSuccess = await _invoiceRepository.TruncateTableAsync(tableName);
                     
                     var tableInfoLog = $"작업 대상 Table: {tableName}";
-                    Console.WriteLine(tableInfoLog);
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {tableInfoLog}\n");
+                    LogManagerService.LogInfo(tableInfoLog);
+                    LogManagerService.LogInfo($"{tableInfoLog}");
 
                     // 초기화 결과 검증 및 로깅
                     if (truncateSuccess)
                     {
                         progress?.Report("✅ 테이블 초기화 완료");
-                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ✅ 테이블 초기화 완료\n");
+                        LogManagerService.LogInfo($"✅ 테이블 초기화 완료");
                         
-                        Console.WriteLine($"[빌드정보] 테이블 초기화 완료: {tableName}");
-                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [빌드정보] 테이블 초기화 완료: {tableName}\n");
+                        LogManagerService.LogInfo($"[빌드정보] 테이블 초기화 완료: {tableName}");
+                        LogManagerService.LogInfo($"[빌드정보] 테이블 초기화 완료: {tableName}");
                     }
                     else
                     {
                         var errorMessage = $"테이블 초기화에 실패했습니다. (테이블: {tableName})";
-                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ❌ {errorMessage}\n");
+                        LogManagerService.LogError($"❌ {errorMessage}");
                         throw new InvalidOperationException(errorMessage);
                     }
                 }
                 catch (Exception truncateEx)
                 {
                     progress?.Report($"⚠️ 테이블 초기화 실패: {truncateEx.Message}");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ⚠️ 테이블 초기화 실패: {truncateEx.Message}\n");
+                    LogManagerService.LogWarning($"⚠️ 테이블 초기화 실패: {truncateEx.Message}");
                     
                     progress?.Report("💡 테이블이 존재하지 않거나 권한이 부족할 수 있습니다.");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 💡 테이블이 존재하지 않거나 권한이 부족할 수 있습니다.\n");
+                    LogManagerService.LogInfo($"💡 테이블이 존재하지 않거나 권한이 부족할 수 있습니다.");
                     
                     progress?.Report("💡 데이터베이스 연결 상태와 테이블 존재 여부를 확인해주세요.");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 💡 데이터베이스 연결 상태와 테이블 존재 여부를 확인해주세요.\n");
+                    LogManagerService.LogInfo($"💡 데이터베이스 연결 상태와 테이블 존재 여부를 확인해주세요.");
                     
                     // 테이블 생성 시도 또는 다른 테이블 사용
                     var fallbackTableName = GetTableName("Tables.Invoice.Main");
                     progress?.Report($"🔄 대체 테이블 사용 시도: {fallbackTableName}");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 🔄 대체 테이블 사용 시도: {fallbackTableName}\n");
+                    LogManagerService.LogInfo($"🔄 대체 테이블 사용 시도: {fallbackTableName}");
                     
                     var fallbackSuccess = await _invoiceRepository.TruncateTableAsync(fallbackTableName);
                     if (!fallbackSuccess)
                     {
                         var errorMessage = $"대체 테이블 초기화도 실패했습니다. (테이블: {fallbackTableName})";
-                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ❌ {errorMessage}\n");
+                        LogManagerService.LogError($"❌ {errorMessage}");
                         throw new InvalidOperationException(errorMessage);
                     }
                     
                     tableName = fallbackTableName;
                     progress?.Report($"✅ 대체 테이블 초기화 완료: {fallbackTableName}");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ✅ 대체 테이블 초기화 완료: {fallbackTableName}\n");
+                    LogManagerService.LogInfo($"✅ 대체 테이블 초기화 완료: {fallbackTableName}");
                 }
                 
                 // 데이터 변환
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 🔄 데이터 변환 중... (DataTable → Order 객체)\n");
+                LogManagerService.LogInfo($"🔄 데이터 변환 중... (DataTable → Order 객체)");
                 
                 var orders = ConvertDataTableToOrders(data);
                 
@@ -937,15 +1004,15 @@ namespace LogisticManager.Processors
                     
                     // 경고 로그 출력 (처리 중단하지 않음)
                     progress?.Report(warningLog.ToString());
-                    Console.WriteLine(warningLog.ToString());
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {warningLog.ToString()}\n");
+                    LogManagerService.LogWarning(warningLog.ToString());
+                    LogManagerService.LogWarning($"{warningLog.ToString()}");
                     
                     // 🔧 수정: 유효하지 않은 데이터도 포함하여 모든 데이터 처리
                     // 대용량 데이터 처리 시 유효성 검증을 완화하여 처리 진행
                     validOrders = orders.ToList(); // 모든 데이터를 유효한 것으로 간주
                     
                     progress?.Report($"📊 유효성 검증을 완화하여 모든 데이터 {validOrders.Count:N0}건으로 처리 계속 진행");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 📊 유효성 검증을 완화하여 모든 데이터 {validOrders.Count:N0}건으로 처리 계속 진행\n");
+                    LogManagerService.LogInfo($"📊 유효성 검증을 완화하여 모든 데이터 {validOrders.Count:N0}건으로 처리 계속 진행");
                 }
                 else
                 {
@@ -955,55 +1022,55 @@ namespace LogisticManager.Processors
                 
                 // 변환 결과 통계 보고
                 progress?.Report($"📊 데이터 변환 완료: 총 {data.Rows.Count}건 → 유효 {validOrders.Count}건");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 📊 데이터 변환 완료: 총 {data.Rows.Count}건 → 유효 {validOrders.Count}건\n");
+                LogManagerService.LogInfo($"📊 데이터 변환 완료: 총 {data.Rows.Count}건 → 유효 {validOrders.Count}건");
                 
                 // 유효 데이터 존재 여부 확인
                 if (validOrders.Count == 0)
                 {
                     progress?.Report("⚠️ 유효한 데이터가 없습니다.");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ⚠️ 유효한 데이터가 없습니다.\n");
+                    LogManagerService.LogWarning($"⚠️ 유효한 데이터가 없습니다.");
                     return; // 처리할 데이터가 없으므로 메서드 종료
                 }
                 
                 // 적응형 배치 처리로 대용량 데이터 삽입
-                progress?.Report("🚀 대용량 배치 처리 시작... (적응형 배치 크기 적용)");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} 🚀 대용량 배치 처리 시작... (적응형 배치 크기 적용)\n");
+                progress?.Report("🚀 대용량 배치 처리 시작...");
+                LogManagerService.LogInfo($"🚀 대용량 배치 처리 시작...");
                 
                 var (successCount, failureCount) = await _batchProcessor.ProcessLargeDatasetAsync(validOrders, progress, false, tableName);
                 
                 // 처리 결과 분석 및 성능 통계
                 progress?.Report($"✅ 원본 데이터 적재 완료: 성공 {successCount:N0}건, 실패 {failureCount:N0}건 (테이블: {tableName})");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ✅ 원본 데이터 적재 완료: 성공 {successCount:N0}건, 실패 {failureCount:N0}건 (테이블: {tableName})\n");
+                LogManagerService.LogInfo($"✅ 원본 데이터 적재 완료: 성공 {successCount:N0}건, 실패 {failureCount:N0}건 (테이블: {tableName})");
                 
                 // 실패 원인 상세 분석
                 if (failureCount > 0)
                 {
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [원본데이터적재] 실패 원인 상세 분석 - 총 실패: {failureCount:N0}건 ({failureCount * 100.0 / validOrders.Count:F1}%)\n");
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [원본데이터적재] 실패율 분석 - 유효 데이터: {validOrders.Count:N0}건, 실패: {failureCount:N0}건, 실패율: {failureCount * 100.0 / validOrders.Count:F1}%\n");
+                    LogManagerService.LogInfo($"[원본데이터적재] 실패 원인 상세 분석 - 총 실패: {failureCount:N0}건 ({failureCount * 100.0 / validOrders.Count:F1}%)");
+                    LogManagerService.LogInfo($"[원본데이터적재] 실패율 분석 - 유효 데이터: {validOrders.Count:N0}건, 실패: {failureCount:N0}건, 실패율: {failureCount * 100.0 / validOrders.Count:F1}%");
                     
                     // 실패율이 높은 경우 경고
                     if (failureCount * 100.0 / validOrders.Count > 5.0)
                     {
-                        File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [원본데이터적재] ⚠️ 높은 실패율 경고 - 실패율이 5%를 초과합니다. ({failureCount * 100.0 / validOrders.Count:F1}%)\n");
+                        LogManagerService.LogWarning($"[원본데이터적재] ⚠️ 높은 실패율 경고 - 실패율이 5%를 초과합니다. ({failureCount * 100.0 / validOrders.Count:F1}%)");
                     }
                 }
                 else
                 {
-                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [원본데이터적재] 모든 데이터 처리 성공! - 성공률: 100% ({validOrders.Count:N0}건)\n");
+                    LogManagerService.LogInfo($"[원본데이터적재] 모든 데이터 처리 성공! - 성공률: 100% ({validOrders.Count:N0}건)");
                 }
                 
                 // 배치 처리 성능 통계 수집 및 출력
                 var (currentBatchSize, currentMemoryMB, availableMemoryMB) = _batchProcessor.GetStatus();
-                Console.WriteLine($"[빌드정보] 배치 처리 완료 - 테이블: {tableName}, 최종 배치 크기: {currentBatchSize}, 메모리 사용량: {currentMemoryMB}MB, 가용 메모리: {availableMemoryMB}MB");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [빌드정보] 배치 처리 완료 - 테이블: {tableName}, 최종 배치 크기: {currentBatchSize}, 메모리 사용량: {currentMemoryMB}MB, 가용 메모리: {availableMemoryMB}MB\n");
+                LogManagerService.LogInfo($"[빌드정보] 배치 처리 완료 - 테이블: {tableName}, 최종 배치 크기: {currentBatchSize}, 메모리 사용량: {currentMemoryMB}MB, 가용 메모리: {availableMemoryMB}MB");
+                LogManagerService.LogInfo($"[빌드정보] 배치 처리 완료 - 테이블: {tableName}, 최종 배치 크기: {currentBatchSize}, 메모리 사용량: {currentMemoryMB}MB, 가용 메모리: {availableMemoryMB}MB");
             }
             catch (Exception ex)
             {
                 progress?.Report($"❌ 데이터베이스 초기화 및 적재 실패: {ex.Message}");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} ❌ 데이터베이스 초기화 및 적재 실패: {ex.Message}\n");
+                LogManagerService.LogError($"❌ 데이터베이스 초기화 및 적재 실패: {ex.Message}");
                 
-                Console.WriteLine($"[빌드정보] 오류 발생: {ex}");
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [빌드정보] 오류 발생: {ex}\n");
+                LogManagerService.LogError($"[빌드정보] 오류 발생: {ex}");
+                LogManagerService.LogError($"[빌드정보] 오류 발생: {ex}");
                 throw;
             }
         }
@@ -1120,7 +1187,8 @@ namespace LogisticManager.Processors
                 
                 var procedureResult = await ExecuteMergePackingProcedureAsync(PROCEDURE_NAME);
                 
-                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 완료: {procedureResult}");
+                // ExecuteStoredProcedureAsync에서 이미 상세 로깅을 수행하므로 간단한 완료 메시지만 기록
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 완료");
                 
                 // 처리 완료
                 var endTime = DateTime.Now;
@@ -1129,8 +1197,8 @@ namespace LogisticManager.Processors
                 WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 🎉 합포장 변경 처리 완료 - 소요시간: {duration.TotalSeconds:F1}초");
                 
                 // 성공 통계 로깅
-                _progress?.Report($"[{METHOD_NAME}] 📊 처리 통계 - 데이터: {insertCount:N0}건, 프로시저결과: {procedureResult}, 소요시간: {duration.TotalSeconds:F1}초");
-                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 📊 처리 통계 - 데이터: {insertCount:N0}건, 프로시저결과: {procedureResult}, 소요시간: {duration.TotalSeconds:F1}초");
+                _progress?.Report($"[{METHOD_NAME}] 📊 처리 통계 - 데이터: {insertCount:N0}건, 프로시저결과: 5개 단계 처리 완료, 소요시간: {duration.TotalSeconds:F1}초");
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 📊 처리 통계 - 데이터: {insertCount:N0}건, 프로시저결과: 5개 단계 처리 완료, 소요시간: {duration.TotalSeconds:F1}초");
             }
             catch (Exception ex)
             {
@@ -1332,12 +1400,12 @@ namespace LogisticManager.Processors
             {
                 // Windows 환경에 맞는 줄바꿈 문자 사용
                 var lineBreak = Environment.NewLine;
-                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}{lineBreak}");
+                LogManagerService.LogInfo($"{message}");
             }
             catch (Exception ex)
             {
                 // 로그 쓰기 실패 시 무시하고 계속 진행
-                Console.WriteLine($"로그 쓰기 실패: {ex.Message}");
+                LogManagerService.LogWarning($"로그 쓰기 실패: {ex.Message}");
             }
         }
 
@@ -1352,7 +1420,7 @@ namespace LogisticManager.Processors
                 if (message.Length <= maxLineLength)
                 {
                     // 짧은 메시지는 한 줄로
-                    File.AppendAllText(logPath, $"{timestamp} {prefix}{message}{lineBreak}");
+                    LogManagerService.LogInfo($"{timestamp} {prefix}{message}");
                 }
                 else
                 {
@@ -1365,7 +1433,7 @@ namespace LogisticManager.Processors
                         if ((currentLine + word).Length > maxLineLength && !string.IsNullOrEmpty(currentLine))
                         {
                             // 현재 줄이 너무 길면 새 줄로
-                            File.AppendAllText(logPath, $"{timestamp} {prefix}{currentLine.Trim()}{lineBreak}");
+                            LogManagerService.LogInfo($"{timestamp} {prefix}{currentLine.Trim()}");
                             currentLine = word;
                         }
                         else
@@ -1377,14 +1445,14 @@ namespace LogisticManager.Processors
                     // 마지막 줄 처리
                     if (!string.IsNullOrEmpty(currentLine))
                     {
-                        File.AppendAllText(logPath, $"{timestamp} {prefix}{currentLine.Trim()}{lineBreak}");
+                        LogManagerService.LogInfo($"{timestamp} {prefix}{currentLine.Trim()}");
                     }
                 }
             }
             catch (Exception ex)
             {
                 // 로그 쓰기 실패 시 무시하고 계속 진행
-                Console.WriteLine($"로그 쓰기 실패: {ex.Message}");
+                LogManagerService.LogWarning($"로그 쓰기 실패: {ex.Message}");
             }
         }
         
@@ -1966,60 +2034,30 @@ namespace LogisticManager.Processors
         {
             try
             {
-                // column_mapping.json 파일 읽기
-                var mappingJson = ConfigurationService.ReadColumnMappingJson();
+                // 테이블별 매핑 파일 경로 생성 (프로젝트 루트에서 찾기)
+                var projectRoot = GetProjectRootDirectory();
+                var mappingFilePath = Path.Combine(projectRoot, "config", "table_mappings", $"{tableName}.json");
+                
+                // 파일 존재 확인
+                if (!File.Exists(mappingFilePath))
+                {
+                    throw new InvalidOperationException($"테이블별 매핑 파일을 찾을 수 없습니다: {mappingFilePath}");
+                }
+                
+                // JSON 파일 읽기
+                var mappingJson = File.ReadAllText(mappingFilePath, Encoding.UTF8);
                 if (string.IsNullOrEmpty(mappingJson))
                 {
-                    throw new InvalidOperationException("column_mapping.json 파일을 읽을 수 없습니다.");
+                    throw new InvalidOperationException($"매핑 파일이 비어있습니다: {mappingFilePath}");
                 }
                 
                 // JSON 파싱
                 var mappingData = JsonSerializer.Deserialize<JsonElement>(mappingJson);
                 
-                // 해당 테이블의 매핑 정보 찾기
-                if (!mappingData.TryGetProperty("mappings", out var mappings))
+                // columns 속성 찾기
+                if (!mappingData.TryGetProperty("columns", out var columns))
                 {
-                    throw new InvalidOperationException("mappings 속성을 찾을 수 없습니다.");
-                }
-                
-                // 테이블명에 따라 적절한 매핑 키 찾기
-                string mappingKey = "";
-                JsonElement tableMapping;
-                
-                if (tableName == "송장출력_메세지")
-                {
-                    mappingKey = "message_table";
-                }
-                else if (tableName == "송장출력_특수출력_합포장변경")
-                {
-                    mappingKey = "merge_packing_table";
-                }
-                else if (tableName == "송장출력_특수출력_감천분리출고")
-                {
-                    mappingKey = "gamcheon_separation_table";
-                }
-                else if (tableName == "송장출력_톡딜불가")
-                {
-                    mappingKey = "talkdeal_unavailable_table";
-                }
-                else if (tableName == "별표송장")
-                {
-                    mappingKey = "star_invoice_table";
-                }
-                else
-                {
-                    // 기본값으로 order_table 사용
-                    mappingKey = "order_table";
-                }
-                
-                if (!mappings.TryGetProperty(mappingKey, out tableMapping))
-                {
-                    throw new InvalidOperationException($"매핑 키 '{mappingKey}'에 대한 매핑 정보를 찾을 수 없습니다. (테이블: {tableName})");
-                }
-                
-                if (!tableMapping.TryGetProperty("columns", out var columns))
-                {
-                    throw new InvalidOperationException("컬럼 매핑 정보를 찾을 수 없습니다.");
+                    throw new InvalidOperationException("columns 속성을 찾을 수 없습니다.");
                 }
                 
                 // 컬럼 매핑 생성
@@ -2041,7 +2079,7 @@ namespace LogisticManager.Processors
                 
                 // 매핑 검증 결과 로깅
                 var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
-                var mappingLog = $"[ValidateColumnMapping] 컬럼 매핑 검증 완료 - 테이블: {tableName}, 매핑키: {mappingKey}, 엑셀: {excelColumns.Count}개, 매핑: {columnMapping.Count}개";
+                var mappingLog = $"[ValidateColumnMapping] 컬럼 매핑 검증 완료 - 테이블: {tableName}, 파일: {mappingFilePath}, 엑셀: {excelColumns.Count}개, 매핑: {columnMapping.Count}개";
                 WriteLogWithFlush(logPath, mappingLog);
                 
                 // 상세 매핑 정보 로깅 (여러 줄로 나누기)
@@ -2192,14 +2230,14 @@ namespace LogisticManager.Processors
                 var procedureLog = $"[ExecuteMergePackingProcedure] {procedureName} 프로시저 실행 시작";
                 WriteLogWithFlush(logPath, procedureLog);
                 
-                // 프로시저 실행
-                var procedureQuery = $"CALL {procedureName}()";
-                var result = await _invoiceRepository.ExecuteNonQueryAsync(procedureQuery);
+                // ExecuteStoredProcedureAsync 사용으로 프로시저 결과 캐치
+                var result = await ExecuteStoredProcedureAsync(procedureName);
                 
-                var resultLog = $"[ExecuteMergePackingProcedure] {procedureName} 프로시저 실행 완료 - 결과: {result}";
+                // ExecuteStoredProcedureAsync에서 이미 상세 로깅을 수행하므로 간단한 완료 메시지만 기록
+                var resultLog = $"[ExecuteMergePackingProcedure] {procedureName} 프로시저 실행 완료";
                 WriteLogWithFlush(logPath, resultLog);
                 
-                return result.ToString();
+                return result;
             }
             catch (Exception ex)
             {
@@ -3406,12 +3444,12 @@ namespace LogisticManager.Processors
 
                 // 기존 파일에 테스트 쓰기
                 var testMessage = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] 쓰기 권한 테스트\n";
-                File.AppendAllText(filePath, testMessage);
+                LogManagerService.LogInfo(testMessage);
                 return true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"⚠️ 로그 파일 쓰기 권한 확인 실패: {ex.Message}");
+                LogManagerService.LogWarning($"⚠️ 로그 파일 쓰기 권한 확인 실패: {ex.Message}");
                 return false;
             }
         }
@@ -3457,50 +3495,24 @@ namespace LogisticManager.Processors
 
         #region 판매입력 데이터 처리 (Sales Input Data Processing)
 
-        /// <summary>
-        /// 판매입력 이카운트 자료를 처리하는 메서드
-        /// 
-        /// 처리 과정:
-        /// 1. 데이터베이스에서 판매입력 데이터 조회
-        /// 2. Excel 파일 생성 (헤더 없음)
-        /// 3. Dropbox에 파일 업로드
-        /// 4. KakaoWork 채팅방에 알림 전송
-        /// 
-        /// 파일명 규칙:
-        /// - 판매입력_이카운트자료_{yyMMdd}_{HH}시{mm}분}.xlsx
-        /// 
-        /// 설정 파일:
-        /// - DropboxFolderPath4: Dropbox 업로드 경로
-        /// - KakaoWork.ChatroomId.Check: 알림 전송 채팅방
-        /// 
-        /// 예외 처리:
-        /// - 데이터베이스 연결 오류
-        /// - Excel 파일 생성 오류
-        /// - Dropbox 업로드 오류
-        /// - KakaoWork 알림 전송 오류
-        /// </summary>
-        /// <returns>처리 성공 여부</returns>
-        /// <summary>
-        /// 판매입력 이카운트 자료를 처리하는 메서드
-        /// 
-        /// - DB에서 판매입력 데이터를 조회하고, 엑셀 파일로 저장 후 Dropbox에 업로드, 카카오워크 알림까지 자동 처리
-        /// - 파일명, 경로, 예외처리 등 모든 과정을 자동화하여 운영 효율성 극대화
-        /// </summary>
         /// <returns>처리 성공 여부 (bool)</returns>
+        // 판매입력 이카운트 자료(송장출력_주문정보 테이블의 판매입력용 데이터)를 조회하여
+        // 엑셀 파일로 저장하고, Dropbox에 업로드 및 카카오워크 알림까지 처리하는 메서드입니다.
+        // 즉, 판매입력용 데이터의 자동 추출·배포·알림을 담당합니다.
         public async Task<bool> ProcessSalesInputData()
         {
             const string METHOD_NAME = "ProcessSalesInputData";
             const string TABLE_NAME = "송장출력_주문정보";
-            const string EXCEL_01 = "판매입력";
+            const string SHEET_NAME = "판매입력";
             
                             // 로그 서비스 초기화
                 var logService = new LogManagementService();
                 
                 try
                 {
-                    Console.WriteLine($"🔍 [{METHOD_NAME}] 판매입력 데이터 처리 시작...");
-                    Console.WriteLine($"🔍 [{METHOD_NAME}] 현재 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                    Console.WriteLine($"🔍 [{METHOD_NAME}] 호출 스택 확인 중...");
+                    LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 판매입력 데이터 처리 시작...");
+                    LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 현재 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                    LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 호출 스택 확인 중...");
                     
                     // 로그 파일 경로 정보 출력
                     logService.PrintLogFilePathInfo();
@@ -3514,41 +3526,116 @@ namespace LogisticManager.Processors
                     logService.LogMessage($"[{METHOD_NAME}] 호출 스택 확인 중...");
 
                 // 1단계: 테이블명 확인
-                Console.WriteLine($"📋 [{METHOD_NAME}] 대상 테이블: {TABLE_NAME}");
+                LogManagerService.LogInfo($"📋 [{METHOD_NAME}] 대상 테이블: {TABLE_NAME}");
                 logService.LogMessage($"[{METHOD_NAME}] 대상 테이블: {TABLE_NAME}");
 
                 // 2단계: 데이터베이스에서 판매입력 데이터 조회
-                var salesData = await GetSalesDataFromDatabase(TABLE_NAME);
+                var salesData = await _databaseCommonService.GetDataFromDatabase(TABLE_NAME);
                 if (salesData == null || salesData.Rows.Count == 0)
                 {
-                    Console.WriteLine($"⚠️ [{METHOD_NAME}] 판매입력 데이터가 없습니다.");
+                    LogManagerService.LogWarning($"⚠️ [{METHOD_NAME}] 판매입력 데이터가 없습니다.");
                     logService.LogMessage($"[{METHOD_NAME}] ⚠️ 판매입력 데이터가 없습니다.");
                     return true; // 데이터가 없는 것은 오류가 아님
                 }
 
-                Console.WriteLine($"📊 [{METHOD_NAME}] 데이터 조회 완료: {salesData.Rows.Count:N0}건");
+                LogManagerService.LogInfo($"📊 [{METHOD_NAME}] 데이터 조회 완료: {salesData.Rows.Count:N0}건");
                 logService.LogMessage($"[{METHOD_NAME}] 📊 데이터 조회 완료: {salesData.Rows.Count:N0}건");
 
                 // 3단계: Excel 파일 생성 (헤더 없음)
-                var excelFileName = GenerateSalesDataExcelFileName();
+                var excelFileName = _fileCommonService.GenerateExcelFileName("판매입력", "이카운트자료");
                 var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
                 
                 logService.LogMessage($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
                 
-                var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(salesData, excelFilePath, EXCEL_01);
+                var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(salesData, excelFilePath, SHEET_NAME);
                 if (!excelCreated)
                 {
-                    Console.WriteLine($"❌ [{METHOD_NAME}] Excel 파일 생성 실패: {excelFilePath}");
+                    LogManagerService.LogError($"❌ [{METHOD_NAME}] Excel 파일 생성 실패: {excelFilePath}");
                     logService.LogMessage($"[{METHOD_NAME}] ❌ Excel 파일 생성 실패: {excelFilePath}");
                     return false;
                 }
 
-                Console.WriteLine($"✅ [{METHOD_NAME}] Excel 파일 생성 완료: {excelFilePath}");
+                LogManagerService.LogInfo($"✅ [{METHOD_NAME}] Excel 파일 생성 완료: {excelFilePath}");
                 logService.LogMessage($"[{METHOD_NAME}] ✅ Excel 파일 생성 완료: {excelFilePath}");
 
-                // 4-7단계 코드 블록 제거됨 - 주석 처리된 미사용 코드
+                // 4단계: Dropbox에 파일 업로드
+                var dropboxFolderPath = ConfigurationManager.AppSettings["DropboxFolderPath4"];
+                if (string.IsNullOrEmpty(dropboxFolderPath))
+                {
+                    LogManagerService.LogWarning($"⚠️ [{METHOD_NAME}] DropboxFolderPath4 설정이 없습니다.");
+                    logService.LogMessage($"[{METHOD_NAME}] ⚠️ DropboxFolderPath4 설정이 없습니다.");
+                    return false;
+                }
 
-                Console.WriteLine($"✅ [{METHOD_NAME}] 판매입력 데이터 처리 완료");
+                logService.LogMessage($"[{METHOD_NAME}] Dropbox 업로드 시작: {dropboxFolderPath}");
+                var dropboxFilePath = await _fileCommonService.UploadFileToDropbox(excelFilePath, dropboxFolderPath);
+                if (string.IsNullOrEmpty(dropboxFilePath))
+                {
+                    LogManagerService.LogError($"❌ [{METHOD_NAME}] Dropbox 업로드 실패");
+                    logService.LogMessage($"[{METHOD_NAME}] ❌ Dropbox 업로드 실패");
+                    return false;
+                }
+
+                LogManagerService.LogInfo($"✅ [{METHOD_NAME}] Dropbox 업로드 완료: {dropboxFilePath}");
+                logService.LogMessage($"[{METHOD_NAME}] ✅ Dropbox 업로드 완료: {dropboxFilePath}");
+
+                // 5단계: Dropbox 공유 링크 생성
+                logService.LogMessage($"[{METHOD_NAME}] Dropbox 공유 링크 생성 시작");
+                var sharedLink = await _fileCommonService.CreateDropboxSharedLink(dropboxFilePath);
+                if (string.IsNullOrEmpty(sharedLink))
+                {
+                    LogManagerService.LogError($"❌ [{METHOD_NAME}] Dropbox 공유 링크 생성 실패");
+                    logService.LogMessage($"[{METHOD_NAME}] ❌ Dropbox 공유 링크 생성 실패");
+                    return false;
+                }
+
+                LogManagerService.LogInfo($"✅ [{METHOD_NAME}] Dropbox 공유 링크 생성 완료: {sharedLink}");
+                logService.LogMessage($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
+
+                // 6단계: KakaoWork 채팅방에 알림 전송
+                // KakaoWork 채팅방 ID 확인 및 로그 기록
+                /*var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
+                if (string.IsNullOrEmpty(kakaoWorkChannelId))
+                {
+                    LogManagerService.LogWarning($"⚠️ [{METHOD_NAME}] KakaoWork 채팅방 ID(KakaoWorkChannelId) 설정이 없습니다.");
+                    logService.LogMessage($"[{METHOD_NAME}] ⚠️ KakaoWork 채팅방 ID(KakaoWorkChannelId) 설정이 없습니다.");
+                    return false;
+                }
+                logService.LogMessage($"[{METHOD_NAME}] KakaoWork 알림 전송 시작 (채팅방ID: {kakaoWorkChannelId})");
+                LogManagerService.LogInfo($"🔔 [{METHOD_NAME}] KakaoWork 알림 전송 대상 채팅방ID: {kakaoWorkChannelId}");
+
+                // KakaoWork 알림 전송 (채팅방ID 명시적으로 전달)
+                var notificationSent = await SendKakaoWorkNotification(sharedLink, kakaoWorkChannelId);
+                if (!notificationSent)
+                {
+                    LogManagerService.LogError($"❌ [{METHOD_NAME}] KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
+                    logService.LogMessage($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
+                    return false;
+                }
+
+                LogManagerService.LogInfo($"✅ [{METHOD_NAME}] KakaoWork 알림 전송 완료");
+                logService.LogMessage($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료");
+                */
+
+                // 7단계: 임시 파일 정리
+                try
+                {
+                    if (File.Exists(excelFilePath))
+                    {
+                        File.Delete(excelFilePath);
+                        LogManagerService.LogInfo($"🗑️ [{METHOD_NAME}] 임시 파일 정리 완료: {excelFilePath}");
+                        logService.LogMessage($"[{METHOD_NAME}] 🗑️ 임시 파일 정리 완료: {excelFilePath}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogManagerService.LogWarning($"⚠️ [{METHOD_NAME}] 임시 파일 정리 실패: {ex.Message}");
+                    logService.LogMessage($"[{METHOD_NAME}] ⚠️ 임시 파일 정리 실패: {ex.Message}");
+                    // 임시 파일 정리 실패는 전체 프로세스 실패로 처리하지 않음
+                }
+                
+
+                LogManagerService.LogInfo($"✅ [{METHOD_NAME}] 판매입력 데이터 처리 완료");
                 logService.LogMessage($"[{METHOD_NAME}] ✅ 판매입력 데이터 처리 완료");
                 return true;
             }
@@ -3557,8 +3644,8 @@ namespace LogisticManager.Processors
                 var errorMessage = $"❌ [{METHOD_NAME}] 처리 중 오류 발생: {ex.Message}";
                 var stackTraceMessage = $"📋 [{METHOD_NAME}] 스택 트레이스: {ex.StackTrace}";
                 
-                Console.WriteLine(errorMessage);
-                Console.WriteLine(stackTraceMessage);
+                LogManagerService.LogError(errorMessage);
+                LogManagerService.LogError(stackTraceMessage);
                 
                 // app.log 파일에 오류 상세 정보 기록
                 logService.LogMessage(errorMessage);
@@ -3568,123 +3655,201 @@ namespace LogisticManager.Processors
                 if (ex.InnerException != null)
                 {
                     var innerErrorMessage = $"📋 [{METHOD_NAME}] 내부 예외: {ex.InnerException.Message}";
-                    Console.WriteLine(innerErrorMessage);
+                    LogManagerService.LogError(innerErrorMessage);
                     logService.LogMessage(innerErrorMessage);
                 }
                 
                 // 추가 디버깅 정보
-                Console.WriteLine($"🔍 [{METHOD_NAME}] 현재 작업 디렉토리: {Environment.CurrentDirectory}");
-                Console.WriteLine($"🔍 [{METHOD_NAME}] 로그 파일 경로: {logService.LogFilePath}");
+                LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 현재 작업 디렉토리: {Environment.CurrentDirectory}");
+                LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 로그 파일 경로: {logService.LogFilePath}");
                 
                 return false;
             }
         }
+        
         /// <summary>
-        /// 데이터베이스에서 판매입력 데이터를 조회하는 메서드
+        /// 서울냉동 최종 파일 처리 메서드
+        /// 
+        /// 📋 주요 기능:
+        /// - 서울냉동 최종 데이터 조회 및 처리
+        /// - Excel 파일 생성 (헤더 없음)
+        /// - Dropbox 업로드 및 공유 링크 생성
+        /// - Kakao Work 알림 전송
+        /// 
+        /// 🔄 처리 단계:
+        /// 1. 데이터베이스에서 서울냉동 최종 데이터 조회
+        /// 2. Excel 파일 생성
+        /// 3. Dropbox 업로드
+        /// 4. 공유 링크 생성
+        /// 5. Kakao Work 알림 전송
+        /// 6. 임시 파일 정리
+        /// 
+        /// 💡 사용법:
+        /// var result = await processor.ProcessSeoulFrozenFinalFile();
         /// </summary>
-        /// <param name="tableName">테이블명</param>
-        /// <returns>판매입력 데이터</returns>
-        private async Task<DataTable?> GetSalesDataFromDatabase(string tableName)
+        /// <returns>처리 성공 여부</returns>
+        public async Task<bool> ProcessSeoulFrozenFinalFile()
         {
+            const string METHOD_NAME = "ProcessSeoulFrozenFinalFile";
+            const string TABLE_NAME = "송장출력_서울냉동_최종";
+            const string SHEET_NAME = "서울냉동최종";
+            
+            // 로그 서비스 초기화
+            var logService = new LogManagementService();
+            
             try
             {
-                // 간단한 SELECT 쿼리로 모든 데이터 조회
-                var query = $"SELECT * FROM `{tableName}`";
+                LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 서울냉동 최종 파일 처리 시작...");
+                LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 현재 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 호출 스택 확인 중...");
                 
-                using (var connection = new MySqlConnection(_databaseService.GetConnectionString()))
+                // 로그 파일 경로 정보 출력
+                logService.PrintLogFilePathInfo();
+                
+                // LogPathManager 정보 출력
+                LogPathManager.PrintLogPathInfo();
+                LogPathManager.ValidateLogFileLocations();
+                
+                // [한글 주석] 즉, 아래와 같이 로그를 동시에 기록하고 메인폼에도 표시할 수 있습니다.
+                //string sampleMessage = $"[{METHOD_NAME}] 샘플 메시지: 서울냉동 최종 파일 처리 단계 진입";
+                //logService.LogMessage(sampleMessage);      // app.log 파일에 기록
+                //_progress?.Report(sampleMessage);          // 메인폼(메인창) 로그창에 표시
+                logService.LogMessage($"[{METHOD_NAME}] 서울냉동 최종 파일 처리 시작");
+                logService.LogMessage($"[{METHOD_NAME}] 현재 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                logService.LogMessage($"[{METHOD_NAME}] 호출 스택 확인 중...");
+
+                // 1단계: 테이블명 확인
+                logService.LogMessage($"[{METHOD_NAME}] 대상 테이블: {TABLE_NAME}");
+
+                // 2단계: 데이터베이스에서 서울냉동 최종 데이터 조회
+                var seoulFrozenData = await _databaseCommonService.GetDataFromDatabase(TABLE_NAME);
+                if (seoulFrozenData == null || seoulFrozenData.Rows.Count == 0)
                 {
-                    await connection.OpenAsync();
-                    
-                    using (var command = new MySqlCommand(query, connection))
-                    {
-                        using (var adapter = new MySqlDataAdapter(command))
-                        {
-                            var dataTable = new DataTable();
-                            adapter.Fill(dataTable);
-                            return dataTable;
-                        }
-                    }
+                    logService.LogMessage($"[{METHOD_NAME}] ⚠️ 서울냉동 최종 데이터가 없습니다.");
+                    return true; // 데이터가 없는 것은 오류가 아님
                 }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"❌ 데이터베이스 조회 실패: {ex.Message}");
-                return null;
-            }
-        }
 
-        /// <summary>
-        /// 판매입력 데이터 Excel 파일명을 생성하는 메서드
-        /// </summary>
-        /// <returns>파일명</returns>
-        private string GenerateSalesDataExcelFileName()
-        {
-            var now = DateTime.Now;
-            var fileName = $"판매입력_이카운트자료_{now:yyMMdd}_{now:HH}시{now:mm}분.xlsx";
-            return fileName;
-        }
+                logService.LogMessage($"[{METHOD_NAME}] 📊 데이터 조회 완료: {seoulFrozenData.Rows.Count:N0}건");
 
-        /// <summary>
-        /// Dropbox에 파일을 업로드하는 메서드
-        /// </summary>
-        /// <param name="localFilePath">로컬 파일 경로</param>
-        /// <param name="dropboxFolderPath">Dropbox 폴더 경로</param>
-        /// <returns>업로드된 파일의 Dropbox 경로</returns>
-        private async Task<string?> UploadFileToDropbox(string localFilePath, string dropboxFolderPath)
-        {
-            try
-            {
-                var dropboxService = DropboxService.Instance;
-                var uploadResult = await dropboxService.UploadFileAsync(localFilePath, dropboxFolderPath);
-                return uploadResult; // UploadFileAsync에서 반환된 실제 파일 경로 반환
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"❌ Dropbox 업로드 실패: {ex.Message}");
-                return null;
-            }
-        }
+                // 3단계: Excel 파일 생성 (헤더 없음)
+                // {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx  
+                // var otherFileName = GenerateExcelFileName("기타", "설명");              
+                var excelFileName = _fileCommonService.GenerateExcelFileName("서울냉동", "서울냉동");
+                var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
+                
+                logService.LogMessage($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
+                
+                var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(seoulFrozenData, excelFilePath, SHEET_NAME);
+                if (!excelCreated)
+                {
+                    logService.LogMessage($"[{METHOD_NAME}] ❌ Excel 파일 생성 실패: {excelFilePath}");
+                    return false;
+                }
 
-        /// <summary>
-        /// Dropbox 공유 링크를 생성하는 메서드
-        /// </summary>
-        /// <param name="dropboxFilePath">Dropbox 파일 경로</param>
-        /// <returns>공유 링크</returns>
-        private async Task<string?> CreateDropboxSharedLink(string dropboxFilePath)
-        {
-            try
-            {
-                Console.WriteLine($"🔗 [{nameof(CreateDropboxSharedLink)}] 공유 링크 생성 시작: {dropboxFilePath}");
-                
-                var dropboxService = DropboxService.Instance;
-                Console.WriteLine($"🔗 [{nameof(CreateDropboxSharedLink)}] DropboxService 인스턴스 획득 완료");
-                
-                var sharedLink = await dropboxService.CreateSharedLinkAsync(dropboxFilePath);
-                
+                logService.LogMessage($"[{METHOD_NAME}] ✅ Excel 파일 생성 완료: {excelFilePath}");
+
+                // 4단계: Dropbox에 파일 업로드
+                var dropboxFolderPath = ConfigurationManager.AppSettings["DropboxFolderPath4"];
+                if (string.IsNullOrEmpty(dropboxFolderPath))
+                {
+                    logService.LogMessage($"[{METHOD_NAME}] ⚠️ DropboxFolderPath4 미설정 상태입니다.");
+                    return false;
+                }
+
+                logService.LogMessage($"[{METHOD_NAME}] Dropbox 업로드 시작: {dropboxFolderPath}");
+                var dropboxFilePath = await _fileCommonService.UploadFileToDropbox(excelFilePath, dropboxFolderPath);
+                if (string.IsNullOrEmpty(dropboxFilePath))
+                {
+                    logService.LogMessage($"[{METHOD_NAME}] ❌ Dropbox 업로드 실패");
+                    return false;
+                }
+
+                logService.LogMessage($"[{METHOD_NAME}] ✅ Dropbox 업로드 완료: {dropboxFilePath}");
+
+                // 5단계: Dropbox 공유 링크 생성
+                logService.LogMessage($"[{METHOD_NAME}] Dropbox 공유 링크 생성 시작");
+                var sharedLink = await _fileCommonService.CreateDropboxSharedLink(dropboxFilePath);
                 if (string.IsNullOrEmpty(sharedLink))
                 {
-                    Console.WriteLine($"❌ [{nameof(CreateDropboxSharedLink)}] 공유 링크가 null 또는 빈 문자열로 반환됨");
-                    return null;
+                    logService.LogMessage($"[{METHOD_NAME}] ❌ Dropbox 공유 링크 생성 실패");
+                    return false;
+                }
+                logService.LogMessage($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
+
+                // 6단계: KakaoWork 채팅방에 알림 전송 (주석 처리됨)
+                // KakaoWork 채팅방 ID 확인 및 로그 기록
+                /*var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
+                if (string.IsNullOrEmpty(kakaoWorkChannelId))
+                {
+                    logService.LogMessage($"[{METHOD_NAME}] ⚠️ KakaoWork 채팅방 ID(KakaoWorkChannelId) 설정이 없습니다.");
+                    return false;
+                }
+                logService.LogMessage($"[{METHOD_NAME}] KakaoWork 알림 전송 시작 (채팅방ID: {kakaoWorkChannelId})");
+
+                // KakaoWork 알림 전송 (채팅방ID 명시적으로 전달)
+                var notificationSent = await SendKakaoWorkNotification(sharedLink, kakaoWorkChannelId);
+                if (!notificationSent)
+                {
+                    logService.LogMessage($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
+                    return false;
+                }
+
+                logService.LogMessage($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료");
+                */
+
+                // 7단계: 임시 파일 정리
+                try
+                {
+                    if (File.Exists(excelFilePath))
+                    {
+                        File.Delete(excelFilePath);
+                        logService.LogMessage($"[{METHOD_NAME}] 🗑️ 임시 파일 정리 완료: {excelFilePath}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logService.LogMessage($"[{METHOD_NAME}] ⚠️ 임시 파일 정리 실패: {ex.Message}");
+                    // 임시 파일 정리 실패는 전체 프로세스 실패로 처리하지 않음
                 }
                 
-                Console.WriteLine($"✅ [{nameof(CreateDropboxSharedLink)}] 공유 링크 생성 성공: {sharedLink}");
-                return sharedLink;
+                logService.LogMessage($"[{METHOD_NAME}] ✅ 서울냉동 최종 파일 처리 완료");
+                return true;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ [{nameof(CreateDropboxSharedLink)}] Dropbox 공유 링크 생성 실패: {ex.Message}");
-                Console.WriteLine($"📋 [{nameof(CreateDropboxSharedLink)}] 예외 타입: {ex.GetType().Name}");
-                Console.WriteLine($"📋 [{nameof(CreateDropboxSharedLink)}] 스택 트레이스: {ex.StackTrace}");
+                var errorMessage = $"❌ [{METHOD_NAME}] 처리 중 오류 발생: {ex.Message}";
+                var stackTraceMessage = $"📋 [{METHOD_NAME}] 스택 트레이스: {ex.StackTrace}";
+                
+                // app.log 파일에 오류 상세 정보 기록
+                logService.LogMessage(errorMessage);
+                logService.LogMessage(stackTraceMessage);
                 
                 // 내부 예외가 있는 경우 추가 로그
                 if (ex.InnerException != null)
                 {
-                    Console.WriteLine($"📋 [{nameof(CreateDropboxSharedLink)}] 내부 예외: {ex.InnerException.Message}");
+                    var innerErrorMessage = $"📋 [{METHOD_NAME}] 내부 예외: {ex.InnerException.Message}";
+                    logService.LogMessage(innerErrorMessage);
                 }
                 
-                return null;
+                // 추가 디버깅 정보
+                //Console.WriteLine($"🔍 [{METHOD_NAME}] 현재 작업 디렉토리: {Environment.CurrentDirectory}");
+                //Console.WriteLine($"🔍 [{METHOD_NAME}] 로그 파일 경로: {logService.LogFilePath}");
+                
+                return false;
             }
         }
+
+
+
+
+
+
+
+
+
+
+
+
 
         /// <summary>
         /// KakaoWork 채팅방에 알림을 전송하는 메서드
@@ -3701,7 +3866,7 @@ namespace LogisticManager.Processors
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ KakaoWork 알림 전송 실패: {ex.Message}");
+                LogManagerService.LogError($"❌ KakaoWork 알림 전송 실패: {ex.Message}");
                 return false;
             }
         }
@@ -3730,5 +3895,45 @@ namespace LogisticManager.Processors
         }
 
         #endregion
+
+        /// <summary>
+        /// 프로젝트 루트 디렉토리를 찾는 메서드
+        /// </summary>
+        /// <returns>프로젝트 루트 디렉토리 경로</returns>
+        private string GetProjectRootDirectory()
+        {
+            try
+            {
+                // 현재 실행 디렉토리에서 시작하여 프로젝트 루트를 찾기
+                var currentDir = AppDomain.CurrentDomain.BaseDirectory;
+                
+                // bin\Debug\net8.0-windows\win-x64 같은 하위 폴더들을 거슬러 올라가기
+                while (!string.IsNullOrEmpty(currentDir))
+                {
+                    // config 폴더가 있는지 확인
+                    var configPath = Path.Combine(currentDir, "config");
+                    if (Directory.Exists(configPath))
+                    {
+                        return currentDir;
+                    }
+                    
+                    // 상위 디렉토리로 이동
+                    var parentDir = Directory.GetParent(currentDir);
+                    if (parentDir == null)
+                    {
+                        break;
+                    }
+                    currentDir = parentDir.FullName;
+                }
+                
+                // 프로젝트 루트를 찾지 못한 경우 현재 실행 디렉토리 반환
+                return AppDomain.CurrentDomain.BaseDirectory;
+            }
+            catch (Exception)
+            {
+                // 오류 발생 시 현재 실행 디렉토리 반환
+                return AppDomain.CurrentDomain.BaseDirectory;
+            }
+        }
     }
 }
