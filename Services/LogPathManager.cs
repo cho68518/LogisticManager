@@ -163,10 +163,7 @@ namespace LogisticManager.Services
         /// </summary>
         public static string KakaoWorkDebugLogPath => Path.Combine(_logsDirectory, "current", "kakaowork_debug.log");
 
-        /// <summary>
-        /// star2_debug.log 파일의 전체 경로
-        /// </summary>
-        public static string Star2DebugLogPath => Path.Combine(_logsDirectory, "current", "star2_debug.log");
+
 
         /// <summary>
         /// 로그 파일 경로 정보 출력
@@ -192,8 +189,7 @@ namespace LogisticManager.Services
             var logFiles = new[]
             {
                 ("app.log", AppLogPath),
-                ("kakaowork_debug.log", KakaoWorkDebugLogPath),
-                ("star2_debug.log", Star2DebugLogPath)
+                ("kakaowork_debug.log", KakaoWorkDebugLogPath)
             };
 
             foreach (var (fileName, correctPath) in logFiles)

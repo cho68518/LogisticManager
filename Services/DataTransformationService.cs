@@ -138,7 +138,7 @@ namespace LogisticManager.Services
                     dataTable.Columns.Add("별표2", typeof(string));
                     var initLog = "[DataTransformationService] 별표2 컬럼이 없어 생성함 (기본값: 빈 문자열)";
                     Console.WriteLine(initLog);
-                    File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {initLog}\n");
+                    LogManagerService.LogInfo(initLog);
                 }
                 else
                 {
@@ -156,7 +156,7 @@ namespace LogisticManager.Services
             {
                 var initErr = $"[DataTransformationService] 별표2 컬럼 생성 실패: {ex.Message}";
                 Console.WriteLine(initErr);
-                File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {initErr}\n");
+                LogManagerService.LogError(initErr);
             }
 
             int transformedCount = 0;
@@ -356,14 +356,14 @@ namespace LogisticManager.Services
                 // 디버깅: 컬럼 존재 확인 로그
                 var logMessage = $"🔍 [행{rowNumber}] 별표2/주소 컬럼 확인: 별표2={dataTable.Columns.Contains("별표2")}, 주소={dataTable.Columns.Contains("주소")}";
                 Console.WriteLine(logMessage);
-                File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                LogManagerService.LogInfo(logMessage);
             }
             else
             {
                 // 필요한 컬럼이 없는 경우 로그 출력
                 var logMessage = $"⚠️ [행{rowNumber}] 별표2 처리 건너뜀: 별표2컬럼={dataTable.Columns.Contains("별표2")}, 주소컬럼={dataTable.Columns.Contains("주소")}";
                 Console.WriteLine(logMessage);
-                File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                LogManagerService.LogInfo(logMessage);
             }
             
             if (dataTable.Columns.Contains("별표2") && dataTable.Columns.Contains("주소"))
@@ -377,7 +377,7 @@ namespace LogisticManager.Services
                     // 디버깅: 원본 데이터 확인
                     var logMessage = $"🔍 [행{rowNumber}] 별표2 처리 시작: 주소타입={addressValue?.GetType().Name}, 별표2타입={star2Value?.GetType().Name}";
                     Console.WriteLine(logMessage);
-                    File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                    LogManagerService.LogInfo(logMessage);
                     
                     // null 체크 및 문자열 변환
                     var addressString = addressValue?.ToString() ?? string.Empty;
@@ -386,7 +386,7 @@ namespace LogisticManager.Services
                     // 디버깅: 변환된 문자열 확인
                     logMessage = $"🔍 [행{rowNumber}] 별표2 문자열 변환: 주소='{addressString}', 별표2='{originalStar2String}'";
                     Console.WriteLine(logMessage);
-                    File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                    LogManagerService.LogInfo(logMessage);
                     
                     // 변환 로직 실행
                     var transformedStar2String = TransformStar2ByAddress(originalStar2String, addressString);
@@ -394,7 +394,7 @@ namespace LogisticManager.Services
                     // 디버깅: 변환 결과 확인
                     logMessage = $"🔍 [행{rowNumber}] 별표2 변환 결과: '{originalStar2String}' → '{transformedStar2String}'";
                     Console.WriteLine(logMessage);
-                    File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                    LogManagerService.LogInfo(logMessage);
                     
                     // 값이 변경된 경우에만 업데이트
                     if (!string.Equals(originalStar2String, transformedStar2String, StringComparison.Ordinal))
@@ -403,25 +403,25 @@ namespace LogisticManager.Services
                         hasChanges = true;
                         logMessage = $"⭐ [행{rowNumber}] 별표2 변환: '{originalStar2String}' → '{transformedStar2String}' (주소: {addressString})";
                         Console.WriteLine(logMessage);
-                        File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                        LogManagerService.LogInfo(logMessage);
                     }
                     else
                     {
                         logMessage = $"ℹ️ [행{rowNumber}] 별표2 변환 없음: 값이 동일함";
                         Console.WriteLine(logMessage);
-                        File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                        LogManagerService.LogInfo(logMessage);
                     }
                 }
                 catch (Exception ex)
                 {
                     // 별표2 처리 중 오류 발생 시 로그 출력 후 계속 진행
-                    var errorMessage = $"⚠️ [DataTransformationService] 별표2 처리 오류 (행{rowNumber}): {ex.Message}";
+                    var errorMessage = $"⚠️ [DataTransformationService] 별표2 처리 오류 (행{rowNumber}):\n   오류 내용: {ex.Message}";
                     Console.WriteLine(errorMessage);
-                    File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorMessage}\n");
+                    LogManagerService.LogError(errorMessage);
                     
-                    var stackTraceMessage = $"⚠️ [DataTransformationService] 별표2 처리 오류 상세: {ex.StackTrace}";
+                    var stackTraceMessage = $"⚠️ [DataTransformationService] 별표2 처리 오류 상세:\n   스택 트레이스:\n   {ex.StackTrace}";
                     Console.WriteLine(stackTraceMessage);
-                    File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {stackTraceMessage}\n");
+                    LogManagerService.LogError(stackTraceMessage);
                     // 오류가 발생해도 다른 변환 작업은 계속 진행
                 }
             }
@@ -1168,7 +1168,7 @@ namespace LogisticManager.Services
                     var transformedValue = "제주";
                     var logMessage = $"⭐ [별표2 변환규칙] 제주특별자치도 주소 감지: 주소='{safeAddressValue}', 별표2 '{safeOriginalValue}' → '{transformedValue}'";
                     Console.WriteLine(logMessage);
-                    File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {logMessage}\n");
+                    LogManagerService.LogInfo(logMessage);
                     return transformedValue;
                 }
 
@@ -1177,13 +1177,13 @@ namespace LogisticManager.Services
             }
             catch (Exception ex)
             {
-                var errorMessage = $"⚠️ [DataTransformationService] 별표2 변환 실패: 별표2={originalStar2Value}, 주소={addressValue} - {ex.Message}";
+                var errorMessage = $"⚠️ [DataTransformationService] 별표2 변환 실패:\n   별표2: {originalStar2Value}\n   주소: {addressValue}\n   오류 내용: {ex.Message}";
                 Console.WriteLine(errorMessage);
-                File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {errorMessage}\n");
+                LogManagerService.LogError(errorMessage);
                 
-                var stackTraceMessage = $"⚠️ [DataTransformationService] 별표2 변환 실패 상세: {ex.StackTrace}";
+                var stackTraceMessage = $"⚠️ [DataTransformationService] 별표2 변환 실패 상세:\n   스택 트레이스:\n   {ex.StackTrace}";
                 Console.WriteLine(stackTraceMessage);
-                File.AppendAllText(LogPathManager.Star2DebugLogPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {stackTraceMessage}\n");
+                LogManagerService.LogError(stackTraceMessage);
                 return originalStar2Value ?? string.Empty; // 변환 실패 시 원본 반환
             }
         }

@@ -3715,11 +3715,7 @@ namespace LogisticManager.Processors
                     LogManagerService.LogError($"❌ [{METHOD_NAME}] Dropbox 공유 링크 생성 실패");
                     
                     // 실패 원인 분석을 위한 추가 로깅
-                    LogManagerService.LogError($"🔍 [{METHOD_NAME}] 공유 링크 생성 실패 원인 분석:");
-                    LogManagerService.LogError($"   - Dropbox 파일 경로: {dropboxFilePath}");
-                    LogManagerService.LogError($"   - Dropbox 폴더 설정: {dropboxFolderPath}");
-                    LogManagerService.LogError($"   - Excel 파일 경로: {excelFilePath}");
-                    LogManagerService.LogError($"   - Excel 파일 존재 여부: {File.Exists(excelFilePath)}");
+                    LogManagerService.LogError($"🔍 [{METHOD_NAME}] 공유 링크 생성 실패 원인 분석:\n   - Dropbox 파일 경로: {dropboxFilePath}\n   - Dropbox 폴더 설정: {dropboxFolderPath}\n   - Excel 파일 경로: {excelFilePath}\n   - Excel 파일 존재 여부: {File.Exists(excelFilePath)}");
                     
                     return false;
                 }
@@ -3770,15 +3766,15 @@ namespace LogisticManager.Processors
             }
             catch (Exception ex)
             {
-                var errorMessage = $"❌ [{METHOD_NAME}] 처리 중 오류 발생: {ex.Message}";
-                var stackTraceMessage = $"📋 [{METHOD_NAME}] 스택 트레이스: {ex.StackTrace}";
+                var errorMessage = $"❌ [{METHOD_NAME}] 처리 중 오류 발생:\n   오류 내용: {ex.Message}";
+                var stackTraceMessage = $"📋 [{METHOD_NAME}] 스택 트레이스:\n   {ex.StackTrace}";
                 
                 LogManagerService.LogError(errorMessage);
                 LogManagerService.LogError(stackTraceMessage);
                 
                 if (ex.InnerException != null)
                 {
-                    var innerErrorMessage = $"📋 [{METHOD_NAME}] 내부 예외: {ex.InnerException.Message}";
+                    var innerErrorMessage = $"📋 [{METHOD_NAME}] 내부 예외:\n   오류 내용: {ex.InnerException.Message}";
                     LogManagerService.LogError(innerErrorMessage);
                 }
                 
@@ -3898,11 +3894,7 @@ namespace LogisticManager.Processors
                     LogManagerService.LogError($"❌ [{METHOD_NAME}] Dropbox 공유 링크 생성 실패");
                     
                     // 실패 원인 분석을 위한 추가 로깅
-                    LogManagerService.LogError($"🔍 [{METHOD_NAME}] 공유 링크 생성 실패 원인 분석:");
-                    LogManagerService.LogError($"   - Dropbox 파일 경로: {dropboxFilePath}");
-                    LogManagerService.LogError($"   - Dropbox 폴더 설정: {dropboxFolderPath}");
-                    LogManagerService.LogError($"   - Excel 파일 경로: {excelFilePath}");
-                    LogManagerService.LogError($"   - Dropbox 파일 존재 여부: {File.Exists(excelFilePath)}");
+                    LogManagerService.LogError($"🔍 [{METHOD_NAME}] 공유 링크 생성 실패 원인 분석:\n   - Dropbox 파일 경로: {dropboxFilePath}\n   - Dropbox 폴더 설정: {dropboxFolderPath}\n   - Excel 파일 경로: {excelFilePath}\n   - Dropbox 파일 존재 여부: {File.Exists(excelFilePath)}");
                     
                     return false;
                 }
@@ -3949,8 +3941,8 @@ namespace LogisticManager.Processors
             }
             catch (Exception ex)
             {
-                var errorMessage = $"❌ [{METHOD_NAME}] 처리 중 오류 발생: {ex.Message}";
-                var stackTraceMessage = $"📋 [{METHOD_NAME}] 스택 트레이스: {ex.StackTrace}";
+                var errorMessage = $"❌ [{METHOD_NAME}] 처리 중 오류 발생:\n   오류 내용: {ex.Message}";
+                var stackTraceMessage = $"📋 [{METHOD_NAME}] 스택 트레이스:\n   {ex.StackTrace}";
                 
                 // app.log 파일에 오류 상세 정보 기록
                 LogManagerService.LogInfo(errorMessage);
@@ -3959,7 +3951,7 @@ namespace LogisticManager.Processors
                 // 내부 예외가 있는 경우 추가 로그
                 if (ex.InnerException != null)
                 {
-                    var innerErrorMessage = $"📋 [{METHOD_NAME}] 내부 예외: {ex.InnerException.Message}";
+                    var innerErrorMessage = $"📋 [{METHOD_NAME}] 내부 예외:\n   오류 내용: {ex.InnerException.Message}";
                     LogManagerService.LogInfo(innerErrorMessage);
                 }
                 
