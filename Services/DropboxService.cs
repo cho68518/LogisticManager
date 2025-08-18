@@ -303,6 +303,97 @@ namespace LogisticManager.Services
         }
 
         /// <summary>
+        /// Dropbox에 파일을 업로드하는 메서드 (공유 링크 생성 없음)
+        /// </summary>
+        /// <param name="localFilePath">로컬 파일 경로</param>
+        /// <param name="dropboxFolderPath">Dropbox 폴더 경로</param>
+        /// <returns>업로드 성공 여부</returns>
+        public async Task<bool> UploadFileOnlyAsync(string localFilePath, string dropboxFolderPath)
+        {
+            try
+            {
+                Console.WriteLine($"📤 [UploadFileOnlyAsync] 파일 업로드 시작: {localFilePath} -> {dropboxFolderPath}");
+
+                // Dropbox 인증 정보 확인
+                if (string.IsNullOrEmpty(_appKey) || string.IsNullOrEmpty(_appSecret) || string.IsNullOrEmpty(_refreshToken))
+                {
+                    throw new InvalidOperationException("Dropbox 인증 정보가 설정되지 않았습니다. App.config에서 Dropbox.AppKey, Dropbox.AppSecret, Dropbox.RefreshToken을 확인해주세요.");
+                }
+
+                // 파일 존재 여부 확인
+                if (!File.Exists(localFilePath))
+                {
+                    throw new FileNotFoundException($"업로드할 파일을 찾을 수 없습니다: {localFilePath}");
+                }
+
+                // 유효한 클라이언트 확보
+                var client = await GetClientAsync();
+
+                // 파일명 추출
+                var fileName = Path.GetFileName(localFilePath);
+                var dropboxPath = Path.Combine(dropboxFolderPath, fileName).Replace('\\', '/');
+
+                Console.WriteLine($"📤 [UploadFileOnlyAsync] Dropbox 업로드 경로: {dropboxPath}");
+
+                // 파일 업로드
+                using (var fileStream = File.OpenRead(localFilePath))
+                {
+                    try
+                    {
+                        // 먼저 파일이 존재하는지 확인
+                        try
+                        {
+                            var existingFile = await client.Files.GetMetadataAsync(dropboxPath);
+                            Console.WriteLine($"📤 [UploadFileOnlyAsync] 파일이 이미 존재합니다: {existingFile.Name}. 덮어쓰기 모드로 업로드합니다.");
+                        }
+                        catch (Dropbox.Api.ApiException<Dropbox.Api.Files.GetMetadataError>)
+                        {
+                            Console.WriteLine($"📤 [UploadFileOnlyAsync] 새로운 파일을 업로드합니다: {fileName}");
+                        }
+
+                        var uploadResult = await client.Files.UploadAsync(
+                            dropboxPath,
+                            Dropbox.Api.Files.WriteMode.Overwrite.Instance,
+                            body: fileStream
+                        );
+
+                        Console.WriteLine($"✅ [UploadFileOnlyAsync] 파일 업로드 완료: {uploadResult.Name}");
+                        return true;
+                    }
+                    catch (Dropbox.Api.ApiException<Dropbox.Api.Files.UploadError> ex)
+                    {
+                        if (ex.ErrorResponse.IsPath)
+                        {
+                            // 경로 관련 오류인 경우에도 덮어쓰기 시도
+                            Console.WriteLine($"📤 [UploadFileOnlyAsync] 경로 오류 발생, 덮어쓰기로 재시도합니다: {ex.Message}");
+                            
+                            // 파일 스트림을 다시 열어서 재시도
+                            using (var retryStream = File.OpenRead(localFilePath))
+                            {
+                                var retryResult = await client.Files.UploadAsync(
+                                    dropboxPath,
+                                    Dropbox.Api.Files.WriteMode.Overwrite.Instance,
+                                    body: retryStream
+                                );
+                                Console.WriteLine($"✅ [UploadFileOnlyAsync] 재시도 성공: {retryResult.Name}");
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            throw; // 다른 오류는 그대로 던지기
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ [UploadFileOnlyAsync] 파일 업로드 오류: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Dropbox 연결 상태를 테스트
         /// </summary>
         /// <returns>연결 성공 여부</returns>

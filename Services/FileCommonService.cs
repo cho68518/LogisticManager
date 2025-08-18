@@ -56,13 +56,33 @@ namespace LogisticManager.Services
         {
             try
             {
+                Console.WriteLine($"🔗 [{nameof(UploadFileToDropbox)}] Dropbox 업로드 시작: {localFilePath} -> {dropboxFolderPath}");
+                
                 var dropboxService = DropboxService.Instance;
-                var uploadResult = await dropboxService.UploadFileAsync(localFilePath, dropboxFolderPath);
-                return uploadResult; // UploadFileAsync에서 반환된 실제 파일 경로 반환
+                
+                // 파일명 추출하여 Dropbox 경로 구성
+                var fileName = Path.GetFileName(localFilePath);
+                var dropboxFilePath = Path.Combine(dropboxFolderPath, fileName).Replace('\\', '/');
+                
+                Console.WriteLine($"🔗 [{nameof(UploadFileToDropbox)}] 예상 Dropbox 경로: {dropboxFilePath}");
+                
+                // 파일 업로드만 수행 (공유 링크 생성은 별도로 처리)
+                var uploadResult = await dropboxService.UploadFileOnlyAsync(localFilePath, dropboxFolderPath);
+                
+                if (uploadResult)
+                {
+                    Console.WriteLine($"✅ [{nameof(UploadFileToDropbox)}] Dropbox 업로드 성공: {dropboxFilePath}");
+                    return dropboxFilePath; // Dropbox 파일 경로 반환
+                }
+                else
+                {
+                    Console.WriteLine($"❌ [{nameof(UploadFileToDropbox)}] Dropbox 업로드 실패");
+                    return null;
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Dropbox 업로드 실패: {ex.Message}");
+                Console.WriteLine($"❌ [{nameof(UploadFileToDropbox)}] Dropbox 업로드 실패: {ex.Message}");
                 return null;
             }
         }
@@ -78,8 +98,27 @@ namespace LogisticManager.Services
             {
                 Console.WriteLine($"🔗 [{nameof(CreateDropboxSharedLink)}] 공유 링크 생성 시작: {dropboxFilePath}");
                 
+                // Dropbox 설정 정보 확인 및 로깅
+                var dropboxAppKey = ConfigurationManager.AppSettings["Dropbox.AppKey"];
+                var dropboxAppSecret = ConfigurationManager.AppSettings["Dropbox.AppSecret"];
+                var dropboxRefreshToken = ConfigurationManager.AppSettings["Dropbox.RefreshToken"];
+                
+                Console.WriteLine($"🔑 [{nameof(CreateDropboxSharedLink)}] Dropbox 설정 상태:");
+                Console.WriteLine($"   AppKey: {(string.IsNullOrEmpty(dropboxAppKey) ? "❌ 미설정" : "✅ 설정됨")}");
+                Console.WriteLine($"   AppSecret: {(string.IsNullOrEmpty(dropboxAppSecret) ? "❌ 미설정" : "✅ 설정됨")}");
+                Console.WriteLine($"   RefreshToken: {(string.IsNullOrEmpty(dropboxRefreshToken) ? "❌ 미설정" : "✅ 설정됨")}");
+                
                 var dropboxService = DropboxService.Instance;
                 Console.WriteLine($"🔗 [{nameof(CreateDropboxSharedLink)}] DropboxService 인스턴스 획득 완료");
+                
+                // Dropbox 파일 경로 유효성 검사
+                if (string.IsNullOrEmpty(dropboxFilePath))
+                {
+                    Console.WriteLine($"❌ [{nameof(CreateDropboxSharedLink)}] Dropbox 파일 경로가 null 또는 빈 문자열입니다.");
+                    return null;
+                }
+                
+                Console.WriteLine($"🔍 [{nameof(CreateDropboxSharedLink)}] Dropbox 파일 경로 검증: {dropboxFilePath}");
                 
                 var sharedLink = await dropboxService.CreateSharedLinkAsync(dropboxFilePath);
                 

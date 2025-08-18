@@ -169,7 +169,7 @@ namespace LogisticManager.Services
         /// - 대용량 데이터 처리를 위한 스트리밍 지원
         /// </summary>
         private readonly IInvoiceRepository _repository;
-        private readonly LogManagementService _logManagementService;
+
         
         /// <summary>
         /// 현재 배치 크기 - 실시간 적응형 성능 조정의 핵심 상태 변수
@@ -292,9 +292,7 @@ namespace LogisticManager.Services
                 "IInvoiceRepository는 BatchProcessorService의 핵심 의존성입니다. " +
                 "의존성 주입 설정을 확인하거나 유효한 Repository 구현체를 제공해주세요.");
             
-            // === 2단계: 로그 관리 서비스 초기화 ===
-            // 로그 파일 크기 자동 관리 기능 추가
-            _logManagementService = new LogManagementService();
+
             
             // === 3단계: 배치 처리 시스템 초기 상태 설정 ===
             // 현재 배치 크기를 경험적 최적값으로 초기화
@@ -315,15 +313,15 @@ namespace LogisticManager.Services
         #region 로그 관리 헬퍼 메서드
 
         /// <summary>
-        /// 로그 파일에 안전하게 메시지 작성 (크기 관리 포함)
+        /// 로그 파일에 안전하게 메시지 작성 (LogManagerService 사용)
         /// 
         /// 🎯 주요 기능:
-        /// - 로그 파일 크기 자동 체크 및 필요시 클리어
-        /// - 스레드 안전한 로그 작성
+        /// - LogManagerService를 통한 일관된 로깅
+        /// - 로그 파일 크기 자동 관리
         /// - 예외 발생 시 안전한 처리
         /// 
         /// 💡 사용 목적:
-        /// - 로그 파일 크기 자동 관리
+        /// - 통일된 로깅 시스템 사용
         /// - 시스템 안정성 보장
         /// - 로그 작성 성능 최적화
         /// </summary>
@@ -332,44 +330,8 @@ namespace LogisticManager.Services
         {
             try
             {
-                // 로그 파일 크기 체크 및 필요시 클리어
-                _logManagementService.CheckAndClearLogFileIfNeeded();
-                
-                // 로그 파일에 메시지 작성 (긴 메시지는 여러 줄로 나누기)
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
-                var timestamp = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}";
-                
-                if (message.Length > 100)
-                {
-                    // 긴 메시지는 여러 줄로 나누기
-                    var words = message.Split(new[] { ", " }, StringSplitOptions.None);
-                    var currentLine = "";
-                    
-                    foreach (var word in words)
-                    {
-                        if ((currentLine + word).Length > 100 && !string.IsNullOrEmpty(currentLine))
-                        {
-                            // 현재 줄이 너무 길면 새 줄로
-                            File.AppendAllText(logPath, $"{timestamp} {currentLine.Trim()}\n");
-                            currentLine = word;
-                        }
-                        else
-                        {
-                            currentLine += (string.IsNullOrEmpty(currentLine) ? "" : ", ") + word;
-                        }
-                    }
-                    
-                    // 마지막 줄 처리
-                    if (!string.IsNullOrEmpty(currentLine))
-                    {
-                        File.AppendAllText(logPath, $"{timestamp} {currentLine.Trim()}\n");
-                    }
-                }
-                else
-                {
-                    // 짧은 메시지는 한 줄로
-                    File.AppendAllText(logPath, $"{timestamp} {message}\n");
-                }
+                // LogManagerService를 통한 일관된 로깅
+                LogManagerService.LogInfo(message);
             }
             catch (Exception ex)
             {
@@ -544,7 +506,7 @@ namespace LogisticManager.Services
             var failureCount = 0;
             
             // 로그 파일 경로
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            var logPath = LogPathManager.AppLogPath;
             
             // === 상세 로깅 시작 ===
             var startLog = $"[원본데이터적재] 대용량 데이터 처리 시작 - 총 {totalCount:N0}건, 테이블: {targetTableName}";
@@ -747,7 +709,7 @@ namespace LogisticManager.Services
             var retryDelays = new[] { 1000, 2000, 4000 }; // 지수 백오프 (밀리초)
             
             // 로그 파일 경로
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+            var logPath = LogPathManager.AppLogPath;
             
             for (int retry = 0; retry <= maxRetries; retry++)
             {

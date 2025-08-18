@@ -28,24 +28,9 @@ namespace LogisticManager.Services
         {
             try
             {
-                // 현재 실행 파일의 위치에서 프로젝트 루트 찾기
-                var currentDir = AppDomain.CurrentDomain.BaseDirectory;
+                // 프로젝트 루트 디렉토리를 찾는 더 안전한 방법
+                var projectRoot = FindProjectRoot();
                 
-                // bin/Debug/net8.0-windows/win-x64/ 에서 프로젝트 루트로 이동
-                var projectRoot = currentDir;
-                for (int i = 0; i < 4; i++)
-                {
-                    var parent = Directory.GetParent(projectRoot);
-                    if (parent != null)
-                    {
-                        projectRoot = parent.FullName;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
                 _projectRoot = projectRoot;
                 _logsDirectory = Path.Combine(_projectRoot, "logs");
 
@@ -53,6 +38,13 @@ namespace LogisticManager.Services
                 if (!Directory.Exists(_logsDirectory))
                 {
                     Directory.CreateDirectory(_logsDirectory);
+                }
+
+                // logs/current 디렉토리도 생성
+                var currentLogsDir = Path.Combine(_logsDirectory, "current");
+                if (!Directory.Exists(currentLogsDir))
+                {
+                    Directory.CreateDirectory(currentLogsDir);
                 }
 
                 Console.WriteLine($"📁 [LogPathManager] 프로젝트 루트 감지: {_projectRoot}");
@@ -64,6 +56,90 @@ namespace LogisticManager.Services
                 // 오류 발생 시 현재 작업 디렉토리 사용
                 _projectRoot = Environment.CurrentDirectory;
                 _logsDirectory = Path.Combine(_projectRoot, "logs");
+            }
+        }
+
+        /// <summary>
+        /// 프로젝트 루트 디렉토리를 찾는 안전한 방법
+        /// </summary>
+        private static string FindProjectRoot()
+        {
+            // 방법 1: 현재 작업 디렉토리에서 .csproj 파일 찾기
+            var currentDir = Environment.CurrentDirectory;
+            var projectRoot = FindProjectRootByCsproj(currentDir);
+            if (!string.IsNullOrEmpty(projectRoot))
+            {
+                return projectRoot;
+            }
+
+            // 방법 2: AppDomain.CurrentDomain.BaseDirectory에서 상위로 이동하며 찾기
+            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            projectRoot = FindProjectRootByCsproj(baseDir);
+            if (!string.IsNullOrEmpty(projectRoot))
+            {
+                return projectRoot;
+            }
+
+            // 방법 3: 실행 파일 위치에서 상위로 이동하며 찾기
+            var exeDir = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            if (!string.IsNullOrEmpty(exeDir))
+            {
+                var exeDirPath = Path.GetDirectoryName(exeDir);
+                if (!string.IsNullOrEmpty(exeDirPath))
+                {
+                    projectRoot = FindProjectRootByCsproj(exeDirPath);
+                    if (!string.IsNullOrEmpty(projectRoot))
+                    {
+                        return projectRoot;
+                    }
+                }
+            }
+
+            // 모든 방법이 실패하면 현재 작업 디렉토리 사용
+            Console.WriteLine("⚠️ [LogPathManager] 프로젝트 루트를 찾을 수 없어 현재 작업 디렉토리 사용");
+            return Environment.CurrentDirectory;
+        }
+
+        /// <summary>
+        /// 지정된 디렉토리에서 .csproj 파일을 찾아 프로젝트 루트 찾기
+        /// </summary>
+        private static string FindProjectRootByCsproj(string startDirectory)
+        {
+            try
+            {
+                var currentDir = startDirectory;
+                var maxDepth = 10; // 최대 10단계 상위로 검색
+
+                for (int i = 0; i < maxDepth; i++)
+                {
+                    if (string.IsNullOrEmpty(currentDir) || !Directory.Exists(currentDir))
+                    {
+                        break;
+                    }
+
+                    // .csproj 파일이 있는지 확인
+                    var csprojFiles = Directory.GetFiles(currentDir, "*.csproj");
+                    if (csprojFiles.Length > 0)
+                    {
+                        Console.WriteLine($"✅ [LogPathManager] .csproj 파일 발견: {csprojFiles[0]}");
+                        return currentDir;
+                    }
+
+                    // 상위 디렉토리로 이동
+                    var parent = Directory.GetParent(currentDir);
+                    if (parent == null)
+                    {
+                        break;
+                    }
+                    currentDir = parent.FullName;
+                }
+
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ [LogPathManager] .csproj 파일 검색 오류: {ex.Message}");
+                return string.Empty;
             }
         }
 
@@ -80,17 +156,17 @@ namespace LogisticManager.Services
         /// <summary>
         /// app.log 파일의 전체 경로
         /// </summary>
-        public static string AppLogPath => Path.Combine(_projectRoot, "app.log");
+        public static string AppLogPath => Path.Combine(_logsDirectory, "current", "app.log");
 
         /// <summary>
         /// kakaowork_debug.log 파일의 전체 경로
         /// </summary>
-        public static string KakaoWorkDebugLogPath => Path.Combine(_projectRoot, "kakaowork_debug.log");
+        public static string KakaoWorkDebugLogPath => Path.Combine(_logsDirectory, "current", "kakaowork_debug.log");
 
         /// <summary>
         /// star2_debug.log 파일의 전체 경로
         /// </summary>
-        public static string Star2DebugLogPath => Path.Combine(_projectRoot, "star2_debug.log");
+        public static string Star2DebugLogPath => Path.Combine(_logsDirectory, "current", "star2_debug.log");
 
         /// <summary>
         /// 로그 파일 경로 정보 출력

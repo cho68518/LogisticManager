@@ -49,7 +49,7 @@ namespace LogisticManager.Services
         /// 로그 파일 관리를 위한 서비스
         /// 로그 파일 크기 자동 관리 및 클리어 기능
         /// </summary>
-        private readonly LogManagementService _logManagementService;
+
 
         #endregion
 
@@ -126,8 +126,7 @@ namespace LogisticManager.Services
             // MappingService 인스턴스 생성
             _mappingService = new MappingService();
             
-            // 로그 관리 서비스 초기화
-            _logManagementService = new LogManagementService();
+
             
             Console.WriteLine("✅ DatabaseService 초기화 완료");
         }
@@ -246,15 +245,15 @@ namespace LogisticManager.Services
         #region 로그 관리 헬퍼 메서드
 
         /// <summary>
-        /// 로그 파일에 안전하게 메시지 작성 (크기 관리 포함)
+        /// 로그 파일에 안전하게 메시지 작성 (LogManagerService 사용)
         /// 
         /// 🎯 주요 기능:
-        /// - 로그 파일 크기 자동 체크 및 필요시 클리어
-        /// - 스레드 안전한 로그 작성
+        /// - LogManagerService를 통한 일관된 로깅
+        /// - 로그 파일 크기 자동 관리
         /// - 예외 발생 시 안전한 처리
         /// 
         /// 💡 사용 목적:
-        /// - 로그 파일 크기 자동 관리
+        /// - 통일된 로깅 시스템 사용
         /// - 시스템 안정성 보장
         /// - 로그 작성 성능 최적화
         /// </summary>
@@ -263,44 +262,8 @@ namespace LogisticManager.Services
         {
             try
             {
-                // 로그 파일 크기 체크 및 필요시 클리어
-                _logManagementService.CheckAndClearLogFileIfNeeded();
-                
-                // 로그 파일에 메시지 작성 (긴 메시지는 여러 줄로 나누기)
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
-                var timestamp = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}";
-                
-                if (message.Length > 100)
-                {
-                    // 긴 메시지는 여러 줄로 나누기
-                    var words = message.Split(new[] { ", " }, StringSplitOptions.None);
-                    var currentLine = "";
-                    
-                    foreach (var word in words)
-                    {
-                        if ((currentLine + word).Length > 100 && !string.IsNullOrEmpty(currentLine))
-                        {
-                            // 현재 줄이 너무 길면 새 줄로
-                            File.AppendAllText(logPath, $"{timestamp} {currentLine.Trim()}\n");
-                            currentLine = word;
-                        }
-                        else
-                        {
-                            currentLine += (string.IsNullOrEmpty(currentLine) ? "" : ", ") + word;
-                        }
-                    }
-                    
-                    // 마지막 줄 처리
-                    if (!string.IsNullOrEmpty(currentLine))
-                    {
-                        File.AppendAllText(logPath, $"{timestamp} {currentLine.Trim()}\n");
-                    }
-                }
-                else
-                {
-                    // 짧은 메시지는 한 줄로
-                    File.AppendAllText(logPath, $"{timestamp} {message}\n");
-                }
+                // LogManagerService를 통한 일관된 로깅
+                LogManagerService.LogInfo(message);
             }
             catch (Exception ex)
             {
@@ -692,7 +655,7 @@ namespace LogisticManager.Services
         {
             const int maxRetries = 3;
             var retryDelays = new[] { 1000, 2000, 4000 }; // 지수 백오프 (밀리초)
-            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                            var logPath = LogPathManager.AppLogPath;
             
             for (int retry = 0; retry <= maxRetries; retry++)
             {

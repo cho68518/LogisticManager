@@ -41,7 +41,7 @@ namespace LogisticManager.Models
         {
             try
             {
-                var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
+                var logPath = LogPathManager.AppLogPath;
                 var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 
                 // 긴 메시지는 여러 줄로 나누기

@@ -1,0 +1,343 @@
+{
+  "table_info": {
+    "table_name": "송장출력_서울냉동_최종",
+    "description": "서울냉동 최종 송장 출력 정보 테이블",
+    "version": "1.0",
+    "created_date": "2025-08-17",
+    "last_updated": "2025-08-17",
+    "total_columns": 23,
+    "primary_key": "",
+    "required_fields": []
+  },
+  
+  "column_mappings": {
+    "msg1": {
+      "description": "메시지 1",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "사용자 정의 메시지 필드 1",
+      "is_required": false,
+      "processing_order": 1
+    },
+    "msg2": {
+      "description": "메시지 2",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "사용자 정의 메시지 필드 2",
+      "is_required": false,
+      "processing_order": 2
+    },
+    "msg3": {
+      "description": "메시지 3",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "사용자 정의 메시지 필드 3",
+      "is_required": false,
+      "processing_order": 3
+    },
+    "msg4": {
+      "description": "메시지 4",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "사용자 정의 메시지 필드 4",
+      "is_required": false,
+      "processing_order": 4
+    },
+    "msg5": {
+      "description": "메시지 5",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "사용자 정의 메시지 필드 5",
+      "is_required": false,
+      "processing_order": 5
+    },
+    "msg6": {
+      "description": "메시지 6",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "사용자 정의 메시지 필드 6",
+      "is_required": false,
+      "processing_order": 6
+    },
+    "수취인명": {
+      "description": "수취인 이름",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "배송받을 사람의 이름",
+      "is_required": false,
+      "processing_order": 7
+    },
+    "전화번호1": {
+      "description": "주요 연락처",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": "^[0-9-+()\\s]*$"
+      },
+      "business_rules": "수취인의 주요 연락처 번호",
+      "is_required": false,
+      "processing_order": 8
+    },
+    "전화번호2": {
+      "description": "보조 연락처",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": "^[0-9-+()\\s]*$"
+      },
+      "business_rules": "수취인의 보조 연락처 번호",
+      "is_required": false,
+      "processing_order": 9
+    },
+    "우편번호": {
+      "description": "배송지 우편번호",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": "^[0-9-]*$"
+      },
+      "business_rules": "배송지의 우편번호",
+      "is_required": false,
+      "processing_order": 10
+    },
+    "주소": {
+      "description": "배송지 주소",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "배송받을 주소",
+      "is_required": false,
+      "processing_order": 11
+    },
+    "송장명": {
+      "description": "송장 상품명",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "송장에 표시될 상품명",
+      "is_required": false,
+      "processing_order": 12
+    },
+    "수량": {
+      "description": "상품 수량",
+      "data_type": "int(11)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "min_value": 1,
+        "max_value": 999999,
+        "pattern": "^[0-9]+$"
+      },
+      "business_rules": "주문한 상품의 수량",
+      "is_required": false,
+      "processing_order": 13
+    },
+    "배송메세지": {
+      "description": "배송 시 요청사항",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "배송 시 요청사항이나 특별 지시사항",
+      "is_required": false,
+      "processing_order": 14
+    },
+    "주문번호": {
+      "description": "고유 주문 번호",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "시스템에서 생성된 고유 주문 번호",
+      "is_required": false,
+      "processing_order": 15
+    },
+    "쇼핑몰": {
+      "description": "주문 쇼핑몰명",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "주문이 발생한 쇼핑몰 또는 플랫폼명",
+      "is_required": false,
+      "processing_order": 16
+    },
+    "품목코드": {
+      "description": "상품 품목 코드",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "상품을 식별하는 고유 코드",
+      "is_required": false,
+      "processing_order": 17
+    },
+    "택배비용": {
+      "description": "배송비",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": "^[0-9,]*$"
+      },
+      "business_rules": "배송에 필요한 택배비용",
+      "is_required": false,
+      "processing_order": 18
+    },
+    "박스크기": {
+      "description": "포장 박스 크기",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "상품 포장에 사용되는 박스 크기",
+      "is_required": false,
+      "processing_order": 19
+    },
+    "출력개수": {
+      "description": "송장 출력 개수",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": "^[0-9]+$"
+      },
+      "business_rules": "송장을 출력할 개수",
+      "is_required": false,
+      "processing_order": 20
+    },
+    "별표1": {
+      "description": "별표 표시 1",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "특별 표시나 메모를 위한 별표 필드 1",
+      "is_required": false,
+      "processing_order": 21
+    },
+    "별표2": {
+      "description": "별표 표시 2",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": null
+      },
+      "business_rules": "특별 표시나 메모를 위한 별표 필드 2",
+      "is_required": false,
+      "processing_order": 22
+    },
+    "품목개수": {
+      "description": "주문 품목 개수",
+      "data_type": "varchar(255)",
+      "nullable": true,
+      "default_value": "NULL",
+      "validation_rules": {
+        "max_length": 255,
+        "pattern": "^[0-9]+$"
+      },
+      "business_rules": "주문에 포함된 총 품목 개수",
+      "is_required": false,
+      "processing_order": 23
+    }
+  },
+  
+  "business_rules": {
+    "description": "송장출력_서울냉동_최종 테이블 비즈니스 규칙",
+    "rules": [
+      "모든 메시지 필드(msg1~msg6)는 선택사항이며 NULL 허용",
+      "수취인 정보(수취인명, 전화번호, 주소)는 배송에 필수적이나 NULL 허용",
+      "주문 정보(송장명, 수량, 주문번호)는 송장 생성에 필요",
+      "쇼핑몰 정보는 주문 출처 추적용",
+      "품목코드는 상품 식별에 사용",
+      "택배비용은 배송비 계산에 사용",
+      "박스크기는 포장 및 배송 계획에 사용",
+      "출력개수는 송장 인쇄 수량 결정에 사용",
+      "별표 필드는 특별 지시사항 표시용",
+      "품목개수는 주문 총량 파악용"
+    ]
+  },
+  
+  "processing_notes": {
+    "description": "데이터 처리 시 주의사항",
+    "notes": [
+      "메시지 필드는 사용자 정의로 활용 가능",
+      "전화번호는 하이픈(-) 포함 형식 지원",
+      "우편번호는 숫자와 하이픈만 허용",
+      "수량과 출력개수는 양의 정수만 허용",
+      "택배비용은 숫자와 쉼표(,) 포함 형식 지원",
+      "별표 필드는 특별 지시사항이나 메모용으로 활용"
+    ]
+  }
+}

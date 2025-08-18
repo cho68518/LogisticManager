@@ -58,14 +58,23 @@
       "columns_count": 7,
       "primary_key": "쇼핑몰",
       "required_fields": ["쇼핑몰"]
+    },
+    "송장출력_서울냉동_최종": {
+      "file_path": "송장출력_서울냉동_최종.json",
+      "description": "서울냉동 최종 송장 출력 정보 테이블",
+      "is_active": true,
+      "processing_order": 7,
+      "columns_count": 23,
+      "primary_key": "",
+      "required_fields": []
     }
   },
   
   "metadata": {
-    "total_tables": 6,
-    "active_tables": 6,
-    "total_columns": 81,
-    "last_sync": "2025-08-17 22:03:00",
+    "total_tables": 7,
+    "active_tables": 7,
+    "total_columns": 104,
+    "last_sync": "2025-08-17 23:45:00",
     "sync_status": "completed"
   },
   
