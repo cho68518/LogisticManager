@@ -355,15 +355,13 @@ namespace LogisticManager.Services
             {
                 // 디버깅: 컬럼 존재 확인 로그
                 var logMessage = $"🔍 [행{rowNumber}] 별표2/주소 컬럼 확인: 별표2={dataTable.Columns.Contains("별표2")}, 주소={dataTable.Columns.Contains("주소")}";
-                Console.WriteLine(logMessage);
-                LogManagerService.LogInfo(logMessage);
+                //Console.WriteLine(logMessage);
+                //LogManagerService.LogInfo(logMessage);
             }
             else
             {
-                // 필요한 컬럼이 없는 경우 로그 출력
-                var logMessage = $"⚠️ [행{rowNumber}] 별표2 처리 건너뜀: 별표2컬럼={dataTable.Columns.Contains("별표2")}, 주소컬럼={dataTable.Columns.Contains("주소")}";
-                Console.WriteLine(logMessage);
-                LogManagerService.LogInfo(logMessage);
+                // 요청 사항: '별표2 처리 건너뜀' 메시지는 로그 및 콘솔에 출력하지 않음
+                // (필요 컬럼이 없는 경우에도 조용히 건너뜀)
             }
             
             if (dataTable.Columns.Contains("별표2") && dataTable.Columns.Contains("주소"))
@@ -375,41 +373,41 @@ namespace LogisticManager.Services
                     var star2Value = row["별표2"];
                     
                     // 디버깅: 원본 데이터 확인
-                    var logMessage = $"🔍 [행{rowNumber}] 별표2 처리 시작: 주소타입={addressValue?.GetType().Name}, 별표2타입={star2Value?.GetType().Name}";
-                    Console.WriteLine(logMessage);
-                    LogManagerService.LogInfo(logMessage);
+                    //var logMessage = $"🔍 [행{rowNumber}] 별표2 처리 시작: 주소타입={addressValue?.GetType().Name}, 별표2타입={star2Value?.GetType().Name}";
+                    //Console.WriteLine(logMessage);
+                    //LogManagerService.LogInfo(logMessage);
                     
                     // null 체크 및 문자열 변환
                     var addressString = addressValue?.ToString() ?? string.Empty;
                     var originalStar2String = star2Value?.ToString() ?? string.Empty;
                     
                     // 디버깅: 변환된 문자열 확인
-                    logMessage = $"🔍 [행{rowNumber}] 별표2 문자열 변환: 주소='{addressString}', 별표2='{originalStar2String}'";
-                    Console.WriteLine(logMessage);
-                    LogManagerService.LogInfo(logMessage);
+                    //logMessage = $"🔍 [행{rowNumber}] 별표2 문자열 변환: 주소='{addressString}', 별표2='{originalStar2String}'";
+                    //Console.WriteLine(logMessage);
+                    //LogManagerService.LogInfo(logMessage);
                     
                     // 변환 로직 실행
                     var transformedStar2String = TransformStar2ByAddress(originalStar2String, addressString);
                     
                     // 디버깅: 변환 결과 확인
-                    logMessage = $"🔍 [행{rowNumber}] 별표2 변환 결과: '{originalStar2String}' → '{transformedStar2String}'";
-                    Console.WriteLine(logMessage);
-                    LogManagerService.LogInfo(logMessage);
+                    //logMessage = $"🔍 [행{rowNumber}] 별표2 변환 결과: '{originalStar2String}' → '{transformedStar2String}'";
+                    //Console.WriteLine(logMessage);
+                    //LogManagerService.LogInfo(logMessage);
                     
                     // 값이 변경된 경우에만 업데이트
                     if (!string.Equals(originalStar2String, transformedStar2String, StringComparison.Ordinal))
                     {
                         row["별표2"] = transformedStar2String;
                         hasChanges = true;
-                        logMessage = $"⭐ [행{rowNumber}] 별표2 변환: '{originalStar2String}' → '{transformedStar2String}' (주소: {addressString})";
-                        Console.WriteLine(logMessage);
-                        LogManagerService.LogInfo(logMessage);
+                        //logMessage = $"⭐ [행{rowNumber}] 별표2 변환: '{originalStar2String}' → '{transformedStar2String}' (주소: {addressString})";
+                        //Console.WriteLine(logMessage);
+                        //LogManagerService.LogInfo(logMessage);
                     }
                     else
                     {
-                        logMessage = $"ℹ️ [행{rowNumber}] 별표2 변환 없음: 값이 동일함";
-                        Console.WriteLine(logMessage);
-                        LogManagerService.LogInfo(logMessage);
+                        //logMessage = $"ℹ️ [행{rowNumber}] 별표2 변환 없음: 값이 동일함";
+                        //Console.WriteLine(logMessage);
+                        //LogManagerService.LogInfo(logMessage);
                     }
                 }
                 catch (Exception ex)
@@ -1285,6 +1283,139 @@ namespace LogisticManager.Services
             {
                 Console.WriteLine($"⚠️ [DataTransformationService] 배송메세지 정제 실패: {ex.Message}");
                 return specialNote;
+            }
+        }
+
+        /// <summary>
+        /// 범용 엑셀 데이터 전처리 - 빈 행 제거 및 null 값 처리
+        /// 
+        /// 🎯 주요 기능:
+        /// - 빈 행 자동 제거 (모든 컬럼이 null/빈 값인 행)
+        /// - null 값을 빈 문자열("")로 안전하게 변환
+        /// - 데이터 타입 안전성 보장 (문자열 변환)
+        /// - 오류 발생 시 원본 데이터 반환으로 안전성 확보
+        /// 
+        /// 🔧 처리 과정:
+        /// 1. 원본 데이터 복사본 생성
+        /// 2. 빈 행 식별 및 제거
+        /// 3. null 값 → 빈 문자열 변환
+        /// 4. 데이터 타입 안전성 검증
+        /// 
+        /// 📊 처리 결과:
+        /// - 제거된 빈 행 수
+        /// - null 값 변환 수
+        /// - 변환된 값 수
+        /// 
+        /// 💡 사용 대상:
+        /// - 톡딜불가 데이터 (talkdeal_unavailable_table)
+        /// - 별표송장 데이터 (star_invoice_table)
+        /// - 기타 모든 엑셀 데이터 전처리
+        /// 
+        /// ⚠️ 처리 방식:
+        /// - 원본 데이터 보호 (복사본 사용)
+        /// - 오류 발생 시 원본 데이터 반환
+        /// - 상세한 처리 로그 기록
+        /// 
+        /// 🔄 반환 값:
+        /// - 성공 시: 전처리된 DataTable
+        /// - 실패 시: 원본 DataTable (안전성 보장)
+        /// </summary>
+        /// <param name="excelData">전처리할 원본 DataTable</param>
+        /// <returns>전처리된 데이터 (실패 시 원본 데이터)</returns>
+        public static DataTable PreprocessExcelData(DataTable excelData)
+        {
+            // 입력 데이터 유효성 검사
+            if (excelData == null)
+            {
+                LogManagerService.LogError("[PreprocessExcelData] ❌ 입력 데이터가 null입니다 - 빈 DataTable 반환");
+                return new DataTable();
+            }
+
+            if (excelData.Rows.Count == 0)
+            {
+                LogManagerService.LogInfo("[PreprocessExcelData] ⚠️ 입력 데이터에 행이 없습니다 - 원본 데이터 반환");
+                return excelData;
+            }
+
+            try
+            {
+                // 원본 데이터 복사본 생성 (원본 데이터 보호)
+                var processedData = excelData.Copy();
+                
+                // === 1단계: 빈 행 제거 (모든 컬럼이 null/빈 값인 행) ===
+                var rowsToRemove = new List<DataRow>();
+                var emptyRowCount = 0;
+                
+                foreach (DataRow row in processedData.Rows)
+                {
+                    bool isEmptyRow = true;
+                    foreach (DataColumn column in processedData.Columns)
+                    {
+                        var value = row[column];
+                        if (value != null && value != DBNull.Value && !string.IsNullOrWhiteSpace(value.ToString()))
+                        {
+                            isEmptyRow = false;
+                            break;
+                        }
+                    }
+                    
+                    if (isEmptyRow)
+                    {
+                        rowsToRemove.Add(row);
+                        emptyRowCount++;
+                    }
+                }
+                
+                // 빈 행 제거 (역순으로 제거하여 인덱스 문제 방지)
+                for (int i = rowsToRemove.Count - 1; i >= 0; i--)
+                {
+                    processedData.Rows.Remove(rowsToRemove[i]);
+                }
+                
+                // === 2단계: null 값 및 데이터 타입 정규화 ===
+                var nullValueCount = 0;
+                var convertedValueCount = 0;
+                
+                foreach (DataRow row in processedData.Rows)
+                {
+                    foreach (DataColumn column in processedData.Columns)
+                    {
+                        var value = row[column];
+                        if (value == null || value == DBNull.Value)
+                        {
+                            row[column] = "";
+                            nullValueCount++;
+                        }
+                        else
+                        {
+                            // 문자열로 변환하여 안전성 확보
+                            var stringValue = value.ToString();
+                            if (stringValue != null)
+                            {
+                                row[column] = stringValue;
+                                convertedValueCount++;
+                            }
+                            else
+                            {
+                                row[column] = "";
+                                nullValueCount++;
+                            }
+                        }
+                    }
+                }
+                
+                // 처리 결과 로깅
+                LogManagerService.LogInfo($"[PreprocessExcelData] ✅ 데이터 전처리 완료 - 제거된 빈 행: {emptyRowCount}개, null 값 변환: {nullValueCount}개, 변환된 값: {convertedValueCount}개");
+                
+                return processedData;
+            }
+            catch (Exception ex)
+            {
+                // 전처리 실패 시 원본 데이터 반환 (안전성 보장)
+                LogManagerService.LogError($"[PreprocessExcelData] ❌ 데이터 전처리 실패:\n   오류 내용: {ex.Message} - 원본 데이터 반환");
+                LogManagerService.LogError($"[PreprocessExcelData] ❌ 스택 트레이스:\n   {ex.StackTrace}");
+                
+                return excelData;
             }
         }
 

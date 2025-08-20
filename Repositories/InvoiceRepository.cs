@@ -944,13 +944,13 @@ namespace LogisticManager.Repositories
         {
             try
             {
-                LogManagerService.LogInfo($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 INSERT 쿼리 생성 시작");
+                //LogManagerService.LogInfo($"🔍 InvoiceRepository: 테이블 '{tableName}'에 대한 하이브리드 INSERT 쿼리 생성 시작");
                 
                 // === 1단계: DynamicQueryBuilder를 사용한 하이브리드 쿼리 생성 ===
                 var (sql, parameters) = _queryBuilder.BuildInsertQuery(tableName, invoice);
                 
-                LogManagerService.LogInfo($"✅ 하이브리드 쿼리 생성 완료 - 테이블: {tableName}");
-                LogManagerService.LogInfo($"📊 생성된 컬럼 수: {parameters.Count}개");
+                //LogManagerService.LogInfo($"✅ 하이브리드 쿼리 생성 완료 - 테이블: {tableName}");
+                //LogManagerService.LogInfo($"📊 생성된 컬럼 수: {parameters.Count}개");
                 
                 return (sql, parameters);
             }

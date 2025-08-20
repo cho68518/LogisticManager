@@ -50,7 +50,7 @@ BEGIN
 
     -- 대체코드1이 있는 데이터 처리
     INSERT INTO 송장출력_사방넷원본변환 (
-        msg1, msg2, msg3, msg4, msg5, msg6, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
+        msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
         수량, 배송메세지, 주문번호, 쇼핑몰, 수집시간, 송장명, 
         품목코드, 옵션명, 박스크기, 출력개수, 송장수량, 
         별표1, 별표2, 품목개수, 택배수량, 택배수량1, 택배수량합산,
@@ -59,7 +59,7 @@ BEGIN
     )
     SELECT
         dev.msg1, dev.msg2, dev.msg3, dev.msg4, dev.msg5, dev.msg6, 
-        dev.택배비용, dev.전화번호1, dev.전화번호2, dev.우편번호, dev.주소,
+        dev.수취인명, dev.택배비용, dev.전화번호1, dev.전화번호2, dev.우편번호, dev.주소,
         (dev.수량 * CAST(spec.대체1수량 AS DECIMAL(10,2))) AS 수량, dev.배송메세지, dev.주문번호, dev.쇼핑몰, dev.수집시간, dev.송장명, 
         spec.대체코드1, spec.대체코드1품목명, 
         NULL, NULL, NULL,
@@ -73,7 +73,7 @@ BEGIN
 
     -- 대체코드2가 있는 데이터 처리
     INSERT INTO 송장출력_사방넷원본변환 (
-        msg1, msg2, msg3, msg4, msg5, msg6, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
+        msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
         수량, 배송메세지, 주문번호, 쇼핑몰, 수집시간, 송장명, 
         품목코드, 옵션명, 박스크기, 출력개수, 송장수량, 
         별표1, 별표2, 품목개수, 택배수량, 택배수량1, 택배수량합산,
@@ -82,7 +82,7 @@ BEGIN
     )
     SELECT
         dev.msg1, dev.msg2, dev.msg3, dev.msg4, dev.msg5, dev.msg6, 
-        dev.택배비용, dev.전화번호1, dev.전화번호2, dev.우편번호, dev.주소,
+        dev.수취인명, dev.택배비용, dev.전화번호1, dev.전화번호2, dev.우편번호, dev.주소,
         (dev.수량 * CAST(spec.대체2수량 AS DECIMAL(10,2))) AS 수량, dev.배송메세지, dev.주문번호, dev.쇼핑몰, dev.수집시간, dev.송장명, 
         spec.대체코드2, spec.대체코드2품목명, 
         NULL, NULL, NULL,
@@ -96,7 +96,7 @@ BEGIN
 
     -- 대체코드3이 있는 데이터 처리
     INSERT INTO 송장출력_사방넷원본변환 (
-        msg1, msg2, msg3, msg4, msg5, msg6, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
+        msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
         수량, 배송메세지, 주문번호, 쇼핑몰, 수집시간, 송장명, 
         품목코드, 옵션명, 박스크기, 출력개수, 송장수량, 
         별표1, 별표2, 품목개수, 택배수량, 택배수량1, 택배수량합산,
@@ -105,7 +105,7 @@ BEGIN
     )
     SELECT
         dev.msg1, dev.msg2, dev.msg3, dev.msg4, dev.msg5, dev.msg6, 
-        dev.택배비용, dev.전화번호1, dev.전화번호2, dev.우편번호, dev.주소,
+        dev.수취인명, dev.택배비용, dev.전화번호1, dev.전화번호2, dev.우편번호, dev.주소,
         (dev.수량 * CAST(spec.대체3수량 AS DECIMAL(10,2))) AS 수량, dev.배송메세지, dev.주문번호, dev.쇼핑몰, dev.수집시간, dev.송장명, 
         spec.대체코드3, spec.대체코드3품목명,
         NULL, NULL, NULL,
@@ -119,7 +119,7 @@ BEGIN
 
     -- 대체코드4가 있는 데이터 처리
     INSERT INTO 송장출력_사방넷원본변환 (
-        msg1, msg2, msg3, msg4, msg5, msg6, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
+        msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
         수량, 배송메세지, 주문번호, 쇼핑몰, 수집시간, 송장명, 
         품목코드, 옵션명, 박스크기, 출력개수, 송장수량, 
         별표1, 별표2, 품목개수, 택배수량, 택배수량1, 택배수량합산,
@@ -128,7 +128,7 @@ BEGIN
     )
     SELECT
         dev.msg1, dev.msg2, dev.msg3, dev.msg4, dev.msg5, dev.msg6, 
-        dev.택배비용, dev.전화번호1, dev.전화번호2, dev.우편번호, dev.주소,
+        dev.수취인명, dev.택배비용, dev.전화번호1, dev.전화번호2, dev.우편번호, dev.주소,
         (dev.수량 * CAST(spec.대체4수량 AS DECIMAL(10,2))) AS 수량, dev.배송메세지, dev.주문번호, dev.쇼핑몰, dev.수집시간, dev.송장명, 
         spec.대체코드4, spec.대체코드4품목명,
         NULL, NULL, NULL,

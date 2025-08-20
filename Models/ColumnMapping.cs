@@ -167,6 +167,108 @@ namespace LogisticManager.Models
     }
 
     /// <summary>
+    /// table_mappings.json에 맞는 테이블 매핑 정보를 담는 모델 클래스
+    /// </summary>
+    public class TableMappingInfo
+    {
+        /// <summary>
+        /// 테이블명
+        /// </summary>
+        [JsonProperty("tableName")]
+        public string TableName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 컬럼 정보 리스트
+        /// </summary>
+        [JsonProperty("columns")]
+        public List<TableColumnInfo> Columns { get; set; } = new List<TableColumnInfo>();
+
+        /// <summary>
+        /// 테이블 설명
+        /// </summary>
+        [JsonProperty("description")]
+        public string? Description { get; set; }
+
+        /// <summary>
+        /// 비즈니스 목적
+        /// </summary>
+        [JsonProperty("businessPurpose")]
+        public string? BusinessPurpose { get; set; }
+
+        /// <summary>
+        /// 데이터 소스
+        /// </summary>
+        [JsonProperty("dataSource")]
+        public string? DataSource { get; set; }
+
+        /// <summary>
+        /// 업데이트 빈도
+        /// </summary>
+        [JsonProperty("updateFrequency")]
+        public string? UpdateFrequency { get; set; }
+
+        /// <summary>
+        /// 데이터 보관 기간
+        /// </summary>
+        [JsonProperty("dataRetention")]
+        public string? DataRetention { get; set; }
+    }
+
+    /// <summary>
+    /// 테이블 컬럼 정보를 담는 모델 클래스
+    /// </summary>
+    public class TableColumnInfo
+    {
+        /// <summary>
+        /// 속성명 (C# 프로퍼티명)
+        /// </summary>
+        [JsonProperty("propertyName")]
+        public string PropertyName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 데이터베이스 컬럼명
+        /// </summary>
+        [JsonProperty("databaseColumn")]
+        public string DatabaseColumn { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 데이터 타입
+        /// </summary>
+        [JsonProperty("dataType")]
+        public string DataType { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 필수 여부
+        /// </summary>
+        [JsonProperty("isRequired")]
+        public bool IsRequired { get; set; } = false;
+
+        /// <summary>
+        /// 자동 증가 여부
+        /// </summary>
+        [JsonProperty("isAutoIncrement")]
+        public bool IsAutoIncrement { get; set; } = false;
+
+        /// <summary>
+        /// 기본키 여부
+        /// </summary>
+        [JsonProperty("isPrimaryKey")]
+        public bool IsPrimaryKey { get; set; } = false;
+
+        /// <summary>
+        /// INSERT에서 제외 여부
+        /// </summary>
+        [JsonProperty("excludeFromInsert")]
+        public bool ExcludeFromInsert { get; set; } = false;
+
+        /// <summary>
+        /// 컬럼 설명
+        /// </summary>
+        [JsonProperty("description")]
+        public string? Description { get; set; }
+    }
+
+    /// <summary>
     /// 컬럼 매핑 요약 정보
     /// </summary>
     public class ColumnMappingSummary

@@ -90,7 +90,7 @@ namespace LogisticManager.Services
         {
             _useReflectionFallback = useReflectionFallback;
             // 테이블별 매핑 파일이 있는 폴더 경로 설정 (프로젝트 루트에서 찾기)
-            _configPath = Path.Combine(GetProjectRootDirectory(), "config", "table_mappings");
+            _configPath = Path.Combine(LogPathManager.GetProjectRootDirectory(), "config", "table_mappings");
             _tableMappings = LoadTableMappings();
             
             var initLog = $"🔧 DynamicQueryBuilder 초기화 완료 - 매핑 폴더: {_configPath}";
@@ -1210,45 +1210,7 @@ namespace LogisticManager.Services
             }
         }
 
-        /// <summary>
-        /// 프로젝트 루트 디렉토리를 찾는 메서드
-        /// </summary>
-        /// <returns>프로젝트 루트 디렉토리 경로</returns>
-        private static string GetProjectRootDirectory()
-        {
-            try
-            {
-                // 현재 실행 디렉토리에서 시작하여 프로젝트 루트를 찾기
-                var currentDir = Directory.GetCurrentDirectory();
-                
-                // bin\Debug\net8.0-windows\win-x64 같은 하위 폴더들을 거슬러 올라가기
-                while (!string.IsNullOrEmpty(currentDir))
-                {
-                    // config 폴더가 있는지 확인
-                    var configPath = Path.Combine(currentDir, "config");
-                    if (Directory.Exists(configPath))
-                    {
-                        return currentDir;
-                    }
-                    
-                    // 상위 디렉토리로 이동
-                    var parentDir = Directory.GetParent(currentDir);
-                    if (parentDir == null)
-                    {
-                        break;
-                    }
-                    currentDir = parentDir.FullName;
-                }
-                
-                // 프로젝트 루트를 찾지 못한 경우 현재 실행 디렉토리 반환
-                return Directory.GetCurrentDirectory();
-            }
-            catch (Exception)
-            {
-                // 오류 발생 시 현재 실행 디렉토리 반환
-                return Directory.GetCurrentDirectory();
-            }
-        }
+
 
         /// <summary>
         /// 엑셀 컬럼명을 영문 속성명으로 변환

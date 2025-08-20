@@ -140,19 +140,19 @@ BEGIN
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 박스상품 명칭 변경', ROW_COUNT());
 
 	/*--=============================================================		
-	-- 택배 박스 낱개 나누기
-    --===============================================================*/
+	-- 택배 박스 낱개 나누기 (sp_MergePacking 에서 처리)
+    --===============================================================
     -- 택배수량 컬럼의 값이 1인 경우에는 '박스', 그 외의 경우에는 '낱개'로 변경.
     UPDATE 송장출력_사방넷원본변환 
 	   SET 택배수량1 = CASE WHEN CAST(택배수량 AS UNSIGNED) = 1 THEN '박스' ELSE '낱개' END 
 	 WHERE 택배수량 REGEXP '^[0-9]+$';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 택배 박스/낱개 구분', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 택배 박스/낱개 구분', ROW_COUNT());*/
 
 	/*--=============================================================		
 	-- 송장 출고지별로 구분
     --===============================================================*/
     UPDATE 송장출력_사방넷원본변환 
-	   SET `송장구분최종` = CONCAT(`송장구분`, IFNULL(`택배수량1`, ''));
+	   SET 송장구분최종 = CONCAT(송장구분, IFNULL(택배수량1, ''));
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 송장구분최종 설정', ROW_COUNT());
 
     /*--=============================================================		
@@ -350,13 +350,11 @@ BEGIN
     --================================================================================*/
 	UPDATE 송장출력_사방넷원본변환
 	   SET
-			-- `송장구분최종`의 현재 값에 따라 새로운 값을 조건부로 할당합니다.
 			송장구분최종 = CASE 송장구분최종
 				WHEN '냉동낱개' THEN '서울낱개'
 				WHEN '냉동박스' THEN '서울박스'
 			END
 	   WHERE
-			-- 두 업데이트 쿼리의 WHERE 조건을 통합합니다.
 			송장구분최종 IN ('냉동낱개', '냉동박스')
 			AND SUBSTRING(
 					TRIM(SUBSTRING_INDEX(주소, ']', -1)), 1, 2

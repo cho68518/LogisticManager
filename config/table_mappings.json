@@ -3,15 +3,6 @@
     "tableName": "송장출력_톡딜불가",
     "columns": [
       {
-        "propertyName": "Id",
-        "databaseColumn": "id",
-        "dataType": "INT",
-        "isRequired": true,
-        "isAutoIncrement": true,
-        "isPrimaryKey": true,
-        "excludeFromInsert": true
-      },
-      {
         "propertyName": "ShoppingMall",
         "databaseColumn": "쇼핑몰",
         "dataType": "VARCHAR(255)",
@@ -81,564 +72,313 @@
     "updateFrequency": "일간",
     "dataRetention": "1년"
   },
-  "송장출력_사방넷원본변환_Dev": {
-    "tableName": "송장출력_사방넷원본변환_Dev",
-    "columns": [
-      {
-        "propertyName": "Id",
-        "databaseColumn": "id",
-        "dataType": "INT",
-        "isRequired": true,
-        "isAutoIncrement": true,
-        "isPrimaryKey": true,
-        "excludeFromInsert": true
-      },
-      {
-        "propertyName": "Msg1",
-        "databaseColumn": "msg1",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "Msg2",
-        "databaseColumn": "msg2",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "Msg3",
-        "databaseColumn": "msg3",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "Msg4",
-        "databaseColumn": "msg4",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "Msg5",
-        "databaseColumn": "msg5",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "Msg6",
-        "databaseColumn": "msg6",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "RecipientName",
-        "databaseColumn": "수취인명",
-        "dataType": "VARCHAR",
-        "isRequired": true
-      },
-      {
-        "propertyName": "Phone1",
-        "databaseColumn": "전화번호1",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "Phone2",
-        "databaseColumn": "전화번호2",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "ZipCode",
-        "databaseColumn": "우편번호",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "Address",
-        "databaseColumn": "주소",
-        "dataType": "VARCHAR",
-        "isRequired": true
-      },
-      {
-        "propertyName": "OptionName",
-        "databaseColumn": "옵션명",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "Quantity",
-        "databaseColumn": "수량",
-        "dataType": "INT",
-        "isRequired": true
-      },
-      {
-        "propertyName": "SpecialNote",
-        "databaseColumn": "배송메세지",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "OrderNumber",
-        "databaseColumn": "주문번호",
-        "dataType": "VARCHAR",
-        "isRequired": true
-      },
-      {
-        "propertyName": "StoreName",
-        "databaseColumn": "쇼핑몰",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "CollectedAt",
-        "databaseColumn": "수집시간",
-        "dataType": "DATETIME",
-        "isRequired": false
-      },
-      {
-        "propertyName": "ProductName",
-        "databaseColumn": "송장명",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "ProductCode",
-        "databaseColumn": "품목코드",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "DeliveryCost",
-        "databaseColumn": "택배비용",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "BoxSize",
-        "databaseColumn": "박스크기",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "PrintCount",
-        "databaseColumn": "출력개수",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "InvoiceQuantity",
-        "databaseColumn": "송장수량",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "Star1",
-        "databaseColumn": "별표1",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "Star2",
-        "databaseColumn": "별표2",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "ProductCount",
-        "databaseColumn": "품목개수",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "DeliveryQuantity",
-        "databaseColumn": "택배수량",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "DeliveryQuantity1",
-        "databaseColumn": "택배수량1",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "DeliveryQuantitySum",
-        "databaseColumn": "택배수량합산",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "InvoiceSeparator",
-        "databaseColumn": "송장구분자",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "InvoiceType",
-        "databaseColumn": "송장구분",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "InvoiceTypeFinal",
-        "databaseColumn": "송장구분최종",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "Location",
-        "databaseColumn": "위치",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "LocationConverted",
-        "databaseColumn": "위치변환",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "OrderNumberMall",
-        "databaseColumn": "주문번호(쇼핑몰)",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "PaymentAmount",
-        "databaseColumn": "결제금액",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "OrderAmount",
-        "databaseColumn": "주문금액",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "PaymentMethod",
-        "databaseColumn": "결제수단",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "TaxType",
-        "databaseColumn": "면과세구분",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "OrderStatus",
-        "databaseColumn": "주문상태",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      },
-      {
-        "propertyName": "ShippingType",
-        "databaseColumn": "배송송",
-        "dataType": "VARCHAR",
-        "isRequired": false
-      }
-    ]
-  },
+
   "송장출력_사방넷원본변환": {
     "tableName": "송장출력_사방넷원본변환",
     "columns": [
       {
-        "propertyName": "Id",
-        "databaseColumn": "id",
-        "dataType": "INT",
-        "isRequired": true,
-        "isAutoIncrement": true,
-        "isPrimaryKey": true,
-        "excludeFromInsert": true
-      },
-      {
         "propertyName": "Msg1",
         "databaseColumn": "msg1",
-        "dataType": "VARCHAR(255)",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "메시지 1"
+        "excludeFromInsert": true,
+        "description": "메시지 1 (Excel에 없음 - INSERT 제외)"
       },
       {
         "propertyName": "Msg2",
         "databaseColumn": "msg2",
-        "dataType": "VARCHAR(255)",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "메시지 2"
+        "excludeFromInsert": true,
+        "description": "메시지 2 (Excel에 없음 - INSERT 제외)"
       },
       {
         "propertyName": "Msg3",
         "databaseColumn": "msg3",
-        "dataType": "VARCHAR(255)",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "메시지 3"
+        "excludeFromInsert": true,
+        "description": "메시지 3 (Excel에 없음 - INSERT 제외)"
       },
       {
         "propertyName": "Msg4",
         "databaseColumn": "msg4",
-        "dataType": "VARCHAR(255)",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "메시지 4"
+        "excludeFromInsert": true,
+        "description": "메시지 4 (Excel에 없음 - INSERT 제외)"
       },
       {
         "propertyName": "Msg5",
         "databaseColumn": "msg5",
-        "dataType": "VARCHAR(255)",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "메시지 5"
+        "excludeFromInsert": true,
+        "description": "메시지 5 (Excel에 없음 - INSERT 제외)"
       },
       {
         "propertyName": "Msg6",
         "databaseColumn": "msg6",
-        "dataType": "VARCHAR(255)",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "메시지 6"
+        "excludeFromInsert": true,
+        "description": "메시지 6 (Excel에 없음 - INSERT 제외)"
       },
       {
         "propertyName": "RecipientName",
         "databaseColumn": "수취인명",
-        "dataType": "VARCHAR(100)",
-        "isRequired": true,
+        "dataType": "varchar(255)",
+        "isRequired": false,
         "description": "수취인명"
       },
       {
         "propertyName": "Phone1",
         "databaseColumn": "전화번호1",
-        "dataType": "VARCHAR(20)",
-        "isRequired": true,
+        "dataType": "varchar(255)",
+        "isRequired": false,
         "description": "전화번호1"
       },
       {
         "propertyName": "Phone2",
         "databaseColumn": "전화번호2",
-        "dataType": "VARCHAR(20)",
+        "dataType": "varchar(255)",
         "isRequired": false,
         "description": "전화번호2"
       },
       {
         "propertyName": "ZipCode",
         "databaseColumn": "우편번호",
-        "dataType": "VARCHAR(10)",
-        "isRequired": true,
+        "dataType": "varchar(255)",
+        "isRequired": false,
         "description": "우편번호"
       },
       {
         "propertyName": "Address",
         "databaseColumn": "주소",
-        "dataType": "VARCHAR(500)",
-        "isRequired": true,
+        "dataType": "varchar(255)",
+        "isRequired": false,
         "description": "주소"
       },
       {
         "propertyName": "OptionName",
         "databaseColumn": "옵션명",
-        "dataType": "VARCHAR(200)",
+        "dataType": "varchar(255)",
         "isRequired": false,
         "description": "옵션명"
       },
       {
         "propertyName": "Quantity",
         "databaseColumn": "수량",
-        "dataType": "INT",
+        "dataType": "int(11)",
         "isRequired": false,
         "description": "수량"
       },
       {
-        "propertyName": "ProductName",
-        "databaseColumn": "송장명",
-        "dataType": "VARCHAR(200)",
-        "isRequired": false,
-        "description": "송장명(품목명)"
-      },
-      {
-        "propertyName": "ProductCode",
-        "databaseColumn": "품목코드",
-        "dataType": "VARCHAR(50)",
-        "isRequired": false,
-        "description": "품목코드"
-      },
-      {
-        "propertyName": "ProductCount",
-        "databaseColumn": "품목개수",
-        "dataType": "VARCHAR(50)",
-        "isRequired": false,
-        "description": "품목개수"
-      },
-      {
         "propertyName": "SpecialNote",
         "databaseColumn": "배송메세지",
-        "dataType": "VARCHAR(500)",
+        "dataType": "varchar(255)",
         "isRequired": false,
         "description": "배송메세지"
       },
       {
         "propertyName": "OrderNumber",
         "databaseColumn": "주문번호",
-        "dataType": "VARCHAR(100)",
-        "isRequired": true,
+        "dataType": "varchar(255)",
+        "isRequired": false,
         "description": "주문번호"
       },
       {
         "propertyName": "StoreName",
         "databaseColumn": "쇼핑몰",
-        "dataType": "VARCHAR(100)",
+        "dataType": "varchar(255)",
         "isRequired": false,
         "description": "쇼핑몰명"
       },
       {
         "propertyName": "CollectedAt",
         "databaseColumn": "수집시간",
-        "dataType": "DATETIME",
+        "dataType": "datetime",
         "isRequired": false,
         "description": "수집시간"
       },
       {
-        "propertyName": "OrderNumberMall",
-        "databaseColumn": "주문번호(쇼핑몰)",
-        "dataType": "VARCHAR(100)",
+        "propertyName": "ProductName",
+        "databaseColumn": "송장명",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "주문번호(쇼핑몰)"
+        "description": "송장명(품목명)"
       },
       {
-        "propertyName": "OrderAmount",
-        "databaseColumn": "주문금액",
-        "dataType": "DECIMAL(10,2)",
+        "propertyName": "ProductCode",
+        "databaseColumn": "품목코드",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "주문금액"
-      },
-      {
-        "propertyName": "PaymentAmount",
-        "databaseColumn": "결제금액",
-        "dataType": "DECIMAL(10,2)",
-        "isRequired": false,
-        "description": "결제금액"
-      },
-      {
-        "propertyName": "PaymentMethod",
-        "databaseColumn": "결제수단",
-        "dataType": "VARCHAR(255)",
-        "isRequired": false,
-        "description": "결제수단"
-      },
-      {
-        "propertyName": "TaxType",
-        "databaseColumn": "면과세구분",
-        "dataType": "VARCHAR(50)",
-        "isRequired": false,
-        "description": "면과세구분"
-      },
-      {
-        "propertyName": "OrderStatus",
-        "databaseColumn": "주문상태",
-        "dataType": "VARCHAR(50)",
-        "isRequired": false,
-        "description": "주문상태"
+        "description": "품목코드"
       },
       {
         "propertyName": "DeliveryCost",
         "databaseColumn": "택배비용",
-        "dataType": "VARCHAR(50)",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "택배비용"
+        "excludeFromInsert": true,
+        "description": "택배비용 (Excel에 없음 - INSERT 제외)"
       },
       {
         "propertyName": "BoxSize",
         "databaseColumn": "박스크기",
-        "dataType": "VARCHAR(50)",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "박스크기"
+        "excludeFromInsert": true,
+        "description": "박스크기 (Excel에 없음 - INSERT 제외)"
+      },
+      {
+        "propertyName": "PrintCount",
+        "databaseColumn": "출력개수",
+        "dataType": "varchar(255)",
+        "isRequired": false,
+        "excludeFromInsert": true,
+        "description": "출력개수 (Excel에 없음 - INSERT 제외)"
+      },
+      {
+        "propertyName": "InvoiceQuantity",
+        "databaseColumn": "송장수량",
+        "dataType": "varchar(255)",
+        "isRequired": false,
+        "description": "송장수량"
+      },
+      {
+        "propertyName": "Star1",
+        "databaseColumn": "별표1",
+        "dataType": "varchar(255)",
+        "isRequired": false,
+        "excludeFromInsert": true,
+        "description": "별표1 (Excel에 없음 - INSERT 제외)"
+      },
+      {
+        "propertyName": "Star2",
+        "databaseColumn": "별표2",
+        "dataType": "varchar(255)",
+        "isRequired": false,
+        "description": "별표2"
+      },
+      {
+        "propertyName": "ProductCount",
+        "databaseColumn": "품목개수",
+        "dataType": "varchar(255)",
+        "isRequired": false,
+        "excludeFromInsert": true,
+        "description": "품목개수 (Excel에 없음 - INSERT 제외)"
       },
       {
         "propertyName": "DeliveryQuantity",
         "databaseColumn": "택배수량",
-        "dataType": "VARCHAR(50)",
+        "dataType": "varchar(255)",
         "isRequired": false,
         "description": "택배수량"
       },
       {
         "propertyName": "DeliveryQuantity1",
         "databaseColumn": "택배수량1",
-        "dataType": "VARCHAR(50)",
+        "dataType": "varchar(255)",
         "isRequired": false,
         "description": "택배수량1"
       },
       {
         "propertyName": "DeliveryQuantitySum",
         "databaseColumn": "택배수량합산",
-        "dataType": "VARCHAR(50)",
+        "dataType": "varchar(255)",
         "isRequired": false,
         "description": "택배수량합산"
       },
       {
-        "propertyName": "ShippingType",
-        "databaseColumn": "배송송",
-        "dataType": "VARCHAR(50)",
-        "isRequired": false,
-        "description": "배송송"
-      },
-      {
-        "propertyName": "PrintCount",
-        "databaseColumn": "출력개수",
-        "dataType": "VARCHAR(50)",
-        "isRequired": false,
-        "description": "출력개수"
-      },
-      {
-        "propertyName": "InvoiceQuantity",
-        "databaseColumn": "송장수량",
-        "dataType": "VARCHAR(50)",
-        "isRequired": false,
-        "description": "송장수량"
-      },
-      {
         "propertyName": "InvoiceSeparator",
         "databaseColumn": "송장구분자",
-        "dataType": "VARCHAR(50)",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "송장구분자"
+        "excludeFromInsert": true,
+        "description": "송장구분자 (Excel에 없음 - INSERT 제외)"
       },
       {
         "propertyName": "InvoiceType",
         "databaseColumn": "송장구분",
-        "dataType": "VARCHAR(50)",
+        "dataType": "varchar(256)",
         "isRequired": false,
-        "description": "송장구분"
+        "excludeFromInsert": true,
+        "description": "송장구분 (Excel에 없음 - INSERT 제외)"
       },
       {
         "propertyName": "InvoiceTypeFinal",
         "databaseColumn": "송장구분최종",
-        "dataType": "VARCHAR(50)",
+        "dataType": "varchar(256)",
         "isRequired": false,
-        "description": "송장구분최종"
+        "excludeFromInsert": true,
+        "description": "송장구분최종 (Excel에 없음 - INSERT 제외)"
       },
       {
         "propertyName": "Location",
         "databaseColumn": "위치",
-        "dataType": "VARCHAR(100)",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "위치"
+        "excludeFromInsert": true,
+        "description": "위치 (Excel에 없음 - INSERT 제외)"
       },
       {
         "propertyName": "LocationConverted",
         "databaseColumn": "위치변환",
-        "dataType": "VARCHAR(100)",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "위치변환"
+        "excludeFromInsert": true,
+        "description": "위치변환 (Excel에 없음 - INSERT 제외)"
       },
       {
-        "propertyName": "Star1",
-        "databaseColumn": "별표1",
-        "dataType": "VARCHAR(50)",
+        "propertyName": "OrderNumberMall",
+        "databaseColumn": "주문번호(쇼핑몰)",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "별표1"
+        "description": "주문번호(쇼핑몰)"
+      },
+
+      {
+        "propertyName": "PaymentAmount",
+        "databaseColumn": "결제금액",
+        "dataType": "varchar(255)",
+        "isRequired": false,
+        "description": "결제금액"
       },
       {
-        "propertyName": "Star2",
-        "databaseColumn": "별표2",
-        "dataType": "VARCHAR(50)",
+        "propertyName": "OrderAmount",
+        "databaseColumn": "주문금액",
+        "dataType": "varchar(255)",
         "isRequired": false,
-        "description": "별표2"
+        "description": "주문금액"
+      },
+      {
+        "propertyName": "PaymentMethod",
+        "databaseColumn": "결제수단",
+        "dataType": "varchar(255)",
+        "isRequired": false,
+        "description": "결제수단"
+      },
+      {
+        "propertyName": "TaxType",
+        "databaseColumn": "면과세구분",
+        "dataType": "varchar(255)",
+        "isRequired": false,
+        "description": "면과세구분"
+      },
+      {
+        "propertyName": "OrderStatus",
+        "databaseColumn": "주문상태",
+        "dataType": "varchar(255)",
+        "isRequired": false,
+        "description": "주문상태"
+      },
+      {
+        "propertyName": "ShippingType",
+        "databaseColumn": "배송송",
+        "dataType": "varchar(255)",
+        "isRequired": false,
+        "description": "배송송"
       }
     ],
     "description": "송장출력 메인 테이블 - 사방넷 원본 데이터 변환",

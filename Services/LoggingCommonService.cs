@@ -19,7 +19,7 @@ namespace LogisticManager.Services
     /// </summary>
     public class LoggingCommonService
     {
-        private const string LOG_PATH = "app.log";
+        private const string LOG_PATH = "logs/current/app.log";
         private const string LOG_TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss";
 
         /// <summary>
@@ -123,7 +123,29 @@ namespace LogisticManager.Services
         }
 
         /// <summary>
-        /// 로그 파일 상태를 진단하는 메서드
+        /// 로그 파일 상태를 진단하는 공통 메서드
+        /// 
+        /// 🎯 주요 기능:
+        /// - 로그 파일 경로 및 존재 여부 확인
+        /// - 파일 크기, 수정시간, 권한 정보 진단
+        /// - 시스템 환경 정보 수집
+        /// - 경고 메시지 및 권장사항 제공
+        /// 
+        /// 🔧 처리 과정:
+        /// 1. 파일 존재 여부 확인
+        /// 2. 파일 상세 정보 수집 (크기, 수정시간, 권한)
+        /// 3. 시스템 환경 정보 수집
+        /// 4. 경고 및 권장사항 생성
+        /// 
+        /// 💡 사용 목적:
+        /// - 로그 파일 문제 진단
+        /// - 시스템 환경 분석
+        /// - 로그 관리 최적화
+        /// 
+        /// ⚠️ 처리 방식:
+        /// - 상세한 진단 정보 제공
+        /// - 사용자 친화적인 메시지 생성
+        /// - 오류 발생 시 안전한 fallback
         /// </summary>
         /// <param name="logPath">진단할 로그 파일 경로</param>
         /// <returns>진단 결과 메시지</returns>
@@ -131,39 +153,73 @@ namespace LogisticManager.Services
         {
             try
             {
-                if (!File.Exists(logPath))
-                {
-                    return $"❌ 로그 파일이 존재하지 않습니다: {logPath}";
-                }
-
-                var fileInfo = new FileInfo(logPath);
-                var sizeInMB = fileInfo.Length / (1024.0 * 1024.0);
-                var lastModified = fileInfo.LastWriteTime;
-
                 var status = new StringBuilder();
-                status.AppendLine($"📋 로그 파일 진단 결과: {logPath}");
-                status.AppendLine($"📁 파일 크기: {sizeInMB:F2} MB");
-                status.AppendLine($"🕒 마지막 수정: {lastModified:yyyy-MM-dd HH:mm:ss}");
-                status.AppendLine($"✅ 파일 상태: 정상");
-
-                // 파일 크기 경고
-                if (sizeInMB > 100)
+                status.AppendLine($"=== 📋 로그 파일 상태 진단 ===");
+                status.AppendLine($"📍 대상 경로: {logPath}");
+                status.AppendLine($"🔗 절대 경로: {Path.GetFullPath(logPath)}");
+                
+                // 디렉토리 및 파일 존재 여부 확인
+                var directoryPath = Path.GetDirectoryName(logPath);
+                status.AppendLine($"📁 디렉토리 존재: {(Directory.Exists(directoryPath) ? "✅" : "❌")}");
+                status.AppendLine($"📄 파일 존재: {(File.Exists(logPath) ? "✅" : "❌")}");
+                
+                if (File.Exists(logPath))
                 {
-                    status.AppendLine($"⚠️ 경고: 로그 파일이 100MB를 초과합니다. 로그 정리를 고려하세요.");
+                    var fileInfo = new FileInfo(logPath);
+                    var sizeInBytes = fileInfo.Length;
+                    var sizeInMB = sizeInBytes / (1024.0 * 1024.0);
+                    var lastModified = fileInfo.LastWriteTime;
+                    
+                    status.AppendLine($"📊 파일 크기: {sizeInBytes:N0} bytes ({sizeInMB:F2} MB)");
+                    status.AppendLine($"🕒 마지막 수정: {lastModified:yyyy-MM-dd HH:mm:ss}");
+                    status.AppendLine($"🔒 읽기 전용: {(fileInfo.IsReadOnly ? "✅" : "❌")}");
+                    status.AppendLine($"✏️ 쓰기 권한: {(CanWriteToFile(logPath) ? "✅" : "❌")}");
+                    status.AppendLine($"✅ 파일 상태: 정상");
+                    
+                    // 파일 크기 경고
+                    if (sizeInMB > 100)
+                    {
+                        status.AppendLine($"⚠️ 경고: 로그 파일이 100MB를 초과합니다. 로그 정리를 고려하세요.");
+                    }
+                    else if (sizeInMB > 50)
+                    {
+                        status.AppendLine($"⚠️ 주의: 로그 파일이 50MB를 초과합니다. 모니터링이 필요합니다.");
+                    }
+                    
+                    // 파일 수정 시간 경고
+                    var timeSinceLastModified = DateTime.Now - lastModified;
+                    if (timeSinceLastModified.TotalDays > 7)
+                    {
+                        status.AppendLine($"⚠️ 경고: 로그 파일이 7일 이상 수정되지 않았습니다.");
+                    }
+                    else if (timeSinceLastModified.TotalDays > 3)
+                    {
+                        status.AppendLine($"ℹ️ 정보: 로그 파일이 3일 이상 수정되지 않았습니다.");
+                    }
                 }
-
-                // 파일 수정 시간 경고
-                var timeSinceLastModified = DateTime.Now - lastModified;
-                if (timeSinceLastModified.TotalDays > 7)
+                else
                 {
-                    status.AppendLine($"⚠️ 경고: 로그 파일이 7일 이상 수정되지 않았습니다.");
+                    status.AppendLine($"❌ 파일이 존재하지 않습니다.");
+                    status.AppendLine($"💡 해결 방법: 파일 경로를 확인하거나 로그 디렉토리를 생성하세요.");
                 }
-
+                
+                // 시스템 환경 정보
+                status.AppendLine($"🖥️ 현재 작업 디렉토리: {Directory.GetCurrentDirectory()}");
+                status.AppendLine($"🔧 AppDomain.BaseDirectory: {AppDomain.CurrentDomain.BaseDirectory}");
+                
+                // 권장사항
+                if (!string.IsNullOrEmpty(directoryPath) && !Directory.Exists(directoryPath))
+                {
+                    status.AppendLine($"💡 권장사항: 디렉토리 '{directoryPath}'를 생성하세요.");
+                }
+                
+                status.AppendLine($"=== 🎯 진단 완료 ===");
+                
                 return status.ToString();
             }
             catch (Exception ex)
             {
-                return $"❌ 로그 파일 진단 실패: {ex.Message}";
+                return $"❌ 로그 파일 상태 진단 실패:\n   오류 내용: {ex.Message}\n   스택 트레이스: {ex.StackTrace}";
             }
         }
 

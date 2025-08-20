@@ -201,5 +201,125 @@ namespace LogisticManager.Services
                 Console.WriteLine($"   {fileName}: {(exists ? "✅" : "❌")} - {correctPath} ({(exists ? $"{sizeMB}MB" : "파일 없음")})");
             }
         }
+
+        /// <summary>
+        /// 프로젝트 루트 디렉토리를 찾는 공통 메서드
+        /// 
+        /// 🎯 주요 기능:
+        /// - 프로젝트 루트 디렉토리를 안전하게 찾기
+        /// - config 폴더 존재 여부로 프로젝트 루트 판단
+        /// - 다양한 시작점에서 프로젝트 루트 검색
+        /// 
+        /// 🔧 검색 방법:
+        /// 1. 현재 작업 디렉토리에서 시작
+        /// 2. AppDomain.CurrentDomain.BaseDirectory에서 시작
+        /// 3. config 폴더 존재 여부로 프로젝트 루트 판단
+        /// 
+        /// ⚠️ 처리 방식:
+        /// - config 폴더가 있는 디렉토리를 프로젝트 루트로 인식
+        /// - 상위 디렉토리로 이동하며 검색 (최대 10단계)
+        /// - 검색 실패 시 현재 실행 디렉토리 반환
+        /// 
+        /// 💡 사용 목적:
+        /// - 로그 파일 경로 설정
+        /// - 설정 파일 경로 설정
+        /// - 프로젝트 관련 파일 경로 설정
+        /// 
+        /// 🔄 반환 값:
+        /// - 성공 시: 프로젝트 루트 디렉토리 경로
+        /// - 실패 시: 현재 실행 디렉토리 경로
+        /// </summary>
+        /// <returns>프로젝트 루트 디렉토리 경로</returns>
+        public static string GetProjectRootDirectory()
+        {
+            try
+            {
+                // 방법 1: 현재 작업 디렉토리에서 시작
+                var currentDir = Environment.CurrentDirectory;
+                var projectRoot = FindProjectRootByConfig(currentDir);
+                if (!string.IsNullOrEmpty(projectRoot))
+                {
+                    return projectRoot;
+                }
+
+                // 방법 2: AppDomain.CurrentDomain.BaseDirectory에서 시작
+                var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                projectRoot = FindProjectRootByConfig(baseDir);
+                if (!string.IsNullOrEmpty(projectRoot))
+                {
+                    return projectRoot;
+                }
+
+                // 방법 3: 실행 파일 위치에서 시작
+                var exeDir = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                if (!string.IsNullOrEmpty(exeDir))
+                {
+                    var exeDirPath = Path.GetDirectoryName(exeDir);
+                    if (!string.IsNullOrEmpty(exeDirPath))
+                    {
+                        projectRoot = FindProjectRootByConfig(exeDirPath);
+                        if (!string.IsNullOrEmpty(projectRoot))
+                        {
+                            return projectRoot;
+                        }
+                    }
+                }
+
+                // 모든 방법이 실패하면 현재 실행 디렉토리 반환
+                Console.WriteLine("⚠️ [LogPathManager] 프로젝트 루트를 찾을 수 없어 현재 실행 디렉토리 사용");
+                return AppDomain.CurrentDomain.BaseDirectory;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ [LogPathManager] 프로젝트 루트 검색 오류: {ex.Message}");
+                // 오류 발생 시 현재 실행 디렉토리 반환
+                return AppDomain.CurrentDomain.BaseDirectory;
+            }
+        }
+
+        /// <summary>
+        /// config 폴더 존재 여부로 프로젝트 루트를 찾는 헬퍼 메서드
+        /// </summary>
+        /// <param name="startDirectory">검색 시작 디렉토리</param>
+        /// <returns>프로젝트 루트 디렉토리 경로 (찾지 못한 경우 빈 문자열)</returns>
+        private static string FindProjectRootByConfig(string startDirectory)
+        {
+            try
+            {
+                var currentDir = startDirectory;
+                var maxDepth = 10; // 최대 10단계 상위로 검색
+
+                for (int i = 0; i < maxDepth; i++)
+                {
+                    if (string.IsNullOrEmpty(currentDir) || !Directory.Exists(currentDir))
+                    {
+                        break;
+                    }
+
+                    // config 폴더가 있는지 확인
+                    var configPath = Path.Combine(currentDir, "config");
+                    if (Directory.Exists(configPath))
+                    {
+                        Console.WriteLine($"✅ [LogPathManager] config 폴더 발견: {configPath}");
+                        return currentDir;
+                    }
+
+                    // 상위 디렉토리로 이동
+                    var parent = Directory.GetParent(currentDir);
+                    if (parent == null)
+                    {
+                        break;
+                    }
+                    currentDir = parent.FullName;
+                }
+
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ [LogPathManager] config 폴더 검색 오류: {ex.Message}");
+                return string.Empty;
+            }
+        }
     }
 }

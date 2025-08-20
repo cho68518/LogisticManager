@@ -17,12 +17,15 @@ namespace LogisticManager.Services
     {
         private MappingConfiguration? _configuration;
         private readonly string _mappingFilePath;
+        private readonly string _tableMappingsFilePath;
 
         public MappingService()
         {
             // 프로젝트 루트 디렉토리에서 설정 파일 찾기
             _mappingFilePath = Path.Combine(Directory.GetCurrentDirectory(), "column_mapping.json");
+            _tableMappingsFilePath = Path.Combine(Directory.GetCurrentDirectory(), "config", "table_mappings.json");
             Console.WriteLine($"[MappingService] 설정 파일 경로: {_mappingFilePath}");
+            Console.WriteLine($"[MappingService] 테이블 매핑 파일 경로: {_tableMappingsFilePath}");
             LoadMappingConfiguration();
         }
 
@@ -61,6 +64,45 @@ namespace LogisticManager.Services
                 Console.WriteLine($"❌ 매핑 설정 로드 실패: {ex.Message}");
                 _configuration = new MappingConfiguration();
             }
+        }
+
+        /// <summary>
+        /// 테이블 매핑 정보를 가져오는 메서드
+        /// </summary>
+        /// <param name="tableName">테이블명</param>
+        /// <returns>테이블 매핑 정보</returns>
+        public TableMappingInfo? GetTableMapping(string tableName)
+        {
+            try
+            {
+                if (File.Exists(_tableMappingsFilePath))
+                {
+                    var jsonContent = File.ReadAllText(_tableMappingsFilePath);
+                    var tableMappings = JsonConvert.DeserializeObject<Dictionary<string, TableMappingInfo>>(jsonContent);
+                    
+                    if (tableMappings != null && tableMappings.TryGetValue(tableName, out var mapping))
+                    {
+                        Console.WriteLine($"[MappingService] 테이블 매핑 정보 로드 완료: {tableName}");
+                        return mapping;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[MappingService] 테이블 '{tableName}'의 매핑 정보를 찾을 수 없습니다.");
+                        var availableTables = string.Join(", ", tableMappings?.Keys.ToArray() ?? Array.Empty<string>());
+                        Console.WriteLine($"[MappingService] 사용 가능한 테이블들: {availableTables}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"[MappingService] 테이블 매핑 파일이 존재하지 않습니다: {_tableMappingsFilePath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[MappingService] 테이블 매핑 정보 로드 실패: {ex.Message}");
+            }
+            
+            return null;
         }
 
         /// <summary>

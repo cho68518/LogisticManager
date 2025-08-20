@@ -23,7 +23,7 @@ namespace LogisticManager.Services
         #region 상수 (Constants)
 
         /// <summary>로그 폴더 경로</summary>
-        private static readonly string LogFolderPath = Path.Combine(GetProjectRootDirectory(), "logs", "current");
+        private static readonly string LogFolderPath = Path.Combine(LogPathManager.GetProjectRootDirectory(), "logs", "current");
 
         /// <summary>메인 로그 파일명</summary>
         private static readonly string MainLogFileName = "app.log";
@@ -153,7 +153,7 @@ namespace LogisticManager.Services
         {
             try
             {
-                var archiveFolder = Path.Combine(GetProjectRootDirectory(), "logs", "archive");
+                var archiveFolder = Path.Combine(LogPathManager.GetProjectRootDirectory(), "logs", "archive");
                 if (!Directory.Exists(archiveFolder))
                 {
                     Directory.CreateDirectory(archiveFolder);
@@ -201,33 +201,7 @@ namespace LogisticManager.Services
             }
         }
 
-        /// <summary>
-        /// 프로젝트 루트 디렉토리 경로 반환
-        /// </summary>
-        /// <returns>프로젝트 루트 디렉토리 경로</returns>
-        private static string GetProjectRootDirectory()
-        {
-            try
-            {
-                var currentDir = Directory.GetCurrentDirectory();
-                while (!string.IsNullOrEmpty(currentDir))
-                {
-                    var configPath = Path.Combine(currentDir, "config");
-                    if (Directory.Exists(configPath))
-                    {
-                        return currentDir;
-                    }
-                    var parentDir = Directory.GetParent(currentDir);
-                    if (parentDir == null) break;
-                    currentDir = parentDir.FullName;
-                }
-                return Directory.GetCurrentDirectory();
-            }
-            catch
-            {
-                return Directory.GetCurrentDirectory();
-            }
-        }
+
 
         #endregion
     }

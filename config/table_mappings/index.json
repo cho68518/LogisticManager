@@ -67,14 +67,23 @@
       "columns_count": 23,
       "primary_key": "",
       "required_fields": []
+    },
+    "송장출력_부산청과_외부출고": {
+      "file_path": "송장출력_부산청과_외부출고.json",
+      "description": "부산청과 외부출고 송장 출력 정보 테이블",
+      "is_active": true,
+      "processing_order": 8,
+      "columns_count": 2,
+      "primary_key": "",
+      "required_fields": []
     }
   },
   
   "metadata": {
-    "total_tables": 7,
-    "active_tables": 7,
-    "total_columns": 104,
-    "last_sync": "2025-08-17 23:45:00",
+    "total_tables": 8,
+    "active_tables": 8,
+    "total_columns": 106,
+    "last_sync": "2025-08-19 14:30:00",
     "sync_status": "completed"
   },
   

@@ -6,7 +6,6 @@ CREATE PROCEDURE sp_ProcessStarInvoice()
 BEGIN
     /*--================================================================================
 	-- 송장출력관리 처리
-    -- 각 단계별 처리된 행의 수를 반환하도록 수정
     --==================================================================================*/
 	DECLARE var_관리자메세지 VARCHAR(255);
 	DECLARE done_msg BOOLEAN DEFAULT FALSE;
@@ -140,19 +139,19 @@ BEGIN
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 박스상품 명칭 변경', ROW_COUNT());
 
 	/*--=============================================================		
-	-- 택배 박스 낱개 나누기
-    --===============================================================*/
+	-- 택배 박스 낱개 나누기 (sp_MergePacking 에서 처리)
+    --===============================================================
     -- 택배수량 컬럼의 값이 1인 경우에는 '박스', 그 외의 경우에는 '낱개'로 변경.
     UPDATE 송장출력_사방넷원본변환 
 	   SET 택배수량1 = CASE WHEN CAST(택배수량 AS UNSIGNED) = 1 THEN '박스' ELSE '낱개' END 
 	 WHERE 택배수량 REGEXP '^[0-9]+$';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 택배 박스/낱개 구분', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 택배 박스/낱개 구분', ROW_COUNT());*/
 
 	/*--=============================================================		
 	-- 송장 출고지별로 구분
     --===============================================================*/
     UPDATE 송장출력_사방넷원본변환 
-	   SET `송장구분최종` = CONCAT(`송장구분`, IFNULL(`택배수량1`, ''));
+	   SET 송장구분최종 = CONCAT(송장구분, IFNULL(택배수량1, ''));
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 송장구분최종 설정', ROW_COUNT());
 
     /*--=============================================================		

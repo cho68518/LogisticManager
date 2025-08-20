@@ -33,17 +33,27 @@ namespace LogisticManager.Services
         /// var fileName = GenerateExcelFileName("서울냉동최종", "이카운트자료");
         /// 
         /// 📁 파일명 형식:
-        /// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
+        /// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx (설명이 null이면 접두사만 사용)
         /// 예: 판매입력_이카운트자료_240731_14시30분.xlsx
+        /// 예: 서울냉동_240731_14시30분.xlsx (설명이 null인 경우)
         /// </summary>
         /// <param name="prefix">파일명 접두사 (예: "판매입력", "서울냉동최종")</param>
-        /// <param name="description">파일 설명 (예: "이카운트자료")</param>
+        /// <param name="description">파일 설명 (예: "이카운트자료"), null이면 접두사만 사용</param>
         /// <returns>생성된 Excel 파일명</returns>
-        public string GenerateExcelFileName(string prefix, string description)
+        public string GenerateExcelFileName(string prefix, string? description)
         {
             var now = DateTime.Now;
-            var fileName = $"{prefix}_{description}_{now:yyMMdd}_{now:HH}시{now:mm}분.xlsx";
-            return fileName;
+            
+            // description이 null이거나 빈 문자열인 경우 접두사만 사용
+            if (string.IsNullOrEmpty(description))
+            {
+                var fileName = $"{prefix}_{now:yyMMdd}_{now:HH}시{now:mm}분.xlsx";
+                return fileName;
+            }
+            
+            // description이 있는 경우 기존 형식 사용
+            var fileNameWithDescription = $"{prefix}_{description}_{now:yyMMdd}_{now:HH}시{now:mm}분.xlsx";
+            return fileNameWithDescription;
         }
 
         /// <summary>
