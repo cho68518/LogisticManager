@@ -365,6 +365,21 @@ BEGIN
     --================================================================================*/
     UPDATE 송장출력_서울냉동_최종
        SET 택배비용 = 2150, 박스크기 = '극소', 출력개수 = 1;
+	   
+	UPDATE 
+		송장출력_서울냉동_최종,
+		(
+			SELECT
+				(SELECT Attribute1 FROM CommonCodes WHERE GroupCode = 'DELIVERY_POLICY' AND Code = 'SEOUL_FROZEN_COST')  AS c_cost,
+				(SELECT Attribute1 FROM CommonCodes WHERE GroupCode = 'DELIVERY_POLICY' AND Code = 'SEOUL_FROZEN_SIZE')  AS c_size,
+				(SELECT Attribute1 FROM CommonCodes WHERE GroupCode = 'DELIVERY_POLICY' AND Code = 'SEOUL_FROZEN_COUNT') AS c_count
+		) AS p_values
+	SET
+		택배비용 = p_values.c_cost,
+		박스크기 = p_values.c_size,
+		출력개수 = p_values.c_count;	   
+	   
+	   
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 송장출력_서울냉동_최종, 최종 테이블 기본값 설정', ROW_COUNT());
 		
     COMMIT;

@@ -5,7 +5,8 @@ using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.IO;
-using Newtonsoft.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using LogisticManager.Models;
 using System.Linq; // Added for First()
 
@@ -119,6 +120,7 @@ namespace LogisticManager.Services
         #region Public 메서드
         /// <summary>
         /// 송장 처리 완료 알림을 지정된 채팅방에 전송
+        /// 새로운 메시지 빌더를 사용하여 메시지 타입별로 적절한 구조 생성
         /// </summary>
         /// <param name="type">알림 종류 (채팅방 자동 선택)</param>
         /// <param name="batch">배치 정보 (예: "2차")</param>
@@ -126,13 +128,10 @@ namespace LogisticManager.Services
         /// <param name="fileUrl">업로드된 파일 URL</param>
         /// <param name="titleSuffix">제목 접미사 (기본값: "운송장")</param>
         /// <returns>전송 성공 여부</returns>
-        public async Task SendInvoiceNotificationAsync(NotificationType type, string batch, int invoiceCount, string fileUrl, string titleSuffix = "")
+        public async Task SendInvoiceNotificationAsync(NotificationType type, string batch, int invoiceCount, string fileUrl, string? chatroomId = null, string titleSuffix = "")
         {
             try
             {
-                // 성공한 패턴 적용: 배치 변수 수정
-                batch = "테스트 모니터링";
-                
                 LogMessage($"📤 KakaoWork 알림 전송 시작: {type} -> {batch}");
 
                 // KakaoWork API 키 확인
@@ -141,50 +140,48 @@ namespace LogisticManager.Services
                     throw new InvalidOperationException("KakaoWork API 키가 설정되지 않았습니다. App.config에서 KakaoWork.AppKey를 확인해주세요.");
                 }
 
-                // 채팅방 ID 확인
-                if (!_chatroomIds.TryGetValue(type, out string? chatroomId) || string.IsNullOrEmpty(chatroomId))
+                // 채팅방 ID 결정: 명시적으로 전달된 값 우선, 없으면 타입 기반 기본값 사용
+                string targetChatroomId = !string.IsNullOrWhiteSpace(chatroomId)
+                    ? chatroomId
+                    : GetChatroomId(type);
+
+                if (string.IsNullOrWhiteSpace(targetChatroomId))
                 {
-                    throw new ArgumentException($"알림 타입 '{type}'에 해당하는 채팅방 ID가 App.config에 설정되지 않았습니다.");
+                    throw new ArgumentException($"알림 타입 '{type}'에 대한 채팅방 ID를 결정할 수 없습니다. App.config 설정을 확인하거나 chatroomId를 직접 전달하세요.");
                 }
 
-                // App.config에서 제목 접미사 읽기 (기본값: "운송장")
-                if (string.IsNullOrEmpty(titleSuffix))
+                // 메시지 타입 결정 (단계별로 다른 메시지 구조 사용)
+                var messageType = GetMessageTypeByNotificationType(type);
+                
+                // 출고지 이름 가져오기
+                var centerName = GetKoreanName(type);
+                
+                // 새로운 메시지 빌더를 사용하여 메시지 생성
+                var messagePayload = KakaoWorkMessageBuilder.Build(
+                    messageType, 
+                    batch, 
+                    fileUrl, 
+                    centerName, 
+                    invoiceCount);
+                
+                // 채팅방 ID 설정
+                messagePayload.ConversationId = targetChatroomId;
+
+                LogMessage($"📝 메시지 제목: {messagePayload.Text}");
+                LogManagerService.LogInfo($"💬 채팅방 ID: {targetChatroomId}");
+                LogManagerService.LogInfo($"🔧 메시지 타입: {messageType}");
+
+                // JSON 직렬화 (System.Text.Json 사용)
+                var jsonOptions = new JsonSerializerOptions
                 {
-                    var configKey = $"KakaoWork.NotificationType.{type}.TitleSuffix";
-                    titleSuffix = ConfigurationManager.AppSettings[configKey] ?? "운송장";
-                }
-
-                // 파이썬 코드와 정확히 동일한 제목 생성 (간단하게)
-                string title = $"{batch} - {GetKoreanName(type)}";
-
-                LogMessage($"📝 메시지 제목: {title}");
-                LogMessage($"💬 채팅방 ID: {chatroomId}");
-
-                // 성공한 패턴 적용: 간단한 블록 구조 (헤더 제거, 텍스트 메시지 변경)
-                var payload = new KakaoWorkPayload
-                {
-                    ConversationId = chatroomId,
-                    Text = title,
-                    Blocks =
-                    {
-                        new TextBlock { Text = "파일을 다운로드 후 파일을 열어 확인해주세요", Markdown = true },
-                        new ButtonBlock { Text = $"{GetKoreanName(type)} 파일 다운로드", Value = fileUrl, Style = "default", ActionType = "open_system_browser" }
-                    }
+                    WriteIndented = false,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
+                    IncludeFields = false
                 };
-
-                // JSON 직렬화 (파이썬과 동일한 형식)
-                var jsonPayload = JsonConvert.SerializeObject(payload, new JsonSerializerSettings
-                {
-                    NullValueHandling = NullValueHandling.Ignore,
-                    Formatting = Formatting.None
-                });
+                var jsonPayload = JsonSerializer.Serialize(messagePayload, jsonOptions);
 
                 LogMessage($"📦 JSON 페이로드 크기: {jsonPayload.Length} bytes");
                 LogMessage($"📦 JSON 페이로드 내용: {jsonPayload}");
-
-                // 파이썬 코드와 비교를 위한 예상 JSON
-                var expectedJson = $"{{\"conversation_id\":\"{chatroomId}\",\"text\":\"{title}\",\"blocks\":[{{\"type\":\"text\",\"text\":\"파일을 다운로드 후 파일을 열어 확인해주세요\",\"markdown\":true}},{{\"type\":\"button\",\"text\":\"{GetKoreanName(type)} 파일 다운로드\",\"style\":\"default\",\"action_type\":\"open_system_browser\",\"value\":\"{fileUrl}\"}}]}}";
-                LogMessage($"📦 예상 JSON (파이썬과 동일): {expectedJson}");
 
                 // HTTP 요청 전송
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
@@ -253,22 +250,22 @@ namespace LogisticManager.Services
                     LogMessage($"  {kvp.Key}: {kvp.Value}");
                 }
 
-                // 성공한 패턴 적용: 간단한 테스트 메시지 (헤더 제거)
-                var testPayload = new KakaoWorkPayload
-                {
-                    ConversationId = _chatroomIds.First().Value, // 첫 번째 채팅방 사용
-                    Text = "2차 - 판매입력_이카운트자료",
-                    Blocks =
-                    {
-                        new TextBlock { Text = "파일을 다운로드 후 파일을 열어 확인해주세요", Markdown = true },
-                        new ButtonBlock { Text = "판매입력 파일 다운로드", Value = "https://example.com/test", Style = "default", ActionType = "open_system_browser" }
-                    }
-                };
+                // 새로운 메시지 빌더를 사용하여 테스트 메시지 생성
+                var testPayload = KakaoWorkMessageBuilder.Build(
+                    KakaoWorkMessageType.SalesInput,
+                    "2차",
+                    "https://example.com/test");
+                
+                // 첫 번째 채팅방 ID 설정
+                testPayload.ConversationId = _chatroomIds.First().Value;
 
-                var jsonPayload = JsonConvert.SerializeObject(testPayload, new JsonSerializerSettings
+                var jsonOptions = new JsonSerializerOptions
                 {
-                    NullValueHandling = NullValueHandling.Ignore
-                });
+                    WriteIndented = false,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
+                    IncludeFields = false
+                };
+                var jsonPayload = JsonSerializer.Serialize(testPayload, jsonOptions);
 
                 LogMessage($"📦 테스트 JSON 페이로드: {jsonPayload}");
 
@@ -359,11 +356,41 @@ namespace LogisticManager.Services
                 NotificationType.SeoulGongsan => "서울공산",
                 NotificationType.GyeonggiGongsan => "경기공산",
                 NotificationType.BusanCheonggwa => "부산청과",
+                NotificationType.BusanCheonggwaPrint => "부산청과",
                 NotificationType.GamcheonFrozen => "감천냉동",
                 NotificationType.SalesData => "판매입력",
-                NotificationType.Integrated => "통합송장",
+                NotificationType.Integrated => "통합 송장",
                 NotificationType.Check => "모니터링체크용(봇방)",
                 _ => type.ToString()
+            };
+        }
+
+        /// <summary>
+        /// 알림 종류에 따른 메시지 타입을 결정
+        /// </summary>
+        /// <param name="type">알림 종류</param>
+        /// <returns>메시지 타입</returns>
+        private static KakaoWorkMessageType GetMessageTypeByNotificationType(NotificationType type)
+        {
+            return type switch
+            {
+                // [4-4] 단계: 판매입력 타입
+                NotificationType.SalesData => KakaoWorkMessageType.SalesInput,
+                
+                // [4-8], [4-10], [4-12], [4-14], [4-16], [4-18], [4-20]: 운송장 타입
+                NotificationType.SeoulFrozen => KakaoWorkMessageType.Shipment,
+                NotificationType.GyeonggiFrozen => KakaoWorkMessageType.Shipment,
+                NotificationType.SeoulGongsan => KakaoWorkMessageType.Shipment,
+                NotificationType.GyeonggiGongsan => KakaoWorkMessageType.Shipment,
+                                        NotificationType.BusanCheonggwa => KakaoWorkMessageType.Shipment,
+                        NotificationType.BusanCheonggwaPrint => KakaoWorkMessageType.PrintMaterial,
+                        NotificationType.GamcheonFrozen => KakaoWorkMessageType.Shipment,
+                
+                // [4-22] 단계: 통합 송장도 Shipment 패턴과 동일하게 사용
+                NotificationType.Integrated => KakaoWorkMessageType.Shipment,
+                
+                // 기본값: 운송장 타입
+                _ => KakaoWorkMessageType.Shipment
             };
         }
         #endregion
@@ -424,40 +451,25 @@ namespace LogisticManager.Services
                     return false;
                 }
 
-                // 한글 주석: 메시지 블록 구성
-                var message = new
+                // 새로운 메시지 빌더를 사용하여 메시지 생성
+                var messagePayload = KakaoWorkMessageBuilder.Build(
+                    KakaoWorkMessageType.SalesInput,
+                    batch,
+                    fileUrl);
+                
+                // 채팅방 ID 설정
+                messagePayload.ConversationId = targetChatroomId;
+
+                LogMessage($"📝 메시지 구성 완료: conversation_id={targetChatroomId}, text={messagePayload.Text}");
+
+                // JSON 직렬화 (System.Text.Json 사용)
+                var jsonOptions = new JsonSerializerOptions
                 {
-                    conversation_id = targetChatroomId,
-                    text = $"{batch} - 판매입력_이카운트자료",
-                    blocks = new object[]
-                    {
-                        new
-                        {
-                            type = "header",
-                            text = $"{batch} - 판매입력_이카운트자료",
-                            style = "blue"
-                        },
-                        new
-                        {
-                            type = "text",
-                            text = "파일 다운로드 후 DB로 한번 더 돌려주세요",
-                            markdown = true
-                        },
-                        new
-                        {
-                            type = "button",
-                            text = "판매입력 파일 다운로드",
-                            style = "default",
-                            action_type = "open_system_browser",
-                            value = fileUrl
-                        }
-                    }
+                    WriteIndented = false,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
+                    IncludeFields = false
                 };
-
-                LogMessage($"📝 메시지 구성 완료: conversation_id={targetChatroomId}, text={batch} - 판매입력_이카운트자료");
-
-                // 한글 주석: JSON 직렬화
-                var jsonContent = JsonConvert.SerializeObject(message);
+                var jsonContent = JsonSerializer.Serialize(messagePayload, jsonOptions);
                 var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
                 
                 LogMessage($"📦 JSON 페이로드 크기: {jsonContent.Length} bytes");
@@ -530,7 +542,7 @@ namespace LogisticManager.Services
         /// <param name="hour">시간 (0-23)</param>
         /// <param name="minute">분 (0-59)</param>
         /// <returns>배치 구분 문자열</returns>
-        private string GetBatchByTime(int hour, int minute)
+        public string GetBatchByTime(int hour, int minute)
         {
             // 한글 주석: 시간대별 배치 구분
             if (1 <= hour && hour <= 7)

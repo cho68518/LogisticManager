@@ -216,7 +216,32 @@ namespace LogisticManager.Processors
         /// <exception cref="ArgumentException">파일 경로가 비어있는 경우</exception>
         /// <exception cref="FileNotFoundException">파일이 존재하지 않는 경우</exception>
         /// <exception cref="Exception">처리 중 오류 발생 시</exception>
-        public async Task<bool> ProcessAsync(string filePath, IProgress<string>? progress = null, IProgress<int>? progressReporter = null)
+        /// <summary>
+        /// 송장 처리를 위한 비동기 메서드
+        /// 
+        /// 📋 주요 기능:
+        /// - Excel 파일에서 주문 데이터 로드 및 검증
+        /// - 데이터베이스 초기화 및 대용량 데이터 적재
+        /// - 단계별 송장 처리 (4-1 ~ 4-22)
+        /// - 진행률 보고 및 오류 처리
+        /// 
+        /// 🎯 매개변수:
+        /// - filePath: 처리할 Excel 파일 경로
+        /// - progress: 진행 상황 텍스트 보고용 콜백
+        /// - progressReporter: 진행률 퍼센트 보고용 콜백
+        /// - maxStep: 최대 처리 단계 (기본값: 22, 전체 처리)
+        /// 
+        /// 📊 처리 단계:
+        /// - 4-1 ~ 4-6: 기본 데이터 처리
+        /// - 4-7 ~ 4-14: 지역별 처리 (서울, 경기, 부산)
+        /// - 4-15 ~ 4-22: 최종 처리 및 파일 생성
+        /// </summary>
+        /// <param name="filePath">Excel 파일 경로</param>
+        /// <param name="progress">진행 상황 텍스트 콜백</param>
+        /// <param name="progressReporter">진행률 퍼센트 콜백</param>
+        /// <param name="maxStep">최대 처리 단계 (1~22, 기본값: 22)</param>
+        /// <returns>처리 성공 여부</returns>
+        public async Task<bool> ProcessAsync(string filePath, IProgress<string>? progress = null, IProgress<int>? progressReporter = null, int maxStep = 22)
         {
             // 입력 파일 경로 검증
             if (string.IsNullOrEmpty(filePath))
@@ -225,6 +250,10 @@ namespace LogisticManager.Processors
             // 파일 존재 여부 확인
             if (!File.Exists(filePath))
                 throw new FileNotFoundException($"Excel 파일을 찾을 수 없습니다: {filePath}");
+
+            // maxStep 매개변수 검증 (1~22 범위)
+            if (maxStep < 1 || maxStep > 22)
+                throw new ArgumentException("maxStep은 1에서 22 사이의 값이어야 합니다.", nameof(maxStep));
 
             try
             {
@@ -246,6 +275,11 @@ namespace LogisticManager.Processors
                 finalProgress?.Report("🚀 [물류 시스템] 송장 처리를 시작합니다...");
                 finalProgress?.Report("📋 처리 대상 파일: " + Path.GetFileName(filePath));
                 finalProgress?.Report("⏰ 처리 시작 시각: " + workflowStartTime.ToString("yyyy-MM-dd HH:mm:ss"));
+                // 🎯 처리 단계 제한 정보 표시 (22단계 전체 처리 시에는 표시하지 않음)
+                if (maxStep < 22)
+                {
+                    finalProgress?.Report($"🎯 처리 단계 제한: 4-1 ~ 4-{maxStep} (총 {maxStep}단계)");
+                }
                 finalProgress?.Report("");
 
                 // 진행률 초기화 (0%에서 시작)
@@ -335,13 +369,21 @@ namespace LogisticManager.Processors
                 // [4-1] 송장출력 메세지 처리 단계 - 오류 발생 시 프로세스 중단 및 메인창 로그(finalProgress)로 오류 메시지 전달
                 try
                 {
-                    finalProgress?.Report("📜 [4-1]  송장출력 메세지 처리");
+                    finalProgress?.Report("❄️ [4-1] 송장출력 메세지 처리");
                     LogManagerService.LogInfo("🔍 ProcessInvoiceMessageData 메서드 호출 시작...");
-                    finalProgressReporter?.Report(30);
+                    finalProgressReporter?.Report(5);
                     await ProcessInvoiceMessageData(); // 📝 4-1 송장출력 메세지 데이터 처리
                     LogManagerService.LogInfo("✅ ProcessInvoiceMessageData 메서드 호출 완료");
-                    finalProgress?.Report("✅ [4-1]  송장출력 메세지 처리 완료");
+                    finalProgress?.Report("✅ [4-1] 송장출력 메세지 처리 완료");
                     finalProgress?.Report("");
+
+                    // maxStep 체크: 4-1까지만 처리하는 경우 종료
+                    if (maxStep <= 1)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-1단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 송장출력 메세지 처리만 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -362,13 +404,21 @@ namespace LogisticManager.Processors
                 // 한글 주석: 합포장 최적화 처리 단계에서 오류 발생 시 프로세스 중단 및 메인창 로그(finalProgress)로 오류 메시지 전달
                 try
                 {
-                    finalProgress?.Report("📜 [4-2]  합포장 최적화 처리");
+                    finalProgress?.Report("❄️ [4-2] 합포장 최적화 처리");
                     LogManagerService.LogInfo("🔍 ProcessMergePacking 메서드 호출 시작...");
                     await ProcessMergePacking(); // 📝 4-2 합포장 최적화 프로시저 호출
-                    finalProgressReporter?.Report(35);
+                    finalProgressReporter?.Report(9);
                     LogManagerService.LogInfo("✅ ProcessMergePacking 메서드 호출 완료");
-                    finalProgress?.Report("✅ [4-2]  합포장 최적화 처리 완료");
+                    finalProgress?.Report("✅ [4-2] 합포장 최적화 처리 완료");
                     finalProgress?.Report("");
+
+                    // maxStep 체크: 4-2까지만 처리하는 경우 종료
+                    if (maxStep <= 2)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-2단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 송장출력 메세지 및 합포장 최적화 처리 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -389,13 +439,21 @@ namespace LogisticManager.Processors
                 // [4-3] 감천 특별출고 처리 단계 - 오류 발생 시 프로세스 중단 및 메인창 로그(finalProgress)로 오류 메시지 전달
                 try
                 {
-                    finalProgress?.Report("📜 [4-3]  감천 특별출고 처리");
+                    finalProgress?.Report("❄️ [4-3] 감천 특별출고 처리");
                     LogManagerService.LogInfo("🔍 ProcessInvoiceSplit1 메서드 호출 시작...");
                     await ProcessInvoiceSplit1();
-                    finalProgressReporter?.Report(40);
+                    finalProgressReporter?.Report(14);
                     LogManagerService.LogInfo("✅ ProcessInvoiceSplit1 메서드 호출 완료");       
-                    finalProgress?.Report("✅ [4-3]  감천 특별출고 완료");
+                    finalProgress?.Report("✅ [4-3] 감천 특별출고 완료");
                     finalProgress?.Report("");
+
+                    // maxStep 체크: 4-3까지만 처리하는 경우 종료
+                    if (maxStep <= 3)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-3단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 송장출력 메세지, 합포장 최적화, 감천 특별출고 처리 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -423,10 +481,10 @@ namespace LogisticManager.Processors
                 try
                 {
                     // 한글 주석: [4-4] 판매입력_이카운트자료 생성 및 업로드 처리 단계 시작
-                    finalProgress?.Report("📜 [4-4]  판매입력_이카운트자료 생성 및 업로드 처리");
+                    finalProgress?.Report("💾 [4-4] 판매입력_이카운트자료 생성 및 업로드 처리");
                     LogManagerService.LogInfo("🔍 ProcessSalesInputData 메서드 호출 시작...");
                     LogManagerService.LogInfo($"🔍 ProcessSalesInputData 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                    finalProgressReporter?.Report(45);
+                    finalProgressReporter?.Report(18);
                     LogManagerService.LogInfo("🔍 ProcessSalesInputData 메서드 실행 중...");
                     finalProgress?.Report("✅ [4-4] 판매입력_이카운트자료 생성 및 업로드 처리 완료");
                     finalProgress?.Report("");
@@ -435,6 +493,14 @@ namespace LogisticManager.Processors
                     var salesInputDataResult = await ProcessSalesInputData();
                     LogManagerService.LogInfo($"✅ ProcessSalesInputData 메서드 호출 완료 - 결과: {salesInputDataResult}");
                     LogManagerService.LogInfo($"✅ ProcessSalesInputData 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+                    // maxStep 체크: 4-4까지만 처리하는 경우 종료
+                    if (maxStep <= 4)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-4단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 송장출력 메세지, 합포장 최적화, 감천 특별출고, 판매입력_이카운트자료 처리 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -454,13 +520,21 @@ namespace LogisticManager.Processors
                 // [4-5] 톡딜불가 처리 단계 - 예외 발생 시 프로세스 중단 및 메인창 로그에 오류 메시지 표시 (finalProgress 사용)
                 try
                 {
-                    finalProgress?.Report("📜 [4-5]  톡딜불가 처리");
+                    finalProgress?.Report("❄️ [4-5] 톡딜불가 처리");
                     LogManagerService.LogInfo("🔍 ProcessTalkDealUnavailable 메서드 호출 시작...");
                     await ProcessTalkDealUnavailable(); // 📝 4-5 톡딜불가 처리
-                    finalProgressReporter?.Report(50);
+                    finalProgressReporter?.Report(23);
                     LogManagerService.LogInfo("✅ ProcessTalkDealUnavailable 메서드 호출 완료");
-                    finalProgress?.Report("✅ [4-5]  톡딜불가 처리 완료");
+                    finalProgress?.Report("✅ [4-5] 톡딜불가 처리 완료");
                     finalProgress?.Report("");
+
+                    // maxStep 체크: 4-5까지만 처리하는 경우 종료
+                    if (maxStep <= 5)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-5단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 송장출력 메세지, 합포장 최적화, 감천 특별출고, 판매입력_이카운트자료, 톡딜불가 처리 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -509,13 +583,21 @@ namespace LogisticManager.Processors
                 #endregion
                 try
                 {
-                    finalProgress?.Report("📜 [4-6]  송장출력관리 처리");
+                    finalProgress?.Report("❄️ [4-6] 송장출력관리 처리");
                     LogManagerService.LogInfo("🔍 ProcessInvoiceManagement 메서드 호출 시작...");
                     await ProcessInvoiceManagement(); // 📝 4-6 송장출력관리 처리
-                    finalProgressReporter?.Report(55);
+                    finalProgressReporter?.Report(27);
                     LogManagerService.LogInfo("✅ ProcessInvoiceManagement 메서드 호출 완료");
-                    finalProgress?.Report("✅ [4-6]  송장출력관리 처리 완료");
+                    finalProgress?.Report("✅ [4-6] 송장출력관리 처리 완료");
                     finalProgress?.Report("");
+
+                    // maxStep 체크: 4-6까지만 처리하는 경우 종료
+                    if (maxStep <= 6)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-6단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 기본 데이터 처리 완료: 송장출력 메세지, 합포장 최적화, 감천 특별출고, 판매입력_이카운트자료, 톡딜불가, 송장출력관리");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -561,10 +643,18 @@ namespace LogisticManager.Processors
                     finalProgress?.Report("❄️ [4-7] 서울냉동 처리");
                     LogManagerService.LogInfo("🔍 ProcessSeoulFrozenManagement 메서드 호출 시작...");
                     await ProcessSeoulFrozenManagement(); // 📝 4-7 서울냉동 처리
-                    finalProgressReporter?.Report(57);
+                    finalProgressReporter?.Report(32);
                     LogManagerService.LogInfo("✅ ProcessSeoulFrozenManagement 메서드 호출 완료");
-                    finalProgress?.Report("✅ [4-7]  서울냉동 처리 완료");
+                    finalProgress?.Report("✅ [4-7] 서울냉동 처리 완료");
                     finalProgress?.Report("");
+
+                    // maxStep 체크: 4-7까지만 처리하는 경우 종료
+                    if (maxStep <= 7)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-7단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동 처리까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -578,12 +668,12 @@ namespace LogisticManager.Processors
 
                 //----------------------------------------------------------------------------------------------
                 // 서울냉동 최종파일 생성(업로드, 카카오워크)
-                finalProgress?.Report("📜 [4-8]  서울냉동 최종파일 생성 및 업로드 처리");
+                finalProgress?.Report("💾 [4-8] 서울냉동 최종파일 생성 및 업로드 처리");
                 LogManagerService.LogInfo("🔍 ProcessSeoulFrozenFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessSeoulFrozenFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(59);
+                                    finalProgressReporter?.Report(36);
                 LogManagerService.LogInfo("🔍 ProcessSeoulFrozenFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-8]  서울냉동 최종파일 생성 및 업로드 처리 완료");
+                finalProgress?.Report("✅ [4-8] 서울냉동 최종파일 생성 및 업로드 처리 완료");
                 finalProgress?.Report("");
 
                 try
@@ -592,6 +682,14 @@ namespace LogisticManager.Processors
                     var salesDataResult = await ProcessSeoulFrozenFinalFile();
                     LogManagerService.LogInfo($"✅ ProcessSeoulFrozenFinalFile 메서드 호출 완료 - 결과: {salesDataResult}");
                     LogManagerService.LogInfo($"✅ ProcessSeoulFrozenFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+                    // maxStep 체크: 4-8까지만 처리하는 경우 종료
+                    if (maxStep <= 8)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-8단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동 처리 및 최종파일 생성까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -634,10 +732,18 @@ namespace LogisticManager.Processors
                     finalProgress?.Report("❄️ [4-9] 경기냉동 처리");           
                     LogManagerService.LogInfo("🔍 ProcessGyeonggiFrozenManagement 메서드 호출 시작...");
                     await ProcessGyeonggiFrozenManagement();
-                    finalProgressReporter?.Report(60);
+                    finalProgressReporter?.Report(41);
                     LogManagerService.LogInfo("🔍 ProcessGyeonggiFrozenManagement 메서드 호출 완료...");
-                    finalProgress?.Report("✅ [4-9]  경기냉동 처리 완료");
+                    finalProgress?.Report("✅ [4-9] 경기냉동 처리 완료");
                     finalProgress?.Report("");
+
+                    // maxStep 체크: 4-9까지만 처리하는 경우 종료
+                    if (maxStep <= 9)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-9단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동 처리까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -650,12 +756,12 @@ namespace LogisticManager.Processors
 
                 //----------------------------------------------------------------------------------------------
                 // 경기냉동 최종파일 생성(업로드, 카카오워크)
-                finalProgress?.Report("📜 [4-10]  경기냉동 최종파일 생성 및 업로드 처리");
+                finalProgress?.Report("💾 [4-10] 경기냉동 최종파일 생성 및 업로드 처리");
                 LogManagerService.LogInfo("🔍 ProcessGyeonggiFrozenFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessGyeonggiFrozenFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(62);
+                finalProgressReporter?.Report(45);
                 LogManagerService.LogInfo("🔍 ProcessGyeonggiFrozenFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-10]  경기냉동 최종파일 생성 및 업로드 처리 완료");
+                finalProgress?.Report("✅ [4-10] 경기냉동 최종파일 생성 및 업로드 처리 완료");
                 finalProgress?.Report("");
 
                 try
@@ -663,6 +769,14 @@ namespace LogisticManager.Processors
                     var salesDataResult = await ProcessGyeonggiFrozenFinalFile(); 
                     LogManagerService.LogInfo($"✅ ProcessGyeonggiFrozenFinalFile 메서드 호출 완료 - 결과: {salesDataResult}");
                     LogManagerService.LogInfo($"✅ ProcessGyeonggiFrozenFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+                    // maxStep 체크: 4-10까지만 처리하는 경우 종료
+                    if (maxStep <= 10)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-10단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동 처리 및 최종파일 생성까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -704,10 +818,18 @@ namespace LogisticManager.Processors
                     finalProgress?.Report("❄️ [4-11] 서울공산 처리");           
                     LogManagerService.LogInfo("🔍 ProcessSeoulGongsanManagement 메서드 호출 시작...");
                     await ProcessSeoulGongsanManagement();
-                    finalProgressReporter?.Report(63);
+                    finalProgressReporter?.Report(50);
                     LogManagerService.LogInfo("🔍 ProcessSeoulGongsanManagement 메서드 호출 완료...");
-                    finalProgress?.Report("✅ [4-11]  서울공산 처리 완료");
+                    finalProgress?.Report("✅ [4-11] 서울공산 처리 완료");
                     finalProgress?.Report("");
+
+                    // maxStep 체크: 4-11까지만 처리하는 경우 종료
+                    if (maxStep <= 11)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-11단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산 처리까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -720,12 +842,12 @@ namespace LogisticManager.Processors
 
                 //----------------------------------------------------------------------------------------------
                 // 서울공산 최종파일 생성(업로드, 카카오워크)
-                finalProgress?.Report("📜 [4-12]  서울공산 최종파일 생성 및 업로드 처리");
+                finalProgress?.Report("💾 [4-12] 서울공산 최종파일 생성 및 업로드 처리");
                 LogManagerService.LogInfo("🔍 ProcessSeoulGongsanFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessSeoulGongsanFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(62);
+                finalProgressReporter?.Report(54);
                 LogManagerService.LogInfo("🔍 ProcessSeoulGongsanFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-12]  서울공산 최종파일 생성 및 업로드 처리 완료");
+                finalProgress?.Report("✅ [4-12] 서울공산 최종파일 생성 및 업로드 처리 완료");
                 finalProgress?.Report("");
 
                 try
@@ -733,6 +855,14 @@ namespace LogisticManager.Processors
                     var salesDataResult = await ProcessSeoulGongsanFinalFile(); 
                     LogManagerService.LogInfo($"✅ ProcessSeoulGongsanFinalFile 메서드 호출 완료 - 결과: {salesDataResult}");
                     LogManagerService.LogInfo($"✅ ProcessSeoulGongsanFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+                    // maxStep 체크: 4-12까지만 처리하는 경우 종료
+                    if (maxStep <= 12)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-12단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산 처리 및 최종파일 생성까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -773,10 +903,18 @@ namespace LogisticManager.Processors
                     finalProgress?.Report("❄️ [4-13] 경기공산 처리");           
                     LogManagerService.LogInfo("🔍 ProcessGyeonggiGongsanManagement 메서드 호출 시작...");
                     await ProcessGyeonggiGongsanManagement();
-                    finalProgressReporter?.Report(63);
+                    finalProgressReporter?.Report(59);
                     LogManagerService.LogInfo("🔍 ProcessGyeonggiGongsanManagement 메서드 호출 완료...");
-                    finalProgress?.Report("✅ [4-13]  경기공산 처리 완료");
+                    finalProgress?.Report("✅ [4-13] 경기공산 처리 완료");
                     finalProgress?.Report("");
+
+                    // maxStep 체크: 4-13까지만 처리하는 경우 종료
+                    if (maxStep <= 13)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-13단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산 처리까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -789,12 +927,12 @@ namespace LogisticManager.Processors
 
                 //----------------------------------------------------------------------------------------------
                 // 경기공산 최종파일 생성(업로드, 카카오워크)
-                finalProgress?.Report("📜 [4-14]  경기공산 최종파일 생성 및 업로드 처리");
+                finalProgress?.Report("💾 [4-14] 경기공산 최종파일 생성 및 업로드 처리");
                 LogManagerService.LogInfo("🔍 ProcessGyeonggiGongsanFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessGyeonggiGongsanFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(62);
+                finalProgressReporter?.Report(63);
                 LogManagerService.LogInfo("🔍 ProcessGyeonggiGongsanFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-14]  경기공산 최종파일 생성 및 업로드 처리 완료");
+                finalProgress?.Report("✅ [4-14] 경기공산 최종파일 생성 및 업로드 처리 완료");
                 finalProgress?.Report("");
 
                 try
@@ -802,6 +940,14 @@ namespace LogisticManager.Processors
                     var salesDataResult = await ProcessGyeonggiGongsanFinalFile(); 
                     LogManagerService.LogInfo($"✅ ProcessGyeonggiGongsanFinalFile 메서드 호출 완료 - 결과: {salesDataResult}");
                     LogManagerService.LogInfo($"✅ ProcessGyeonggiGongsanFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+                    // maxStep 체크: 4-14까지만 처리하는 경우 종료
+                    if (maxStep <= 14)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-14단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산 처리 및 최종파일 생성까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -842,10 +988,18 @@ namespace LogisticManager.Processors
                     finalProgress?.Report("❄️ [4-15] 부산청과 처리");           
                     LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaManagement 메서드 호출 시작...");
                     await ProcessBusanCheonggwaManagement();
-                    finalProgressReporter?.Report(63);
+                    finalProgressReporter?.Report(68);
                     LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaManagement 메서드 호출 완료...");
-                    finalProgress?.Report("✅ [4-15]  부산청과 처리 완료");
+                    finalProgress?.Report("✅ [4-15] 부산청과 처리 완료");
                     finalProgress?.Report("");
+
+                    // maxStep 체크: 4-15까지만 처리하는 경우 종료
+                    if (maxStep <= 15)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-15단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -860,12 +1014,12 @@ namespace LogisticManager.Processors
                 // 송장출력_부산청과_최종변환
                 //try
                 //{
-                //    finalProgress?.Report("📜 [4-16]  부산 외부출고 처리");
+                //    finalProgress?.Report("💾 [4-16] 부산 외부출고 처리");
                 //    LogManagerService.LogInfo("🔍 ProcessBusanExtShipmentManagement 메서드 호출 시작...");
                 //    await ProcessBusanExtShipmentManagement();
                 //    finalProgressReporter?.Report(64);
                 //    LogManagerService.LogInfo("✅ ProcessBusanExtShipmentManagement 메서드 호출 완료");
-                //    finalProgress?.Report("✅ [4-16]  부산 외부출고 처리 완료");
+                //    finalProgress?.Report("✅ [4-16] 부산 외부출고 처리 완료");
                 //    finalProgress?.Report("");
                 //}
                 //catch (Exception ex)
@@ -879,17 +1033,17 @@ namespace LogisticManager.Processors
 
                     // 프로세스 중단 (예외 재던짐)
                 //    throw;
-                }
+                //}
 
                 // ===================  = [부산청과 최종파일 생성] ========================================================
                 // 부산청과 최종파일 생성(업로드, 카카오워크)
                 // 부산청과 운송장
-                finalProgress?.Report("📜 [4-17]  부산청과 최종파일 생성 및 업로드 처리");
+                finalProgress?.Report("💾 [4-16] 부산청과 최종파일 생성 및 업로드 처리");
                 LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessBusanCheonggwaFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(62);
+                finalProgressReporter?.Report(72);
                 LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-17]  부산청과 최종파일 생성 및 업로드 처리 완료");
+                finalProgress?.Report("✅ [4-16] 부산청과 최종파일 생성 및 업로드 처리 완료");
                 finalProgress?.Report("");
 
                 try
@@ -897,6 +1051,14 @@ namespace LogisticManager.Processors
                     var salesDataResult = await ProcessBusanCheonggwaFinalFile(); 
                     LogManagerService.LogInfo($"✅ ProcessBusanCheonggwaFinalFile 메서드 호출 완료 - 결과: {salesDataResult}");
                     LogManagerService.LogInfo($"✅ ProcessBusanCheonggwaFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+                    // maxStep 체크: 4-16까지만 처리하는 경우 종료
+                    if (maxStep <= 16)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-16단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -910,12 +1072,12 @@ namespace LogisticManager.Processors
                 // ===================  = [부산청과외부출고 최종파일 생성] ========================================================
                 // 부산청과 최종파일 생성(업로드, 카카오워크)
                 // 부산청과 운송장
-                //finalProgress?.Report("📜 [4-18]  부산청과 외부출고 최종파일 생성 및 업로드 처리");
+                //finalProgress?.Report("💾 [4-18] 부산청과 외부출고 최종파일 생성 및 업로드 처리");
                 //LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaExtFinalFile 메서드 호출 시작...");
                 //LogManagerService.LogInfo($"🔍 ProcessBusanCheonggwaExtFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 //finalProgressReporter?.Report(63);
                 //LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaExtFinalFile 메서드 실행 중...");
-                //finalProgress?.Report("✅ [4-18]  부산청과 외부출고 최종파일 생성 및 업로드 처리 완료");
+                //finalProgress?.Report("✅ [4-18] 부산청과 외부출고 최종파일 생성 및 업로드 처리 완료");
                 //finalProgress?.Report("");
 
                 //try
@@ -926,23 +1088,31 @@ namespace LogisticManager.Processors
                 //}
                 //catch (Exception ex)
                 //{
-                    //LogManagerService.LogError($"❌ ProcessBusanCheonggwaExtFinalFile 실행 중 오류 발생: {ex.Message}");
-                    //LogManagerService.LogError($"❌ ProcessBusanCheonggwaExtFinalFile 오류 상세: {ex.StackTrace}");
-                    //finalProgress?.Report($"❌ [부산청과 외부출고 최종파일 생성 오류] {ex.Message}");
+                //    LogManagerService.LogError($"❌ ProcessBusanCheonggwaExtFinalFile 실행 중 오류 발생: {ex.Message}");
+                //    LogManagerService.LogError($"❌ ProcessBusanCheonggwaExtFinalFile 오류 상세: {ex.StackTrace}");
+                //    finalProgress?.Report($"❌ [부산청과 외부출고 최종파일 생성 오류] {ex.Message}");
 
-                    //throw;
-                }
+                //    throw;
+                //}
 
                 // ===================  = [부산청과자료 처리] ========================================================
                 try
                 {
-                    finalProgress?.Report("❄️ [4-19] 부산청과자료 처리");           
+                    finalProgress?.Report("❄️ [4-17] 부산청과자료 처리");           
                     LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaDoc 메서드 호출 시작...");
                     await ProcessBusanCheonggwaDoc();
-                    finalProgressReporter?.Report(64);
+                    finalProgressReporter?.Report(77);
                     LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaDoc 메서드 호출 완료...");
-                    finalProgress?.Report("✅ [4-19]  부산청과자료 처리 완료");
+                    finalProgress?.Report("✅ [4-17] 부산청과자료 처리 완료");
                     finalProgress?.Report("");
+
+                    // maxStep 체크: 4-17까지만 처리하는 경우 종료
+                    if (maxStep <= 17)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-17단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -956,12 +1126,12 @@ namespace LogisticManager.Processors
                 // ===================  = [부산청과자료 최종파일 생성] ========================================================
                 // 부산청과자료 최종파일 생성(업로드, 카카오워크)
                 // 부산청과 A4자료
-                finalProgress?.Report("📜 [4-20]  부산청과 A4자료 최종파일 생성 및 업로드 처리");
+                finalProgress?.Report("💾 [4-18] 부산청과 A4자료 최종파일 생성 및 업로드 처리");
                 LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaDocFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessBusanCheonggwaDocFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(63);
+                finalProgressReporter?.Report(81);
                 LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaDocFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-20]  부산청과 A4자료 최종파일 생성 및 업로드 처리 완료");
+                finalProgress?.Report("✅ [4-18] 부산청과 A4자료 최종파일 생성 및 업로드 처리 완료");
                 finalProgress?.Report("");
 
                 try
@@ -969,6 +1139,14 @@ namespace LogisticManager.Processors
                     var salesDataResult = await ProcessBusanCheonggwaDocFinalFile(); 
                     LogManagerService.LogInfo($"✅ ProcessBusanCheonggwaDocFinalFile 메서드 호출 완료 - 결과: {salesDataResult}");
                     LogManagerService.LogInfo($"✅ ProcessBusanCheonggwaDocFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+                    // maxStep 체크: 4-18까지만 처리하는 경우 종료
+                    if (maxStep <= 18)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-18단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리 및 A4자료 최종파일 생성까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -982,13 +1160,21 @@ namespace LogisticManager.Processors
                 // ===================  [감천냉동 처리] ========================================================
                 try
                 {
-                    finalProgress?.Report("❄️ [4-21] 감천냉동 처리");           
+                    finalProgress?.Report("❄️ [4-19] 감천냉동 처리");           
                     LogManagerService.LogInfo("🔍 ProcessGamcheonFrozenManagement 메서드 호출 시작...");
                     await ProcessGamcheonFrozenManagement();
-                    finalProgressReporter?.Report(64);
+                    finalProgressReporter?.Report(86);
                     LogManagerService.LogInfo("🔍 ProcessGamcheonFrozenManagement 메서드 호출 완료...");
-                    finalProgress?.Report("✅ [4-21]  감천냉동 처리 완료");
+                    finalProgress?.Report("✅ [4-19] 감천냉동 처리 완료");
                     finalProgress?.Report("");
+
+                    // maxStep 체크: 4-19까지만 처리하는 경우 종료
+                    if (maxStep <= 19)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-19단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리 및 A4자료 최종파일 생성, 감천냉동 처리까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1002,12 +1188,12 @@ namespace LogisticManager.Processors
                 // ===================  = [감천냉동 최종파일 생성] ========================================================
                 // 감천냉동 최종파일 생성(업로드, 카카오워크)
                 // 감천냉동 운송장
-                finalProgress?.Report("📜 [4-22]  감천냉동 최종파일 생성 및 업로드 처리");
+                finalProgress?.Report("💾 [4-20] 감천냉동 최종파일 생성 및 업로드 처리");
                 LogManagerService.LogInfo("🔍 ProcessGamcheonFrozenFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessGamcheonFrozenFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(65);
+                finalProgressReporter?.Report(90);
                 LogManagerService.LogInfo("🔍 ProcessGamcheonFrozenFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-22]  감천냉동 최종파일 생성 및 업로드 처리 완료");
+                finalProgress?.Report("✅ [4-20] 감천냉동 최종파일 생성 및 업로드 처리 완료");
                 finalProgress?.Report("");
 
                 try
@@ -1015,6 +1201,14 @@ namespace LogisticManager.Processors
                     var salesDataResult = await ProcessGamcheonFrozenFinalFile(); 
                     LogManagerService.LogInfo($"✅ ProcessGamcheonFrozenFinalFile 메서드 호출 완료 - 결과: {salesDataResult}");
                     LogManagerService.LogInfo($"✅ ProcessGamcheonFrozenFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+                    // maxStep 체크: 4-20까지만 처리하는 경우 종료
+                    if (maxStep <= 20)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-20단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리 및 A4자료 최종파일 생성, 감천냉동 처리 및 최종파일 생성까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1028,13 +1222,21 @@ namespace LogisticManager.Processors
                 // ===================  [송장출력 최종 처리] ========================================================
                 try
                 {
-                    finalProgress?.Report("❄️ [4-23] 송장출력 최종 처리");           
+                    finalProgress?.Report("❄️ [4-21] 송장출력 최종 처리");           
                     LogManagerService.LogInfo("🔍 ProcessInvoiceFinalManagement 메서드 호출 시작...");
                     await ProcessInvoiceFinalManagement();
-                    finalProgressReporter?.Report(66);
+                    finalProgressReporter?.Report(95);
                     LogManagerService.LogInfo("🔍 ProcessInvoiceFinalManagement 메서드 호출 완료...");
-                    finalProgress?.Report("✅ [4-23]  송장출력 최종 처리 완료");
+                    finalProgress?.Report("✅ [4-21] 송장출력 최종 처리 완료");
                     finalProgress?.Report("");
+
+                    // maxStep 체크: 4-21까지만 처리하는 경우 종료
+                    if (maxStep <= 21)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-21단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리 및 A4자료 최종파일 생성, 감천냉동 처리 및 최종파일 생성, 송장출력 최종 처리까지 완료되었습니다.");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1048,12 +1250,12 @@ namespace LogisticManager.Processors
                 // ===================  = [송장출력 최종파일 생성 (통합송장)] ========================================================
                 // 송장출력 최종파일 생성(업로드, 카카오워크)
                 // 통합송장
-                finalProgress?.Report("📜 [4-24]  송장출력 최종파일 생성 및 업로드 처리");
+                finalProgress?.Report("💾 [4-22] 송장출력 최종파일 생성 및 업로드 처리");
                 LogManagerService.LogInfo("🔍 ProcessInvoiceFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessInvoiceFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(68);
+                finalProgressReporter?.Report(100);
                 LogManagerService.LogInfo("🔍 ProcessInvoiceFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-24]  송장출력 최종파일 생성 및 업로드 처리 완료");
+                finalProgress?.Report("✅ [4-22] 송장출력 최종파일 생성 및 업로드 처리 완료");
                 finalProgress?.Report("");
 
                 try
@@ -1061,6 +1263,15 @@ namespace LogisticManager.Processors
                     var salesDataResult = await ProcessInvoiceFinalFile(); 
                     LogManagerService.LogInfo($"✅ ProcessInvoiceFinalFile 메서드 호출 완료 - 결과: {salesDataResult}");
                     LogManagerService.LogInfo($"✅ ProcessInvoiceFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+                    // maxStep 체크: 4-22까지 처리 완료 (전체 처리)
+                    // maxStep이 22인 경우는 전체 처리가므로 제한 메시지 표시하지 않음
+                    if (maxStep < 22)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-22단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 송장출력 메세지부터 송장출력 최종파일 생성까지 완료되었습니다!");
+                        return true;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -1174,10 +1385,10 @@ namespace LogisticManager.Processors
                 var processingDuration = endTime - workflowStartTime; // 실제 경과 시간 계산
                 
                 // 🎉 전사 물류 시스템 워크플로우 성공적 완료 선언
-                //finalProgress?.Report("🎉 물류 시스템 송장 처리 성공!");
+                finalProgress?.Report("🎉 물류 시스템 송장 처리 성공!");
                 finalProgress?.Report($"⏱️ 총 처리 시간: {processingDuration.TotalSeconds:F1}초");
-                finalProgress?.Report($"📊 현재 활성화 단계: 1-2단계 (데이터 수집 및 적재)");
-                finalProgress?.Report($"🚀 향후 확장 예정: 3-7단계 (고급 처리 및 자동화)");
+                finalProgress?.Report($"📊 처리 완료: 총 22단계 처리됨");
+                finalProgress?.Report($"✅ 최종 상태: 모든 송장 처리 완료");
 
                 return await Task.FromResult(true);
             }
@@ -4182,6 +4393,8 @@ namespace LogisticManager.Processors
                 
                 // === 출고지별 개별 알림 전송 처리 ===
                 // 각 업로드 결과에 대해 해당 출고지의 채팅방으로 개별 알림 전송
+                // centerName은 출고지 이름(예: "서울공산", "경기공산" 등)을 의미합니다.
+                // 출고지별로 알림 메시지나 채팅방을 다르게 처리할 때 사용됩니다.
                 foreach (var (centerName, filePath, dropboxUrl) in uploadResults)
                 {
                     try
@@ -4192,17 +4405,19 @@ namespace LogisticManager.Processors
                         var notificationType = GetNotificationTypeByCenter(centerName);
                         
                         // === 배치 식별자 생성 ===
-                        // 타임스탬프 기반 고유 배치 ID로 알림 메시지에서 구분 가능
-                        var batch = $"배치_{DateTime.Now:yyyyMMdd_HHmmss}";
+                        // 시간대별 차수 설정 (1차~막차, 추가)
+                        var now = DateTime.Now;
+                        var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
                         
                         // === 송장 개수 계산 (현재는 임시값) ===
                         // TODO: 실제 처리된 송장 개수를 DB에서 조회하여 정확한 값 사용
                         var invoiceCount = 1; // 실제로는 처리된 송장 개수를 계산해야 함
                         
                         // === KakaoWork 메시지 블록 구성 및 전송 ===
-                        // SendInvoiceNotificationAsync: 구조화된 메시지 블록으로 알림 전송
+                        // SendInvoiceNotificationAsync: 새로운 메시지 빌더를 사용하여 메시지 타입별로 적절한 구조 생성
                         // - 출고지 정보, 배치 정보, 송장 개수, Dropbox 다운로드 링크 포함
                         // - 각 출고지별 전용 채팅방으로 자동 라우팅
+                        // - [4-4] 단계는 판매입력 타입, 나머지는 운송장 수집 타입으로 자동 구분
                         await kakaoWorkService.SendInvoiceNotificationAsync(
                             notificationType,
                             batch,
@@ -4603,7 +4818,7 @@ namespace LogisticManager.Processors
             const string TABLE_NAME = "송장출력_주문정보";
             const string SHEET_NAME = "Sheet1";
             const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath4";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
             
                 try
                 {
@@ -4689,27 +4904,42 @@ namespace LogisticManager.Processors
 
                 LogManagerService.LogInfo($"✅ [{METHOD_NAME}] Dropbox 공유 링크 생성 완료: {sharedLink}");
 
-                // 6단계: KakaoWork 채팅방에 알림 전송  (판매입력)
-                // KakaoWork 채팅방 ID 확인 및 로그 기록
-                /*var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
-                if (string.IsNullOrEmpty(kakaoWorkChannelId))
-                {
-                    LogManagerService.LogWarning($"⚠️ [{METHOD_NAME}] KakaoWork 채팅방 ID(KakaoWorkChannelId) 설정이 없습니다.");
-                    return false;
-                }
-                LogManagerService.LogInfo($"[{METHOD_NAME}] KakaoWork 알림 전송 시작 (채팅방ID: {kakaoWorkChannelId})");
-                LogManagerService.LogInfo($"🔔 [{METHOD_NAME}] KakaoWork 알림 전송 대상 채팅방ID: {kakaoWorkChannelId}");
-
-                // KakaoWork 알림 전송 (채팅방ID 명시적으로 전달)
-                var notificationSent = await SendKakaoWorkNotification(sharedLink, kakaoWorkChannelId);
-                if (!notificationSent)
-                {
-                    LogManagerService.LogError($"❌ [{METHOD_NAME}] KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
-                    LogManagerService.LogInfo($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
-                    return false;
-                }
-                */
-                LogManagerService.LogInfo($"✅ [{METHOD_NAME}] KakaoWork 알림 전송 완료");
+                // 6단계: KakaoWork 채팅방에 알림 전송 (판매입력)
+				// 송장 개수 계산 및 시간대별 차수 설정
+				var invoiceCount = salesData?.Rows.Count ?? 0;
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
+				
+				var kakaoWorkService = KakaoWorkService.Instance;
+				var now = DateTime.Now;
+				var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
+				
+				// 채팅방 ID 설정
+				var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+				if (string.IsNullOrEmpty(chatroomId))
+				{
+					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
+					return false;
+				}
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+				
+				try
+				{
+					// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+					await kakaoWorkService.SendInvoiceNotificationAsync(
+						NotificationType.SalesData,
+						batch,
+						invoiceCount,
+						sharedLink,
+						chatroomId);
+					
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
+				}
+				catch (Exception ex)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+					// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+				}
                 
 
                 // 7단계: 임시 파일 정리
@@ -4769,7 +4999,7 @@ namespace LogisticManager.Processors
             const string TABLE_NAME = "송장출력_서울냉동_최종";
             const string SHEET_NAME = "서울냉동최종";
             const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath7";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
             try
             {
@@ -4878,25 +5108,54 @@ namespace LogisticManager.Processors
                 LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
 
                 // 6단계: KakaoWork 채팅방에 알림 전송 (서울냉동 운송장)
-                // KakaoWork 채팅방 ID 확인 및 로그 기록
-                /*var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
-                if (string.IsNullOrEmpty(kakaoWorkChannelId))
+                // 송장 개수 계산 및 시간대별 차수 설정
+                var invoiceCount = seoulFrozenData?.Rows.Count ?? 0;
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
+                
+                var kakaoWorkService = KakaoWorkService.Instance;
+                var now = DateTime.Now;
+                var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+                LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
+                
+                // 채팅방 ID 설정
+                var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+                if (string.IsNullOrEmpty(chatroomId))
                 {
-                    LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoWork 채팅방 ID(KakaoWorkChannelId) 설정이 없습니다.");
+                    LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
                     return false;
                 }
-                LogManagerService.LogInfo($"[{METHOD_NAME}] KakaoWork 알림 전송 시작 (채팅방ID: {kakaoWorkChannelId})");
-
-                // KakaoWork 알림 전송 (채팅방ID 명시적으로 전달)
-                var notificationSent = await SendKakaoWorkNotification(sharedLink, kakaoWorkChannelId);
-                if (!notificationSent)
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+                
+                try
                 {
-                    LogManagerService.LogInfo($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
-                    return false;
+                    // KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+                    // KakaoWork 알림 전송 메서드 파라미터 설명:
+                    // - NotificationType.SeoulFrozen: 알림 타입(서울냉동 운송장)
+                    //      SeoulFrozen (서울냉동)
+                    //      GyeonggiFrozen (경기냉동)
+                    //      SeoulGongsan (서울공산)
+                    //      GyeonggiGongsan (경기공산)
+                    //      BusanCheonggwa (부산청과)
+                    //      BusanCheonggwaPrint (부산청과A4자료)
+                    //      GamcheonFrozen (감천냉동)
+                    // - batch: 시간대별 차수(예: 1차, 2차 등)
+                    // - invoiceCount: 실제 송장 개수
+                    // - sharedLink: Dropbox 공유 링크(URL)
+                    // - chatroomId: 채팅방 ID
+                    await kakaoWorkService.SendInvoiceNotificationAsync(
+                        NotificationType.SeoulFrozen,
+                        batch,
+                        invoiceCount,
+                        sharedLink,
+                        chatroomId);
+                    
+                    LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
                 }
-
-                LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료");
-                */
+                catch (Exception ex)
+                {
+                    LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+                    // 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+                }
 
                 // 7단계: 임시 파일 정리
                 try
@@ -4956,7 +5215,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_경기냉동_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath8";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			// 로그 서비스 초기화 (LogManagerService로 통일)
 			try
@@ -5071,23 +5330,41 @@ namespace LogisticManager.Processors
 				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
 
 				// 6단계: KakaoWork 채팅방에 알림 전송 (경기냉동 운송장)
-				/*var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
-				if (string.IsNullOrEmpty(kakaoWorkChannelId))
+				// 송장 개수 계산 및 시간대별 차수 설정
+				var invoiceCount = gyeonggiFrozenData?.Rows.Count ?? 0;
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
+				
+				var kakaoWorkService = KakaoWorkService.Instance;
+				var now = DateTime.Now;
+				var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
+				
+				// 채팅방 ID 설정
+				var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+				if (string.IsNullOrEmpty(chatroomId))
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoWork 채팅방 ID(KakaoWorkChannelId) 설정이 없습니다.");
+					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
 					return false;
 				}
-				LogManagerService.LogInfo($"[{METHOD_NAME}] KakaoWork 알림 전송 시작 (채팅방ID: {kakaoWorkChannelId})");
-
-				// KakaoWork 알림 전송 (채팅방ID 명시적으로 전달)
-				var notificationSent = await SendKakaoWorkNotification(sharedLink, kakaoWorkChannelId);
-				if (!notificationSent)
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+				
+				try
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
-					return false;
+					// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+					await kakaoWorkService.SendInvoiceNotificationAsync(
+						NotificationType.GyeonggiFrozen,
+						batch,
+						invoiceCount,
+						sharedLink,
+						chatroomId);
+					
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
 				}
-
-				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료");*/
+				catch (Exception ex)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+					// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+				}
 
 				// 7단계: 임시 파일 정리
 				try
@@ -5144,7 +5421,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_서울공산_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath9";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -5244,23 +5521,41 @@ namespace LogisticManager.Processors
 				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
 
 				// 6단계: KakaoWork 채팅방에 알림 전송 (서울공산 운송장)
-				/*var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
-				if (string.IsNullOrEmpty(kakaoWorkChannelId))
+				// 송장 개수 계산 및 시간대별 차수 설정
+				var invoiceCount = seoulGongsanData?.Rows.Count ?? 0;
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
+				
+				var kakaoWorkService = KakaoWorkService.Instance;
+				var now = DateTime.Now;
+				var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
+				
+				// 채팅방 ID 설정
+				var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+				if (string.IsNullOrEmpty(chatroomId))
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoWork 채팅방 ID(KakaoWorkChannelId) 설정이 없습니다.");
+					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
 					return false;
 				}
-				LogManagerService.LogInfo($"[{METHOD_NAME}] KakaoWork 알림 전송 시작 (채팅방ID: {kakaoWorkChannelId})");
-
-				// KakaoWork 알림 전송 (채팅방ID 명시적으로 전달)
-				var notificationSent = await SendKakaoWorkNotification(sharedLink, kakaoWorkChannelId);
-				if (!notificationSent)
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+				
+				try
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
-					return false;
+					// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+					await kakaoWorkService.SendInvoiceNotificationAsync(
+						NotificationType.SeoulGongsan,
+						batch,
+						invoiceCount,
+						sharedLink,
+						chatroomId);
+					
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
 				}
-
-				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료");*/
+				catch (Exception ex)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+					// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+				}
 
 				// 7단계: 임시 파일 정리
 				try
@@ -5317,7 +5612,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_경기공산_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath10";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -5419,23 +5714,41 @@ namespace LogisticManager.Processors
 				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
 
 				// 6단계: KakaoWork 채팅방에 알림 전송 (경기공산 운송장)
-				/*var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
-				if (string.IsNullOrEmpty(kakaoWorkChannelId))
+				// 송장 개수 계산 및 시간대별 차수 설정
+				var invoiceCount = gyeonggiGongsanData?.Rows.Count ?? 0;
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
+				
+				var kakaoWorkService = KakaoWorkService.Instance;
+				var now = DateTime.Now;
+				var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
+				
+				// 채팅방 ID 설정
+				var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+				if (string.IsNullOrEmpty(chatroomId))
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoWork 채팅방 ID(KakaoWorkChannelId) 설정이 없습니다.");
+					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
 					return false;
 				}
-				LogManagerService.LogInfo($"[{METHOD_NAME}] KakaoWork 알림 전송 시작 (채팅방ID: {kakaoWorkChannelId})");
-
-				// KakaoWork 알림 전송 (채팅방ID 명시적으로 전달)
-				var notificationSent = await SendKakaoWorkNotification(sharedLink, kakaoWorkChannelId);
-				if (!notificationSent)
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+				
+				try
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
-					return false;
+					// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+					await kakaoWorkService.SendInvoiceNotificationAsync(
+						NotificationType.GyeonggiGongsan,
+						batch,
+						invoiceCount,
+						sharedLink,
+						chatroomId);
+					
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
 				}
-
-				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료");*/
+				catch (Exception ex)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+					// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+				}
 
 				// 7단계: 임시 파일 정리
 				try
@@ -5500,7 +5813,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_부산청과_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath12";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -5602,23 +5915,41 @@ namespace LogisticManager.Processors
 				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
 
 				// 6단계: KakaoWork 채팅방에 알림 전송 (부산청과 운송장)
-				/*var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
-				if (string.IsNullOrEmpty(kakaoWorkChannelId))
+				// 송장 개수 계산 및 시간대별 차수 설정
+				var invoiceCount = busanCheonggwaData?.Rows.Count ?? 0;
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
+				
+				var kakaoWorkService = KakaoWorkService.Instance;
+				var now = DateTime.Now;
+				var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
+				
+				// 채팅방 ID 설정
+				var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+				if (string.IsNullOrEmpty(chatroomId))
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoWork 채팅방 ID(KakaoWorkChannelId) 설정이 없습니다.");
+					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
 					return false;
 				}
-				LogManagerService.LogInfo($"[{METHOD_NAME}] KakaoWork 알림 전송 시작 (채팅방ID: {kakaoWorkChannelId})");
-
-				// KakaoWork 알림 전송 (채팅방ID 명시적으로 전달)
-				var notificationSent = await SendKakaoWorkNotification(sharedLink, kakaoWorkChannelId);
-				if (!notificationSent)
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+				
+				try
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
-					return false;
+					// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+					await kakaoWorkService.SendInvoiceNotificationAsync(
+						NotificationType.BusanCheonggwa,
+						batch,
+						invoiceCount,
+						sharedLink,
+						chatroomId);
+					
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
 				}
-
-				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료");*/
+				catch (Exception ex)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+					// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+				}
 
 				// 7단계: 임시 파일 정리
 				try
@@ -5668,7 +5999,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_부산청과자료_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath12";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -5771,23 +6102,41 @@ namespace LogisticManager.Processors
 				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
 
 				// 6단계: KakaoWork 채팅방에 알림 전송 (부산청과 A4자료)
-				/*var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
-				if (string.IsNullOrEmpty(kakaoWorkChannelId))
-				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoWork 채팅방 ID(KakaoWorkChannelId) 설정이 없습니다.");
-					return false;
-				}
-				LogManagerService.LogInfo($"[{METHOD_NAME}] KakaoWork 알림 전송 시작 (채팅방ID: {kakaoWorkChannelId})");
-
-				// KakaoWork 알림 전송 (채팅방ID 명시적으로 전달)
-				var notificationSent = await SendKakaoWorkNotification(sharedLink, kakaoWorkChannelId);
-				if (!notificationSent)
-				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
-					return false;
-				}
-
-				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료");*/
+                // 송장 개수 계산 및 시간대별 차수 설정
+                var invoiceCount = busanCheonggwaDocData?.Rows.Count ?? 0;
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
+                
+                var kakaoWorkService = KakaoWorkService.Instance;
+                var now = DateTime.Now;
+                var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+                LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
+                
+                // 채팅방 ID 설정
+                var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+                if (string.IsNullOrEmpty(chatroomId))
+                {
+                    LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
+                    return false;
+                }
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+                
+                try
+                {
+                    // KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+                    await kakaoWorkService.SendInvoiceNotificationAsync(
+                        NotificationType.BusanCheonggwaPrint,
+                        batch,
+                        invoiceCount,
+                        sharedLink,
+                        chatroomId);
+                    
+                    LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
+                }
+                catch (Exception ex)
+                {
+                    LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+                    // 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+                }
 
 				// 7단계: 임시 파일 정리
 				try
@@ -5851,7 +6200,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_감천냉동_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath13";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -5955,23 +6304,41 @@ namespace LogisticManager.Processors
 				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
 
 				// 6단계: KakaoWork 채팅방에 알림 전송 (감천냉동 운송장)
-				/*var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
-				if (string.IsNullOrEmpty(kakaoWorkChannelId))
+				// 송장 개수 계산 및 시간대별 차수 설정
+				var invoiceCount = gamcheonFrozenData?.Rows.Count ?? 0;
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
+				
+				var kakaoWorkService = KakaoWorkService.Instance;
+				var now = DateTime.Now;
+				var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
+				
+				// 채팅방 ID 설정
+				var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+				if (string.IsNullOrEmpty(chatroomId))
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoWork 채팅방 ID(KakaoWorkChannelId) 설정이 없습니다.");
+					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
 					return false;
 				}
-				LogManagerService.LogInfo($"[{METHOD_NAME}] KakaoWork 알림 전송 시작 (채팅방ID: {kakaoWorkChannelId})");
-
-				// KakaoWork 알림 전송 (채팅방ID 명시적으로 전달)
-				var notificationSent = await SendKakaoWorkNotification(sharedLink, kakaoWorkChannelId);
-				if (!notificationSent)
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+				
+				try
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
-					return false;
+					// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+					await kakaoWorkService.SendInvoiceNotificationAsync(
+						NotificationType.GamcheonFrozen,
+						batch,
+						invoiceCount,
+						sharedLink,
+						chatroomId);
+					
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
 				}
-
-				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료");*/
+				catch (Exception ex)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+					// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+				}
 
 				// 7단계: 임시 파일 정리
 				try
@@ -6035,7 +6402,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath14";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -6075,7 +6442,7 @@ namespace LogisticManager.Processors
 				// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
 				// 파일명 생성 예시: "송장출력_송장출력_YYMMDD_HH시MM분.xlsx" 형식으로 생성됨
 				// 예: 송장출력_250820_09시08분.xlsx
-				var excelFileName = _fileCommonService.GenerateExcelFileName("송장출력", null);
+				var excelFileName = _fileCommonService.GenerateExcelFileName("통합송장", null);
 				var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
@@ -6139,23 +6506,41 @@ namespace LogisticManager.Processors
 				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
 
 				// 6단계: KakaoWork 채팅방에 알림 전송 (통합송장)
-				/*var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
-				if (string.IsNullOrEmpty(kakaoWorkChannelId))
+				// 송장 개수 계산 및 시간대별 차수 설정
+				var invoiceCount = invoiceFinalData?.Rows.Count ?? 0;
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
+				
+				var kakaoWorkService = KakaoWorkService.Instance;
+				var now = DateTime.Now;
+				var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
+				
+				// 채팅방 ID 설정
+				var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+				if (string.IsNullOrEmpty(chatroomId))
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoWork 채팅방 ID(KakaoWorkChannelId) 설정이 없습니다.");
+					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
 					return false;
 				}
-				LogManagerService.LogInfo($"[{METHOD_NAME}] KakaoWork 알림 전송 시작 (채팅방ID: {kakaoWorkChannelId})");
-
-				// KakaoWork 알림 전송 (채팅방ID 명시적으로 전달)
-				var notificationSent = await SendKakaoWorkNotification(sharedLink, kakaoWorkChannelId);
-				if (!notificationSent)
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+				
+				try
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
-					return false;
+					// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+					await kakaoWorkService.SendInvoiceNotificationAsync(
+						NotificationType.Integrated,    
+    					batch,
+						invoiceCount,
+						sharedLink,
+						chatroomId);
+					
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
 				}
-
-				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료");*/
+				catch (Exception ex)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+					// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+				}
 
 				// 7단계: 임시 파일 정리
 				try
@@ -6202,7 +6587,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_부산청과_최종변환";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath12";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -6303,24 +6688,42 @@ namespace LogisticManager.Processors
 				}
 				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
 
-				// 6단계: KakaoWork 채팅방에 알림 전송 (주석 처리됨)
-				/*var kakaoWorkChannelId = ConfigurationManager.AppSettings["KakaoWork.ChatroomId.Check"];
-				if (string.IsNullOrEmpty(kakaoWorkChannelId))
+				// 6단계: KakaoWork 채팅방에 알림 전송 (부산청과 외부출고)
+				// 송장 개수 계산 및 시간대별 차수 설정
+				var invoiceCount = busanCheonggwaExtData?.Rows.Count ?? 0;
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
+				
+				var kakaoWorkService = KakaoWorkService.Instance;
+				var now = DateTime.Now;
+				var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
+				
+				// 채팅방 ID 설정
+				var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+				if (string.IsNullOrEmpty(chatroomId))
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoWork 채팅방 ID(KakaoWorkChannelId) 설정이 없습니다.");
+					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
 					return false;
 				}
-				LogManagerService.LogInfo($"[{METHOD_NAME}] KakaoWork 알림 전송 시작 (채팅방ID: {kakaoWorkChannelId})");
-
-				// KakaoWork 알림 전송 (채팅방ID 명시적으로 전달)
-				var notificationSent = await SendKakaoWorkNotification(sharedLink, kakaoWorkChannelId);
-				if (!notificationSent)
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+				
+				try
 				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패 (채팅방ID: {kakaoWorkChannelId})");
-					return false;
+					// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+					await kakaoWorkService.SendInvoiceNotificationAsync(
+						NotificationType.BusanCheonggwa,
+						batch,
+						invoiceCount,
+						sharedLink,
+						chatroomId);
+					
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
 				}
-
-				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료");*/
+				catch (Exception ex)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+					// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+				}
 
 				// 7단계: 임시 파일 정리
 				try
@@ -6364,13 +6767,14 @@ namespace LogisticManager.Processors
         /// KakaoWork 채팅방에 알림을 전송하는 메서드
         /// </summary>
         /// <param name="fileUrl">파일 다운로드 링크</param>
+        /// <param name="chatroomId">채팅방 ID (선택사항)</param>
         /// <returns>전송 성공 여부</returns>
-        private async Task<bool> SendKakaoWorkNotification(string fileUrl)
+        private async Task<bool> SendKakaoWorkNotification(string fileUrl, string? chatroomId = null)
         {
             try
             {
                 var kakaoWorkService = KakaoWorkService.Instance;
-                var notificationResult = await kakaoWorkService.SendSalesDataNotificationAsync(fileUrl);
+                var notificationResult = await kakaoWorkService.SendSalesDataNotificationAsync(fileUrl, chatroomId);
                 return notificationResult;
             }
             catch (Exception ex)

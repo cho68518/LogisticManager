@@ -42,6 +42,11 @@ namespace LogisticManager.Models
         BusanCheonggwa,
         
         /// <summary>
+        /// 부산청과 소분 프린트 자료 알림
+        /// </summary>
+        BusanCheonggwaPrint,
+        
+        /// <summary>
         /// 감천냉동 알림
         /// </summary>
         GamcheonFrozen,

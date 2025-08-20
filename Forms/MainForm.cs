@@ -665,7 +665,13 @@ namespace LogisticManager.Forms
                 });
 
                 // 송장 처리 실행
-                var result = await processor.ProcessAsync(_selectedFilePath, logCallback, progressCallback);
+                // ProcessAsync 메서드 호출
+                // 매개변수:
+                //   _selectedFilePath : 사용자가 선택한 엑셀 파일 경로
+                //   logCallback       : 로그 메시지 Progress 콜백 (UI 및 로그 기록용)
+                //   progressCallback  : 진행률 Progress 콜백 (UI 진행률 표시용)
+                //   1                 : 처리 단계(1단계, 기본값)  ([4-1]~[4-22])
+                var result = await processor.ProcessAsync(_selectedFilePath, logCallback, progressCallback, 22);
 
                 // 처리 결과에 따른 메시지 표시 (약간의 지연을 두어 로그 순서 보장)
                 await Task.Delay(100); // UI 업데이트를 위한 짧은 지연
