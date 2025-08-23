@@ -172,7 +172,7 @@ namespace LogisticManager.Services
         {
             Console.WriteLine("📁 [LogPathManager] 로그 경로 정보:");
             Console.WriteLine($"   현재 작업 디렉토리: {Environment.CurrentDirectory}");
-            Console.WriteLine($"   애플리케이션 기본 디렉토리: {AppDomain.CurrentDomain.BaseDirectory}");
+            Console.WriteLine($"   프로그램 기본 디렉토리: {AppDomain.CurrentDomain.BaseDirectory}");
             Console.WriteLine($"   프로젝트 루트 디렉토리: {_projectRoot}");
             Console.WriteLine($"   로그 디렉토리: {_logsDirectory}");
             Console.WriteLine($"   app.log 경로: {AppLogPath}");

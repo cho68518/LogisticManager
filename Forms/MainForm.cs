@@ -1,12 +1,14 @@
 using LogisticManager.Services;
 using LogisticManager.Models;
 using LogisticManager.Processors;
+using LogisticManager.Repositories;
 using System.Drawing.Drawing2D;
+using System.Configuration;
 
 namespace LogisticManager.Forms
 {
     /// <summary>
-    /// 송장 처리 애플리케이션의 메인 폼
+    /// 송장 처리 프로그램의 메인 폼
     /// 
     /// 주요 기능:
     /// - Excel 파일 선택 및 업로드
@@ -79,7 +81,17 @@ namespace LogisticManager.Forms
         private ProgressBar progressBar = null!;
 
         /// <summary>
-        /// 타이틀 라벨 - 애플리케이션 제목
+        /// 진행상황 표시 컨트롤 - 원형 차트와 단계별 상태 표시
+        /// </summary>
+        private ProgressDisplayControl progressDisplayControl = null!;
+
+        /// <summary>
+        /// 데이터베이스 연결 상태 표시 라벨
+        /// </summary>
+        private Label lblDbStatus = null!;
+
+        /// <summary>
+        /// 타이틀 라벨 - 프로그램 제목
         /// </summary>
         private Label lblTitle = null!;
 
@@ -89,7 +101,7 @@ namespace LogisticManager.Forms
         private Label lblStatus = null!;
 
         /// <summary>
-        /// 종료 버튼 - 애플리케이션 완전 종료
+        /// 종료 버튼 - 프로그램 완전 종료
         /// </summary>
         private Button btnExit = null!;
 
@@ -144,6 +156,9 @@ namespace LogisticManager.Forms
             
             // KakaoWork 연결 테스트
             TestKakaoWorkConnection();
+            
+            // 진행상황 단계 데이터 로딩
+            _ = LoadProgressStepsAsync();
 
         }
 
@@ -177,19 +192,19 @@ namespace LogisticManager.Forms
         private void InitializeUI()
         {
             // 폼 기본 설정
-            this.Text = "송장 처리 자동화 시스템";
-            this.Size = new Size(900, 700);
+            this.Text = "송장 처리 시스템";
+            this.Size = new Size(1100, 900); // 폼 크기를 1100으로 조정
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.Sizable; // 크기 조절 가능하도록 변경
             this.MaximizeBox = true; // 최대화 버튼 활성화
             this.MinimizeBox = true; // 최소화 버튼 활성화
-            this.MinimumSize = new Size(800, 600); // 최소 크기 설정
+            this.MinimumSize = new Size(1000, 700); // 최소 크기도 더 크게 조정
             this.BackColor = Color.FromArgb(240, 244, 248); // 연한 회색 배경
 
             // 타이틀 라벨 생성 및 설정
             lblTitle = new Label
             {
-                Text = "📦 송장 처리 자동화 시스템",
+                Text = "📦 송장 처리 시스템",
                 Location = new Point(20, 20),
                 Size = new Size(860, 40),
                 Font = new Font("맑은 고딕", 16F, FontStyle.Bold),
@@ -198,7 +213,7 @@ namespace LogisticManager.Forms
             };
 
             // 파일 선택 버튼 생성 및 설정 (둥근 모서리, 그라데이션)
-            btnSelectFile = CreateModernButton("📁 파일 선택", new Point(20, 80), new Size(120, 40));
+            btnSelectFile = CreateModernButton("📁 파일 선택", new Point(20, 80), new Size(150, 45));
             btnSelectFile.Click += BtnSelectFile_Click;
 
             // 파일 경로 라벨 생성 및 설정 (파일 선택 버튼 밑에 위치)
@@ -229,8 +244,8 @@ namespace LogisticManager.Forms
             btnExit = CreateModernButton("❌ 종료", new Point(790, 80), new Size(80, 40), Color.FromArgb(231, 76, 60));
             btnExit.Click += BtnExit_Click;
 
-            // 송장 처리 시작 버튼 생성 및 설정
-            btnStartProcess = CreateModernButton("🚀 송장 처리 시작", new Point(20, 160), new Size(150, 45), Color.FromArgb(46, 204, 113));
+            // 송장 처리 시작 버튼 생성 및 설정 (파일선택 버튼 오른쪽에 배치)
+            btnStartProcess = CreateModernButton("🚀 송장 처리 시작", new Point(150, 80), new Size(150, 45), Color.FromArgb(46, 204, 113));
             btnStartProcess.Enabled = false;  // 파일이 선택되기 전까지 비활성화
             btnStartProcess.Click += BtnStartProcess_Click;
 
@@ -243,7 +258,7 @@ namespace LogisticManager.Forms
             btnDebugSalesData = CreateModernButton("🐛 디버그: 판매입력", new Point(340, 160), new Size(120, 45), Color.FromArgb(231, 76, 60));
             btnDebugSalesData.Click += BtnDebugSalesData_Click;
 
-            // 진행률 표시바 생성 및 설정
+            // 진행률 표시바 생성 및 설정 (현재 숨김 처리됨 - 원형 진행률 차트로 대체)
             progressBar = new ProgressBar
             {
                 Location = new Point(190, 165),
@@ -251,7 +266,8 @@ namespace LogisticManager.Forms
                 Style = ProgressBarStyle.Continuous,
                 Minimum = 0,
                 Maximum = 100,
-                Value = 0
+                Value = 0,
+                Visible = false // 진행률바 숨김 처리 - 원형 진행률 차트 사용
             };
 
             // 진행률 표시바 스타일 설정
@@ -270,11 +286,34 @@ namespace LogisticManager.Forms
                 TextAlign = ContentAlignment.MiddleLeft
             };
 
-            // 로그 표시 텍스트박스 생성 및 설정
+            // 데이터베이스 연결 상태 표시 라벨 생성 및 설정
+            lblDbStatus = new Label
+            {
+                Text = "데이터베이스 연결 확인 중...",
+                Location = new Point(800, 240), // 초기 위치를 오른쪽으로 설정
+                Font = new Font("맑은 고딕", 8F), // 폰트 크기를 8로 줄이고 Bold 제거
+                ForeColor = Color.FromArgb(52, 73, 94),
+                BackColor = Color.Transparent, // 배경색을 투명하게
+                TextAlign = ContentAlignment.MiddleRight, // 오른쪽 정렬로 변경
+                BorderStyle = BorderStyle.None, // 테두리 제거
+                AutoSize = true, // 자동 크기 조정 활성화하여 텍스트 완전 표시
+                MaximumSize = new Size(400, 25) // 최대 크기 제한 (폭: 400px, 높이: 25px)
+            };
+
+            // 진행상황 표시 컨트롤 생성 및 설정 (60% 비율)
+            progressDisplayControl = new ProgressDisplayControl
+            {
+                Location = new Point(20, 265), // 데이터베이스 상태 라벨 아래로 이동 (위치 조정)
+                Size = new Size(1160, 360), // 높이 조정 (상태 라벨 공간 고려)
+                BackColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            // 로그 표시 텍스트박스 생성 및 설정 (40% 비율)
             txtLog = new RichTextBox
             {
-                Location = new Point(20, 240),
-                Size = new Size(840, 400),
+                Location = new Point(20, 660), // 진행상황 컨트롤 아래로 이동 (위치 조정됨)
+                Size = new Size(1160, 200), // 높이 조정 (40% 비율)
                 ReadOnly = true,  // 사용자 입력 방지
                 Font = new Font("맑은 고딕", 9F),
                 BackColor = Color.FromArgb(44, 62, 80),
@@ -297,14 +336,19 @@ namespace LogisticManager.Forms
                 btnSalesDataProcess,
                 progressBar,
                 lblStatus,
+                lblDbStatus,
+                progressDisplayControl,
                 txtLog
             });
 
             // 폼 리사이즈 이벤트 핸들러 추가
             this.Resize += MainForm_Resize;
 
+            // 초기 크기 조정 적용
+            MainForm_Resize(this, EventArgs.Empty);
+
             // 초기 로그 메시지 출력
-            LogMessage("🎉 송장 처리 자동화 시스템이 시작되었습니다.");
+            LogMessage("🎉 송장 처리 시스템이 시작되었습니다.");
             LogMessage("📁 파일을 선택하고 '송장 처리 시작' 버튼을 클릭하세요.");
         }
 
@@ -417,21 +461,44 @@ namespace LogisticManager.Forms
             btnDropboxTest.Location = new Point(btnSettings.Location.X - btnDropboxTest.Width - buttonSpacing, padding + titleHeight + 20);
             btnKakaoWorkTest.Location = new Point(btnDropboxTest.Location.X - btnKakaoWorkTest.Width - buttonSpacing, padding + titleHeight + 20);
 
-            // 송장 처리 시작 버튼 위치 조정 (파일 경로 라벨 밑에 위치)
-            btnStartProcess.Location = new Point(padding, lblFilePath.Location.Y + lblFilePath.Height + 20);
+            // 송장 처리 시작 버튼 위치 조정 (파일선택 버튼 오른쪽 옆에 위치)
+            btnStartProcess.Location = new Point(btnSelectFile.Location.X + btnSelectFile.Width + 10, btnSelectFile.Location.Y);
 
-            // 진행률 표시바 조정
+            // 진행률 표시바 조정 (현재 숨김 처리됨)
             int progressBarWidth = this.ClientSize.Width - btnStartProcess.Width - (padding * 3);
             progressBar.Size = new Size(progressBarWidth, 35);
             progressBar.Location = new Point(btnStartProcess.Location.X + btnStartProcess.Width + 20, btnStartProcess.Location.Y + 5);
 
-            // 상태 라벨 조정
-            lblStatus.Size = new Size(progressBarWidth, 20);
-            lblStatus.Location = new Point(progressBar.Location.X, progressBar.Location.Y + progressBar.Height + 5);
+            // 상태 라벨 조정 (송장처리시작 버튼 오른쪽 옆에 위치)
+            lblStatus.Size = new Size(200, 20); // 고정 크기로 설정
+            lblStatus.Location = new Point(btnStartProcess.Location.X + btnStartProcess.Width + 10, btnStartProcess.Location.Y + 12); // 버튼 중앙에 맞춤
 
-            // 로그 텍스트박스 조정 (하단 전체 영역)
-            int logTop = lblStatus.Location.Y + lblStatus.Height + 20;
-            int logHeight = this.ClientSize.Height - logTop - padding;
+            // 진행상황 표시 컨트롤 조정 (동적 높이) - 먼저 위치 계산
+            int progressTop = btnStartProcess.Location.Y + btnStartProcess.Height + 40; // 버튼 아래 40px 여백
+            int remainingHeight = this.ClientSize.Height - progressTop - (padding * 2);
+            
+            // 진행상황 컨트롤과 로그의 비율 설정 (진행상황: 60%, 로그: 40%)
+            int progressHeight = Math.Max(200, Math.Min(500, (int)(remainingHeight * 0.6))); // 최소 200px, 최대 500px
+            int logHeight = remainingHeight - progressHeight - 20; // 여백 20px 고려
+            
+            // 로그 높이가 너무 작아지지 않도록 보장
+            if (logHeight < 150)
+            {
+                progressHeight = remainingHeight - 170; // 로그를 최소 150px로 보장
+                logHeight = 150;
+            }
+            
+            progressDisplayControl.Size = new Size(this.ClientSize.Width - (padding * 2), progressHeight);
+            progressDisplayControl.Location = new Point(padding, progressTop);
+
+            // 데이터베이스 상태 라벨 조정 (진행상황 컨트롤 위의 오른쪽 끝에 위치)
+            int dbStatusTop = progressDisplayControl.Location.Y - 25; // 진행상황 컨트롤 위 25px
+            int dbStatusLeft = progressDisplayControl.Location.X + progressDisplayControl.Width - 300; // 오른쪽 끝에서 300px 왼쪽
+            lblDbStatus.Location = new Point(Math.Max(padding, dbStatusLeft), dbStatusTop);
+            // AutoSize = true이므로 Size는 자동으로 조정됨
+
+            // 로그 텍스트박스 조정 (진행상황 컨트롤 아래)
+            int logTop = progressDisplayControl.Location.Y + progressDisplayControl.Height + 20;
             txtLog.Size = new Size(this.ClientSize.Width - (padding * 2), logHeight);
             txtLog.Location = new Point(padding, logTop);
         }
@@ -477,7 +544,7 @@ namespace LogisticManager.Forms
                                 // 성공 시 로그 메시지만 출력 (readonly 필드이므로 재할당 불가)
                                 LogMessage("✅ 데이터베이스 설정이 업데이트되었습니다.");
                                 LogMessage("🔗 새로운 설정으로 데이터베이스 연결이 성공했습니다.");
-                                LogMessage("💡 애플리케이션을 재시작하면 새로운 설정이 적용됩니다.");
+                                LogMessage("💡 프로그램을 재시작하면 새로운 설정이 적용됩니다.");
                             }
                             else
                             {
@@ -641,19 +708,16 @@ namespace LogisticManager.Forms
                 btnStartProcess.Enabled = false;
                 btnSelectFile.Enabled = false;
                 btnSettings.Enabled = false;
-                progressBar.Value = 0;
+                // progressBar.Value = 0; // 진행률바 숨김 처리됨 - 원형 진행률 차트 사용
                 lblStatus.Text = "처리 중...";
                 lblStatus.ForeColor = Color.FromArgb(52, 152, 219);
 
                 //LogMessage("🚀 송장 처리 작업을 시작합니다...");
 
-                // InvoiceProcessor 생성 및 처리 실행
-                var processor = new InvoiceProcessor(_fileService, _databaseService, _apiService);
-                
-                // 진행률 콜백 설정
+                // 진행률 콜백 설정 (현재 진행률바 숨김 처리됨 - 원형 진행률 차트로 대체)
                 var progressCallback = new Progress<int>(value => 
                 { 
-                    progressBar.Value = value; 
+                    // progressBar.Value = value; // 진행률바 숨김 처리됨
                     Application.DoEvents(); 
                 });
                 
@@ -664,6 +728,17 @@ namespace LogisticManager.Forms
                     Application.DoEvents(); 
                 });
 
+                // InvoiceProcessor 생성 및 처리 실행
+                var processor = new InvoiceProcessor(_fileService, _databaseService, _apiService, 
+                    logCallback, progressCallback, progressDisplayControl);
+
+                // 진행상황 단계별 업데이트 콜백 설정
+                var stepProgressCallback = new Progress<int>(stepIndex => 
+                { 
+                    progressDisplayControl?.ReportStepProgress(stepIndex);
+                    Application.DoEvents(); 
+                });
+                
                 // 송장 처리 실행
                 // ProcessAsync 메서드 호출
                 // 매개변수:
@@ -671,7 +746,8 @@ namespace LogisticManager.Forms
                 //   logCallback       : 로그 메시지 Progress 콜백 (UI 및 로그 기록용)
                 //   progressCallback  : 진행률 Progress 콜백 (UI 진행률 표시용)
                 //   1                 : 처리 단계(1단계, 기본값)  ([4-1]~[4-22])
-                var result = await processor.ProcessAsync(_selectedFilePath, logCallback, progressCallback, 22);
+                var testLevel = ConfigurationManager.AppSettings["TestLevel"] ?? "1"; // app.config에서 테스트 레벨 가져오기
+                var result = await processor.ProcessAsync(_selectedFilePath, logCallback, progressCallback, int.Parse(testLevel));
 
                 // 처리 결과에 따른 메시지 표시 (약간의 지연을 두어 로그 순서 보장)
                 await Task.Delay(100); // UI 업데이트를 위한 짧은 지연
@@ -982,9 +1058,10 @@ namespace LogisticManager.Forms
                         LogMessage("📊 송장 처리 시스템이 준비되었습니다.");
                         
                         // 연결된 DB 서버 정보만 포함한 상태 메시지 생성
-                        var dbInfoText = $"데이터베이스 연결됨 ({dbInfo.Server})";
-                        lblStatus.Text = dbInfoText;
-                        lblStatus.ForeColor = Color.FromArgb(46, 204, 113);
+                        var dbInfoText = $"✅ 데이터베이스 연결됨 ({dbInfo.Server})";
+                        lblDbStatus.Text = dbInfoText;
+                        lblDbStatus.ForeColor = Color.FromArgb(46, 204, 113);
+                        lblDbStatus.BackColor = Color.Transparent; // 배경색을 투명하게
                         Console.WriteLine("✅ MainForm: 연결 성공 처리 완료");
                     }
                     else
@@ -992,8 +1069,9 @@ namespace LogisticManager.Forms
                         LogMessage("⚠️ 데이터베이스 연결에 실패했습니다.");
                         LogMessage($"🔍 오류 상세: {testResult.ErrorMessage}");
                         LogMessage("💡 설정 화면에서 데이터베이스 정보를 확인해주세요.");
-                        lblStatus.Text = "데이터베이스 연결 실패";
-                        lblStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                        lblDbStatus.Text = "❌ 데이터베이스 연결 실패";
+                        lblDbStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                        lblDbStatus.BackColor = Color.Transparent; // 배경색을 투명하게
                         Console.WriteLine("❌ MainForm: 연결 실패 처리 완료");
                     }
                 }
@@ -1010,8 +1088,9 @@ namespace LogisticManager.Forms
                         Console.WriteLine($"🔍 MainForm: 내부 예외: {ex.InnerException.Message}");
                     }
                     LogMessage("💡 설정 화면에서 데이터베이스 정보를 확인해주세요.");
-                    lblStatus.Text = "데이터베이스 연결 오류";
-                    lblStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                    lblDbStatus.Text = "❌ 데이터베이스 연결 오류";
+                    lblDbStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                    lblDbStatus.BackColor = Color.Transparent; // 배경색을 투명하게
                 }
             }
             catch (Exception ex)
@@ -1020,8 +1099,9 @@ namespace LogisticManager.Forms
                 Console.WriteLine($"❌ MainForm: 최상위 예외 발생: {ex.Message}");
                 Console.WriteLine($"🔍 MainForm: 최상위 예외 상세: {ex}");
                 LogMessage($"❌ 데이터베이스 연결 테스트 중 오류 발생: {ex.Message}");
-                lblStatus.Text = "연결 오류";
-                lblStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                lblDbStatus.Text = "❌ 연결 오류";
+                lblDbStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                lblDbStatus.BackColor = Color.Transparent; // 배경색을 투명하게
             }
         }
 
@@ -1194,6 +1274,7 @@ namespace LogisticManager.Forms
         /// - 상태 라벨 초기화
         /// - 버튼 상태 초기화
         /// - 파일 경로 라벨 초기화
+        /// - 진행상황 표시 컨트롤 초기화
         /// </summary>
         private void ResetUIState()
         {
@@ -1206,8 +1287,8 @@ namespace LogisticManager.Forms
                     return;
                 }
 
-                // 진행률바 초기화
-                progressBar.Value = 0;
+                // 진행률바 초기화 (현재 숨김 처리됨 - 원형 진행률 차트 사용)
+                // progressBar.Value = 0;
                 
                 // 상태 라벨 초기화
                 lblStatus.Text = "대기 중...";
@@ -1216,7 +1297,10 @@ namespace LogisticManager.Forms
                 // 파일 경로 라벨 초기화
                 lblFilePath.Text = "선택된 파일: 없음";
                 
-                // 버튼 상태 초기화 (초기화 버튼은 백그라운드 작업 완료 후 활성화)
+                // 진행상황 표시 컨트롤 초기화
+                progressDisplayControl?.ResetProgress();
+                
+                // 버튼 상태 초기화 (초기화 버튼은 백그라운드 작업 완료 후 설정)
                 btnStartProcess.Enabled = false;
                 btnSelectFile.Enabled = true;
                 btnSettings.Enabled = true;
@@ -1237,6 +1321,61 @@ namespace LogisticManager.Forms
             }
         }
 
+        /// <summary>
+        /// 공통코드에서 진행상황 단계 데이터를 로딩하는 메서드
+        /// </summary>
+        private async Task LoadProgressStepsAsync()
+        {
+            try
+            {
+                // CommonCodeRepository를 통해 'PG_PROC' 그룹의 데이터 로딩
+                var commonCodeRepository = new CommonCodeRepository(_databaseService);
+                var progressSteps = await commonCodeRepository.GetCommonCodesByGroupAsync("PG_PROC");
+                
+                // UI 스레드에서 안전하게 실행
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(() => UpdateProgressDisplay(progressSteps));
+                }
+                else
+                {
+                    UpdateProgressDisplay(progressSteps);
+                }
+                
+                LogMessage($"📊 진행상황 단계 {progressSteps.Count}개를 로딩했습니다.");
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"⚠️ 진행상황 단계 로딩 중 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 진행상황 표시 컨트롤을 업데이트하는 메서드
+        /// </summary>
+        /// <param name="progressSteps">진행상황 단계 목록</param>
+        private void UpdateProgressDisplay(List<CommonCode> progressSteps)
+        {
+            try
+            {
+                if (progressDisplayControl != null)
+                {
+                    // SortOrder 기준으로 정렬
+                    var sortedSteps = progressSteps
+                        .Where(step => step.IsUsed) // 사용 중인 단계만
+                        .OrderBy(step => step.SortOrder)
+                        .ToList();
+                    
+                    progressDisplayControl.ProgressSteps = sortedSteps;
+                    LogMessage($"🔄 진행상황 표시가 업데이트되었습니다. (총 {sortedSteps.Count}단계)");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"⚠️ 진행상황 표시 업데이트 중 오류: {ex.Message}");
+            }
+        }
+        
         /// <summary>
         /// 폼 종료 시 이벤트 핸들러
         /// 

@@ -59,7 +59,7 @@ namespace LogisticManager.Services
             catch (Exception ex)
             {
                 Console.WriteLine($"DropboxService 초기화 오류: {ex.Message}");
-                // 초기화 오류가 있어도 애플리케이션은 계속 실행되도록 예외를 던지지 않음
+                // 초기화 오류가 있어도 프로그램은 계속 실행되도록 예외를 던지지 않음
             }
         }
         #endregion

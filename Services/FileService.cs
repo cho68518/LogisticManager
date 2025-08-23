@@ -2,6 +2,7 @@ using OfficeOpenXml;
 using System.Data;
 using System.Configuration;
 using LogisticManager.Models;
+using System.Linq;
 
 namespace LogisticManager.Services
 {
@@ -164,7 +165,7 @@ namespace LogisticManager.Services
         /// <returns>Excel 데이터가 담긴 DataTable (매핑 적용)</returns>
         /// <exception cref="FileNotFoundException">파일이 존재하지 않는 경우</exception>
         /// <exception cref="IOException">파일 읽기 오류</exception>
-        public DataTable ReadExcelToDataTable(string filePath, string tableMappingKey = "order_table")
+        public DataTable ReadExcelToDataTable(string filePath, string? tableMappingKey = null)
         {
             // 파일 존재 여부 확인
             if (!File.Exists(filePath))
@@ -196,19 +197,30 @@ namespace LogisticManager.Services
                     // 헤더 행을 읽어서 매핑된 컬럼명으로 DataTable 컬럼 생성
                     for (int col = 1; col <= dimension.End.Column; col++)
                     {
-                        var excelColumnName = worksheet.Cells[1, col].Value?.ToString() ?? $"Column{col}";
-                        
-                        // 매핑 서비스를 통해 데이터베이스 컬럼명 가져오기
-                        var databaseColumnName = _mappingService.GetDatabaseColumn(excelColumnName, tableMappingKey);
-                        
-                        // 매핑된 컬럼명이 있으면 사용, 없으면 원본 이름 사용
-                        var columnName = databaseColumnName ?? excelColumnName;
-                        
-                        // 데이터 타입에 따른 컬럼 생성
-                        var dataType = GetColumnDataType(excelColumnName, tableMappingKey);
-                        dataTable.Columns.Add(columnName, dataType);
-                        
-                        Console.WriteLine($"📋 FileService: 컬럼 매핑 - Excel: {excelColumnName} → DB: {columnName} ({dataType.Name})");
+                        try
+                        {
+                            var cell = worksheet.Cells[1, col];
+                            var cellValue = cell.Value;
+                            var excelColumnName = cellValue?.ToString() ?? $"Column{col}";
+                            
+                            // 매핑 없이 Excel 컬럼명 그대로 사용
+                            var columnName = excelColumnName;
+                            
+                            // 모든 컬럼을 문자열로 처리
+                            var dataType = typeof(string);
+                            dataTable.Columns.Add(columnName, dataType);
+                            
+                            Console.WriteLine($"📋 FileService: 컬럼 생성 - Excel: {excelColumnName} (String)");
+                        }
+                        catch
+                        {
+                            // 셀 접근 실패 시 기본 컬럼명 사용
+                            var excelColumnName = $"Column{col}";
+                            var columnName = excelColumnName;
+                            var dataType = typeof(string);
+                            dataTable.Columns.Add(columnName, dataType);
+                            Console.WriteLine($"📋 FileService: 컬럼 생성 - Excel: {excelColumnName} (String) - 기본값 사용");
+                        }
                     }
 
                     // 데이터 행들을 읽어서 DataTable에 추가
@@ -218,42 +230,74 @@ namespace LogisticManager.Services
                         bool hasData = false;
 
                         // 각 컬럼의 값을 읽어서 DataRow에 추가
-                        for (int col = 1; col <= dimension.End.Column; col++)
+                        for (int col = 1; col <= dimension.Columns; col++)
                         {
-                            var excelColumnName = worksheet.Cells[1, col].Value?.ToString() ?? $"Column{col}";
-                            var cellValue = worksheet.Cells[row, col].Value?.ToString() ?? string.Empty;
-                            
-                            // 매핑된 컬럼명 가져오기
-                            var databaseColumnName = _mappingService.GetDatabaseColumn(excelColumnName, tableMappingKey);
-                            var columnName = databaseColumnName ?? excelColumnName;
-                            
-                            // 데이터 타입에 따른 변환 적용
-                            var convertedValue = ConvertCellValue(cellValue, excelColumnName, tableMappingKey);
-                            
-                            // 컬럼명으로 데이터 설정
-                            if (dataTable.Columns.Contains(columnName))
+                            try
                             {
-                                dataRow[columnName] = convertedValue;
+                                var headerCell = worksheet.Cells[1, col];
+                                var headerCellValue = headerCell.Value;
+                                var excelColumnName = headerCellValue?.ToString() ?? $"Column{col}";
+                                var rowCell = worksheet.Cells[row, col];
+                                var rowCellValue = rowCell.Value;
+                                var cellValue = rowCellValue?.ToString() ?? string.Empty;
                                 
-                                // 디버깅을 위한 로그 추가 (쇼핑몰 컬럼 특별 처리)
-                                if (row <= 3 || columnName == "쇼핑몰") // 처음 몇 행만 로깅 + 쇼핑몰 컬럼은 항상 로깅
+                                // 매핑 없이 Excel 컬럼명 그대로 사용
+                                var columnName = excelColumnName;
+                                
+                                // 문자열 값 그대로 사용 (변환 없음)
+                                var convertedValue = cellValue;
+                                
+                                // 결제수단 컬럼 특별 디버깅 (첫 번째 행)
+                                if (row == 2 && excelColumnName == "결제수단")
                                 {
-                                    Console.WriteLine($"[FileService] 행{row} 컬럼 '{excelColumnName}' → '{columnName}': '{cellValue}' → '{convertedValue}'");
+                                    var rawValue = rowCellValue;
+                                    var rawValueType = rawValue?.GetType().Name ?? "NULL";
+                                    var rawValueString = rawValue?.ToString() ?? "NULL";
+                                    
+                                    Console.WriteLine($"[FileService] 🔍 결제수단 컬럼 디버깅 (첫 번째 행):");
+                                    Console.WriteLine($"  - 원본 값: '{rawValueString}' (타입: {rawValueType})");
+                                    Console.WriteLine($"  - cellValue: '{cellValue}' (길이: {cellValue?.Length ?? 0})");
+                                    Console.WriteLine($"  - convertedValue: '{convertedValue}' (타입: {convertedValue?.GetType().Name ?? "NULL"})");
+                                    Console.WriteLine($"  - 셀 주소: {rowCell.Address}");
+                                    
+                                    // 셀의 상세 정보 확인
+                                    Console.WriteLine($"  - 셀 형식: {rowCell.Style.Numberformat.Format}");
+                                    Console.WriteLine($"  - 셀 값 타입: {rowCellValue?.GetType().Name ?? "NULL"}");
+                                }
+                                
+                                // 컬럼명으로 데이터 설정
+                                if (dataTable.Columns.Contains(columnName))
+                                {
+                                    dataRow[columnName] = convertedValue;
+                                    
+                                    // 디버깅을 위한 로그 추가 (쇼핑몰 컬럼 특별 처리)
+                                    if (row <= 3 || columnName == "쇼핑몰") // 처음 몇 행만 로깅 + 쇼핑몰 컬럼은 항상 로깅
+                                    {
+                                        Console.WriteLine($"[FileService] 행{row} 컬럼 '{excelColumnName}' → '{columnName}': '{cellValue}' → '{convertedValue}'");
+                                    }
+                                }
+                                else
+                                {
+                                    // 컬럼이 존재하지 않는 경우 로깅
+                                    if (row <= 3)
+                                    {
+                                        Console.WriteLine($"[FileService] ⚠️ 행{row} 컬럼 '{columnName}'이 DataTable에 존재하지 않음");
+                                    }
+                                }
+                                
+                                // 빈 셀이 아닌 경우 데이터가 있다고 표시
+                                if (!string.IsNullOrEmpty(cellValue))
+                                {
+                                    hasData = true;
                                 }
                             }
-                            else
+                            catch
                             {
-                                // 컬럼이 존재하지 않는 경우 로깅
+                                // 셀 접근 실패 시 건너뛰기
                                 if (row <= 3)
                                 {
-                                    Console.WriteLine($"[FileService] ⚠️ 행{row} 컬럼 '{columnName}'이 DataTable에 존재하지 않음");
+                                    Console.WriteLine($"[FileService] ⚠️ 행{row} 컬럼 {col} 접근 실패 - 건너뛰기");
                                 }
-                            }
-                            
-                            // 빈 셀이 아닌 경우 데이터가 있다고 표시
-                            if (!string.IsNullOrEmpty(cellValue))
-                            {
-                                hasData = true;
                             }
                         }
 
@@ -267,10 +311,10 @@ namespace LogisticManager.Services
 
                 Console.WriteLine($"✅ FileService: Excel 파일 읽기 완료 (매핑 적용) - {dataTable.Rows.Count}행, {dataTable.Columns.Count}열");
                 
-                // 📊 데이터 변환 및 정규화 수행
-                Console.WriteLine($"🔄 FileService: 데이터 변환 및 정규화 시작...");
-                dataTable = _transformationService.TransformData(dataTable);
-                Console.WriteLine($"✨ FileService: 데이터 변환 및 정규화 완료");
+                // 📊 데이터 변환 및 정규화 수행 (주석 처리 - 나중에 사용 가능)
+                // Console.WriteLine($"🔄 FileService: 데이터 변환 및 정규화 시작...");
+                // dataTable = _transformationService.TransformData(dataTable);
+                // Console.WriteLine($"✨ FileService: 데이터 변환 및 정규화 완료");
                 
                 return dataTable;
             }
@@ -657,6 +701,256 @@ namespace LogisticManager.Services
             {
                 Console.WriteLine($"❌ FileService: 디렉토리 생성 실패: {ex.Message}");
                 throw;
+            }
+        }
+
+        #endregion
+
+        #region Excel 데이터를 프로시저로 전달 (Excel Data to Procedure)
+
+        /// <summary>
+        /// Excel 파일을 읽어서 DataTable로 변환하고 지정된 프로시저로 전달하는 공용 메서드
+        /// 
+        /// 🎯 주요 기능:
+        /// - Excel 파일을 DataTable로 읽기 (기존 ReadExcelToDataTable 메서드 활용)
+        /// - 지정된 프로시저명으로 프로시저 호출
+        /// - DataTable을 프로시저 파라미터로 전달
+        /// - 컬럼명은 자동으로 전달됨 (별도 전달 불필요)
+        /// 
+        /// 📋 처리 과정:
+        /// 1. Excel 파일을 DataTable로 읽기
+        /// 2. 프로시저명 유효성 검증
+        /// 3. DatabaseService를 통한 프로시저 호출
+        /// 4. DataTable을 프로시저 파라미터로 전달
+        /// 5. 결과 반환 및 오류 처리
+        /// 
+        /// ⚙️ 설정 파일:
+        /// - App.config에서 프로시저명 정의
+        /// - <add key="ExcelProcessor.Proc1" value="sp_Excel_Proc1" />
+        /// 
+        /// 🔄 재사용성:
+        /// - 다양한 Excel 파일과 프로시저 조합으로 사용 가능
+        /// - 공용 메서드로 여러 곳에서 호출 가능
+        /// 
+        /// ⚠️ 예외 처리:
+        /// - FileNotFoundException: Excel 파일이 존재하지 않는 경우
+        /// - ArgumentException: 프로시저명이 유효하지 않은 경우
+        /// - InvalidOperationException: 프로시저 실행 실패
+        /// 
+        /// 💡 사용 예시:
+        /// ```csharp
+        /// var fileService = new FileService();
+        /// var result = await fileService.ReadExcelToDataTableWithProcedure(
+        ///     "C:\\Work\\Input\\data.xlsx", 
+        ///     "ExcelProcessor.Proc1"
+        /// );
+        /// ```
+        /// </summary>
+        /// <param name="filePath">읽을 Excel 파일의 전체 경로</param>
+        /// <param name="procedureConfigKey">프로시저 설정 키 (App.config의 key 값)</param>
+        /// <returns>프로시저 실행 결과 (성공/실패)</returns>
+        /// <exception cref="FileNotFoundException">Excel 파일이 존재하지 않는 경우</exception>
+        /// <exception cref="ArgumentException">프로시저명이 유효하지 않은 경우</exception>
+        /// <exception cref="InvalidOperationException">프로시저 실행 실패</exception>
+        public async Task<bool> ReadExcelToDataTableWithProcedure(string filePath, string procedureConfigKey)
+        {
+            // 메서드명과 프로시저명 상수 정의
+            const string METHOD_NAME = "ReadExcelToDataTableWithProcedure";
+
+            try
+            {
+                LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일을 프로시저로 전달하는 작업 시작");
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 파일 경로: {filePath}");
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 프로시저 설정 키: {procedureConfigKey}");
+
+                // 1단계: Excel 파일을 DataTable로 읽기 (기존 메서드 호출)
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 1단계: Excel 파일 읽기 시작");
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 파일 경로: {filePath}");
+                
+                // 파일 존재 여부 확인
+                if (!File.Exists(filePath))
+                {
+                    var errorMsg = $"Excel 파일이 존재하지 않습니다: {filePath}";
+                    LogManagerService.LogError($"[{METHOD_NAME}] {errorMsg}");
+                    return false;
+                }
+                
+                // 파일 크기 확인
+                var fileInfo = new FileInfo(filePath);
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 파일 크기: {fileInfo.Length:N0} bytes");
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 파일 수정 시간: {fileInfo.LastWriteTime}");
+                
+                var dataTable = ReadExcelToDataTable(filePath); // 매핑 없이 처리
+                
+                if (dataTable == null)
+                {
+                    var errorMsg = $"Excel 파일을 읽어서 DataTable로 변환할 수 없습니다: {filePath}";
+                    LogManagerService.LogError($"[{METHOD_NAME}] {errorMsg}");
+                    return false;
+                }
+                
+                if (dataTable.Rows.Count == 0)
+                {
+                    var errorMsg = $"Excel 파일에 데이터가 없습니다: {filePath}";
+                    LogManagerService.LogWarning($"[{METHOD_NAME}] {errorMsg}");
+                    return false;
+                }
+                
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 1단계 완료: Excel 파일 읽기 성공");
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 데이터 정보: {dataTable.Rows.Count:N0}행, {dataTable.Columns.Count}열");
+                
+                // 컬럼 정보 로깅
+                var columnList = string.Join(", ", dataTable.Columns.Cast<DataColumn>().Select((col, i) => $"{i + 1}: {col.ColumnName} ({col.DataType.Name})"));
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 컬럼 목록: {columnList}");
+                
+                // 샘플 데이터 로깅 (처음 3행)
+                for (int row = 0; row < Math.Min(3, dataTable.Rows.Count); row++)
+                {
+                    var sampleData = string.Join(" | ", dataTable.Columns.Cast<DataColumn>().Select(col => $"{col.ColumnName}: {dataTable.Rows[row][col]?.ToString() ?? "NULL"}"));
+                    LogManagerService.LogInfo($"[{METHOD_NAME}] 샘플 데이터 행 {row + 1}: {sampleData}");
+                }
+
+                // 2단계: 프로시저명 설정에서 가져오기
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 2단계: 프로시저명 설정 확인");
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 설정 키: {procedureConfigKey}");
+                
+                // App.config에서 프로시저명 조회
+                var procedureName = ConfigurationManager.AppSettings[procedureConfigKey];
+                LogManagerService.LogInfo($"[{METHOD_NAME}] App.config에서 조회된 값: '{procedureName ?? "NULL"}'");
+                
+                if (string.IsNullOrEmpty(procedureName))
+                {
+                    var errorMessage = $"프로시저 설정 키 '{procedureConfigKey}'에 해당하는 프로시저명을 찾을 수 없습니다. App.config를 확인해주세요.";
+                    LogManagerService.LogError($"[{METHOD_NAME}] {errorMessage}");
+                    throw new ArgumentException(errorMessage, nameof(procedureConfigKey));
+                }
+                
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 2단계 완료: 프로시저명 확인");
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 실행할 프로시저: {procedureName}");
+                
+                // 프로시저명 유효성 검사
+                if (procedureName.Trim().Length == 0)
+                {
+                    var errorMessage = $"프로시저명이 빈 문자열입니다: '{procedureConfigKey}' = '{procedureName}'";
+                    LogManagerService.LogError($"[{METHOD_NAME}] {errorMessage}");
+                    throw new ArgumentException(errorMessage, nameof(procedureConfigKey));
+                }
+
+                // 3단계: DatabaseService를 통한 프로시저 호출
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 3단계: 프로시저 호출 시작");
+                LogManagerService.LogInfo($"[{METHOD_NAME}] DatabaseService 인스턴스 생성 중...");
+                
+                // DatabaseService 인스턴스 생성
+                var databaseService = new DatabaseService();
+                LogManagerService.LogInfo($"[{METHOD_NAME}] DatabaseService 인스턴스 생성 완료");
+                
+                // 프로시저 호출 전 최종 확인
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 프로시저 호출 정보:");
+                LogManagerService.LogInfo($"[{METHOD_NAME}]   - 프로시저명: {procedureName}");
+                LogManagerService.LogInfo($"[{METHOD_NAME}]   - 데이터 행수: {dataTable.Rows.Count:N0}행");
+                LogManagerService.LogInfo($"[{METHOD_NAME}]   - 데이터 컬럼수: {dataTable.Columns.Count}열");
+                LogManagerService.LogInfo($"[{METHOD_NAME}]   - 첫 번째 컬럼명: {dataTable.Columns[0]?.ColumnName ?? "NULL"}");
+                LogManagerService.LogInfo($"[{METHOD_NAME}]   - 마지막 컬럼명: {dataTable.Columns[dataTable.Columns.Count - 1]?.ColumnName ?? "NULL"}");
+                
+                // 프로시저 호출 (DataTable을 파라미터로 전달)
+                LogManagerService.LogInfo($"[{METHOD_NAME}] ExecuteProcedureWithDataTable 메서드 호출 시작...");
+                var result = await ExecuteProcedureWithDataTable(databaseService, procedureName, dataTable);
+                
+                if (result)
+                {
+                    LogManagerService.LogInfo($"[{METHOD_NAME}] 3단계 완료: 프로시저 실행 성공");
+                    LogManagerService.LogInfo($"[{METHOD_NAME}] 프로시저 '{procedureName}' 실행 성공 - {dataTable.Rows.Count:N0}행 처리 완료");
+                }
+                else
+                {
+                    var errorMsg = $"프로시저 '{procedureName}' 실행 실패 - 데이터가 테이블에 삽입되지 않았습니다";
+                    LogManagerService.LogError($"[{METHOD_NAME}] 3단계 실패: {errorMsg}");
+                    
+                    // 프로시저 실행 실패 시 상세 오류 정보를 포함한 예외 발생
+                    throw new InvalidOperationException(errorMsg);
+                }
+
+                LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일을 프로시저로 전달하는 작업 완료");
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 최종 결과: {(result ? "성공" : "실패")}");
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 처리된 파일: {filePath}");
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 실행된 프로시저: {procedureName}");
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 처리된 데이터: {dataTable.Rows.Count:N0}행, {dataTable.Columns.Count}열");
+                
+                return result;
+            }
+            catch (FileNotFoundException ex)
+            {
+                var errorMsg = $"Excel 파일을 찾을 수 없습니다: {ex.Message}";
+                LogManagerService.LogError($"[{METHOD_NAME}] {errorMsg} - 파일: {filePath}");
+                throw;
+            }
+            catch (ArgumentException ex)
+            {
+                var errorMsg = $"잘못된 매개변수: {ex.Message}";
+                LogManagerService.LogError($"[{METHOD_NAME}] {errorMsg} - 설정키: {procedureConfigKey}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                var errorMsg = $"예상치 못한 오류 발생: {ex.Message}";
+                
+                // 상세 오류 정보를 로그에 기록
+                LogManagerService.LogError($"[{METHOD_NAME}] {errorMsg}");
+                LogManagerService.LogError($"[{METHOD_NAME}] 오류 상세: {ex.StackTrace}");
+                LogManagerService.LogError($"[{METHOD_NAME}] 파일 경로: {filePath}");
+                LogManagerService.LogError($"[{METHOD_NAME}] 프로시저 설정키: {procedureConfigKey}");
+                
+                throw new InvalidOperationException($"Excel 파일을 프로시저로 전달하는 중 오류가 발생했습니다: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// DatabaseService를 통해 프로시저를 실행하는 내부 메서드
+        /// 
+        /// 🎯 주요 기능:
+        /// - 지정된 프로시저명으로 프로시저 호출
+        /// - DataTable을 프로시저 파라미터로 전달
+        /// - 컬럼명은 자동으로 전달됨
+        /// - 비동기 실행으로 성능 최적화
+        /// 
+        /// 📋 처리 과정:
+        /// 1. 프로시저 실행 준비
+        /// 2. DataTable을 프로시저 파라미터로 전달
+        /// 3. 프로시저 실행 및 결과 확인
+        /// 4. 결과 반환 및 오류 처리
+        /// 
+        /// ⚠️ 주의사항:
+        /// - DataTable의 컬럼명은 자동으로 전달됨
+        /// - 프로시저에서 컬럼 구조를 동적으로 파악 가능
+        /// - 대량 데이터 처리 시 성능 고려 필요
+        /// </summary>
+        /// <param name="databaseService">데이터베이스 서비스 인스턴스</param>
+        /// <param name="procedureName">실행할 프로시저명</param>
+        /// <param name="dataTable">프로시저로 전달할 DataTable</param>
+        /// <returns>프로시저 실행 성공 여부</returns>
+        private async Task<bool> ExecuteProcedureWithDataTable(DatabaseService databaseService, string procedureName, DataTable dataTable)
+        {
+            try
+            {
+                Console.WriteLine($"🔄 프로시저 '{procedureName}' 실행 시작...");
+                Console.WriteLine($"📊 전달할 데이터: {dataTable.Rows.Count}행, {dataTable.Columns.Count}열");
+
+                // DataTable의 컬럼 정보 로깅 (디버깅용)
+                var columnNames = dataTable.Columns.Cast<DataColumn>().Select(c => c.ColumnName).ToArray();
+                Console.WriteLine($"📋 컬럼명 목록: {string.Join(", ", columnNames)}");
+
+                // 프로시저 실행 (DataTable을 파라미터로 전달)
+                // DatabaseService에서 DataTable을 프로시저 파라미터로 처리하는 메서드 호출
+                var result = await databaseService.ExecuteProcedureWithDataTableAsync(procedureName, dataTable);
+                
+                Console.WriteLine($"✅ 프로시저 '{procedureName}' 실행 완료 - 결과: {(result ? "성공" : "실패")}");
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ 프로시저 '{procedureName}' 실행 중 오류 발생: {ex.Message}");
+                Console.WriteLine($"📋 오류 상세: {ex.StackTrace}");
+                return false;
             }
         }
 

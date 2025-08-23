@@ -44,7 +44,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # 5. 게시
-Write-Host "📤 애플리케이션 게시 중..." -ForegroundColor Blue
+Write-Host "📤 프로그램 게시 중..." -ForegroundColor Blue
 $publishPath = "publish-$Environment"
 dotnet publish --configuration $Environment --runtime $Runtime --output $publishPath --no-build
 

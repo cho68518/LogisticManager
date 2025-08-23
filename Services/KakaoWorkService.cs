@@ -109,7 +109,7 @@ namespace LogisticManager.Services
             {
                 LogMessage($"❌ KakaoWorkService 초기화 오류: {ex.Message}");
                 LogMessage($"🔍 상세 오류: {ex}");
-                // 초기화 실패 시에도 기본값으로 설정하여 애플리케이션 시작은 가능하도록 함
+                // 초기화 실패 시에도 기본값으로 설정하여 프로그램 시작은 가능하도록 함
                 _httpClient = new HttpClient();
                 _chatroomIds = new Dictionary<NotificationType, string>();
                 LogMessage("⚠️ KakaoWorkService 기본값으로 초기화됨");
@@ -133,6 +133,14 @@ namespace LogisticManager.Services
             try
             {
                 LogMessage($"📤 KakaoWork 알림 전송 시작: {type} -> {batch}");
+
+                // KakaoCheck 설정 확인 - 'Y'인 경우에만 카카오워크 메시지 전송
+                string kakaoCheck = ConfigurationManager.AppSettings["KakaoCheck"] ?? "N";
+                if (kakaoCheck.ToUpper() != "Y")
+                {
+                    LogMessage($"⚠️ KakaoCheck 설정이 'Y'가 아닙니다 (현재: {kakaoCheck}). 카카오워크 메시지 전송을 건너뜁니다.");
+                    return; // 메시지 전송 없이 정상 종료
+                }
 
                 // KakaoWork API 키 확인
                 if (string.IsNullOrEmpty(_httpClient.DefaultRequestHeaders.Authorization?.Parameter))

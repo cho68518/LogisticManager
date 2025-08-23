@@ -109,7 +109,7 @@ namespace LogisticManager.Services
                     Console.WriteLine($"   {message}");
                 }
                 
-                // 필수값이 누락된 경우 애플리케이션 중단
+                // 필수값이 누락된 경우 프로그램 중단
                 throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
             }
             
@@ -126,7 +126,18 @@ namespace LogisticManager.Services
             // MappingService 인스턴스 생성
             _mappingService = new MappingService();
             
-
+            // 연결 문자열 로깅 (보안상 비밀번호는 마스킹)
+            var maskedPassword = password.Length > 2 ? password.Substring(0, 2) + "***" : "***";
+            var maskedConnectionString = _connectionString.Replace(password, maskedPassword);
+            Console.WriteLine($"🔗 연결 문자열: {maskedConnectionString}");
+            
+            // 현재 연결 정보 상세 로깅
+            Console.WriteLine($"📊 DatabaseService: 연결 정보 상세");
+            Console.WriteLine($"   서버: {server}");
+            Console.WriteLine($"   데이터베이스: {database}");
+            Console.WriteLine($"   사용자: {user}");
+            Console.WriteLine($"   포트: {port}");
+            Console.WriteLine($"   연결 문자열 길이: {_connectionString.Length}");
             
             Console.WriteLine("✅ DatabaseService 초기화 완료");
         }
@@ -221,7 +232,7 @@ namespace LogisticManager.Services
                         Console.WriteLine($"   {message}");
                     }
                     
-                    // 필수값이 누락된 경우 애플리케이션 중단
+                    // 필수값이 누락된 경우 프로그램 중단
                     Console.WriteLine("❌ 필수 설정값이 누락되었습니다.");
                     throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
                 }
@@ -986,7 +997,7 @@ namespace LogisticManager.Services
         /// 4. 연결 해제
         /// 
         /// 사용 목적:
-        /// - 애플리케이션 시작 시 연결 상태 확인
+        /// - 프로그램 시작 시 연결 상태 확인
         /// - 네트워크 연결 상태 확인
         /// - 데이터베이스 서버 상태 확인
         /// </summary>
@@ -1007,12 +1018,84 @@ namespace LogisticManager.Services
                 await command.ExecuteScalarAsync();
                 
                 Console.WriteLine("✅ DatabaseService: 쿼리 테스트 성공");
+                
+                // 연결 성공 시 현재 데이터베이스 정보 출력
+                var databaseName = connection.Database;
+                var serverVersion = connection.ServerVersion;
+                var dataSource = connection.DataSource;
+                
+                Console.WriteLine($"📊 DatabaseService: 연결 정보");
+                Console.WriteLine($"   데이터베이스: {databaseName}");
+                Console.WriteLine($"   서버 버전: {serverVersion}");
+                Console.WriteLine($"   데이터 소스: {dataSource}");
+                
+                // 현재 데이터베이스에서 CommonCode 테이블 존재 여부 확인
+                await CheckCommonCodeTableExistsAsync(connection);
+                
                 return true;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"❌ DatabaseService: 연결 테스트 실패: {ex.Message}");
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// 현재 연결된 데이터베이스에서 CommonCode 테이블 존재 여부를 확인하는 메서드
+        /// </summary>
+        /// <param name="connection">데이터베이스 연결</param>
+        private async Task CheckCommonCodeTableExistsAsync(MySqlConnection connection)
+        {
+            try
+            {
+                var checkTableQuery = @"
+                    SELECT COUNT(*) 
+                    FROM information_schema.tables 
+                    WHERE table_schema = DATABASE() 
+                    AND table_name = 'CommonCode'";
+                
+                using var command = new MySqlCommand(checkTableQuery, connection);
+                var result = await command.ExecuteScalarAsync();
+                var tableExists = Convert.ToInt32(result) > 0;
+                
+                Console.WriteLine($"🔍 DatabaseService: CommonCode 테이블 존재 여부: {tableExists}");
+                
+                if (tableExists)
+                {
+                    // 테이블이 존재하면 데이터 개수 확인
+                    var countQuery = "SELECT COUNT(*) FROM CommonCode";
+                    using var countCommand = new MySqlCommand(countQuery, connection);
+                    var dataCount = await countCommand.ExecuteScalarAsync();
+                    Console.WriteLine($"📊 DatabaseService: CommonCode 테이블 데이터 개수: {dataCount}");
+                    
+                    // 그룹코드별 데이터 개수 확인
+                    var groupCountQuery = @"
+                        SELECT GroupCode, COUNT(*) as Count 
+                        FROM CommonCode 
+                        GROUP BY GroupCode 
+                        ORDER BY GroupCode";
+                    
+                    using var groupCommand = new MySqlCommand(groupCountQuery, connection);
+                    using var reader = await groupCommand.ExecuteReaderAsync();
+                    
+                    Console.WriteLine("📋 DatabaseService: 그룹코드별 데이터 개수:");
+                    while (await reader.ReadAsync())
+                    {
+                        var groupCode = reader["GroupCode"].ToString();
+                        var count = reader["Count"];
+                        Console.WriteLine($"   {groupCode}: {count}개");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("⚠️ DatabaseService: CommonCode 테이블이 현재 데이터베이스에 존재하지 않습니다!");
+                    Console.WriteLine("   다른 데이터베이스나 스키마에 테이블이 있을 수 있습니다.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ DatabaseService: CommonCode 테이블 확인 중 오류: {ex.Message}");
             }
         }
 
@@ -1220,6 +1303,322 @@ namespace LogisticManager.Services
                 Console.WriteLine($"❌ DatabaseService: 데이터베이스 연결 객체 생성 실패 (비동기): {ex.Message}");
                 throw;
             }
+        }
+
+        #endregion
+
+        #region 프로시저 실행 (Procedure Execution)
+
+        /// <summary>
+        /// DataTable을 파라미터로 받아서 프로시저를 실행하는 비동기 메서드
+        /// 
+        /// 🎯 주요 기능:
+        /// - DataTable을 프로시저 파라미터로 전달
+        /// - 컬럼명은 자동으로 전달됨 (별도 전달 불필요)
+        /// - 비동기 실행으로 성능 최적화
+        /// - 대량 데이터 처리 지원
+        /// 
+        /// 📋 처리 과정:
+        /// 1. 데이터베이스 연결 생성
+        /// 2. 프로시저 실행 준비
+        /// 3. DataTable을 프로시저 파라미터로 전달
+        /// 4. 프로시저 실행 및 결과 확인
+        /// 5. 연결 해제 및 결과 반환
+        /// 
+        /// ⚠️ 주의사항:
+        /// - DataTable의 컬럼명은 자동으로 전달됨
+        /// - 프로시저에서 컬럼 구조를 동적으로 파악 가능
+        /// - 대량 데이터 처리 시 메모리 사용량 고려 필요
+        /// 
+        /// 💡 사용 예시:
+        /// ```csharp
+        /// var databaseService = new DatabaseService();
+        /// var result = await databaseService.ExecuteProcedureWithDataTableAsync(
+        ///     "sp_Excel_Proc1", 
+        ///     dataTable
+        /// );
+        /// ```
+        /// </summary>
+        /// <param name="procedureName">실행할 프로시저명</param>
+        /// <param name="dataTable">프로시저로 전달할 DataTable</param>
+        /// <returns>프로시저 실행 성공 여부</returns>
+        /// <exception cref="ArgumentNullException">프로시저명이나 DataTable이 null인 경우</exception>
+        /// <exception cref="InvalidOperationException">프로시저 실행 실패</exception>
+        public async Task<bool> ExecuteProcedureWithDataTableAsync(string procedureName, DataTable dataTable)
+        {
+            // 입력값 검증
+            if (string.IsNullOrWhiteSpace(procedureName))
+            {
+                throw new ArgumentNullException(nameof(procedureName), "프로시저명은 null이거나 빈 문자열일 수 없습니다.");
+            }
+
+            if (dataTable == null)
+            {
+                throw new ArgumentNullException(nameof(dataTable), "DataTable은 null일 수 없습니다.");
+            }
+
+            if (dataTable.Rows.Count == 0)
+            {
+                LogManagerService.LogWarning("DatabaseService: DataTable에 데이터가 없습니다. 프로시저 실행을 건너뜁니다.");
+                return true; // 데이터가 없어도 성공으로 처리
+            }
+
+            MySqlConnection? connection = null;
+            MySqlCommand? command = null;
+
+            try
+            {
+                LogManagerService.LogInfo($"DatabaseService: 프로시저 '{procedureName}' 실행 시작");
+                LogManagerService.LogInfo($"DatabaseService: 전달할 데이터: {dataTable.Rows.Count}행, {dataTable.Columns.Count}열");
+
+                // 데이터베이스 연결 생성
+                connection = await GetConnectionAsync();
+                await connection.OpenAsync();
+                LogManagerService.LogInfo("DatabaseService: 데이터베이스 연결 성공");
+                LogManagerService.LogInfo($"DatabaseService: 연결된 데이터베이스: {connection.Database}");
+                LogManagerService.LogInfo($"DatabaseService: 연결된 서버: {connection.ServerVersion}");
+
+                // 프로시저 실행 준비
+                LogManagerService.LogInfo($"DatabaseService: 프로시저 존재 여부 확인 시작");
+                
+                // MySqlCommand 인스턴스 초기화 (NullReference 방지)
+                command = new MySqlCommand()
+                {
+                    Connection = connection
+                };
+                
+                // 프로시저 존재 여부 확인
+                if (connection?.Database == null)
+                {
+                    throw new InvalidOperationException("데이터베이스 연결이 유효하지 않습니다.");
+                }
+                
+                var currentDbName = connection?.Database ?? "알 수 없음";
+                var checkProcedureSql = $@"
+                    SELECT COUNT(*) as procedure_count 
+                    FROM INFORMATION_SCHEMA.ROUTINES 
+                    WHERE ROUTINE_NAME = '{procedureName ?? "NULL"}' 
+                    AND ROUTINE_SCHEMA = '{currentDbName}'
+                    AND ROUTINE_TYPE = 'PROCEDURE'";
+                
+                command.CommandText = checkProcedureSql;
+                command.CommandType = CommandType.Text;
+                command.Parameters.Clear();
+                
+                var procedureExists = await command.ExecuteScalarAsync();
+                var procedureCount = Convert.ToInt32(procedureExists);
+                
+                LogManagerService.LogInfo($"DatabaseService: 프로시저 '{procedureName ?? "NULL"}' 존재 여부: {(procedureCount > 0 ? "존재" : "존재하지 않음")} ({procedureCount}개)");
+                
+                if (procedureCount == 0)
+                {
+                    throw new InvalidOperationException($"프로시저 '{procedureName}'이(가) 데이터베이스 '{currentDbName}'에 존재하지 않습니다.");
+                }
+                
+                LogManagerService.LogInfo($"DatabaseService: 프로시저 존재 확인 완료");
+
+                // DataTable을 프로시저 파라미터로 전달
+                // MySQL에서는 DataTable을 직접 파라미터로 전달할 수 없으므로
+                // 임시 테이블을 생성하고 데이터를 삽입한 후 프로시저를 호출하는 방식 사용
+                
+                // 1단계: 임시 테이블 생성
+                var tempTableName = $"temp_excel_data_{Guid.NewGuid().ToString("N")}";
+                var createTempTableSql = GenerateCreateTempTableSql(tempTableName, dataTable);
+                
+                command.CommandText = createTempTableSql;
+                await command.ExecuteNonQueryAsync();
+                LogManagerService.LogInfo($"DatabaseService: 임시 테이블 '{tempTableName}' 생성 완료");
+
+                // 2단계: 데이터 삽입
+                var insertDataSql = GenerateInsertDataSql(tempTableName, dataTable);
+                command.CommandText = insertDataSql;
+                
+                // 배치 처리로 데이터 삽입
+                var batchSize = 1000; // 배치 크기
+                var totalRows = dataTable.Rows.Count;
+                
+                for (int i = 0; i < totalRows; i += batchSize)
+                {
+                    var currentBatchSize = Math.Min(batchSize, totalRows - i);
+                    var batchSql = insertDataSql;
+                    
+                    // 배치별 파라미터 설정
+                    for (int j = 0; j < currentBatchSize; j++)
+                    {
+                        var rowIndex = i + j;
+                        var row = dataTable.Rows[rowIndex];
+                        
+                        for (int colIndex = 0; colIndex < dataTable.Columns.Count; colIndex++)
+                        {
+                            var columnName = dataTable.Columns[colIndex].ColumnName;
+                            var value = row[colIndex] ?? DBNull.Value;
+                            
+                            var parameterName = $"@p{rowIndex}_{colIndex}";
+                            command.Parameters.AddWithValue(parameterName, value);
+                        }
+                    }
+                    
+                    await command.ExecuteNonQueryAsync();
+                    LogManagerService.LogInfo($"DatabaseService: 배치 데이터 삽입 완료 - {i + 1}~{i + currentBatchSize}행 / 총 {totalRows}행");
+                }
+
+                // 3단계: 프로시저 호출 (임시 테이블명을 파라미터로 전달)
+                LogManagerService.LogInfo($"DatabaseService: 프로시저 호출 시작 - 프로시저명: {procedureName}");
+                LogManagerService.LogInfo($"DatabaseService: 임시 테이블명: {tempTableName}");
+                
+                // 프로시저 호출 방식 변경: CALL 문 사용
+                command.CommandText = $"CALL {procedureName}(@tempTableName)";
+                command.CommandType = CommandType.Text; // StoredProcedure 대신 Text 사용
+                command.Parameters.Clear();
+                command.Parameters.AddWithValue("@tempTableName", tempTableName);
+                
+                LogManagerService.LogInfo($"DatabaseService: 실행할 SQL: {command.CommandText}");
+                
+                var result = await command.ExecuteNonQueryAsync();
+                LogManagerService.LogInfo($"DatabaseService: 프로시저 '{procedureName}' 실행 완료 - 영향받은 행: {result}");
+
+                // 프로시저 실행 후 오류 정보 확인
+                var hasErrors = false;
+                var errorDetails = new List<string>();
+                
+                try
+                {
+                    // SHOW ERRORS 명령으로 오류 정보 확인
+                    command.CommandText = "SHOW ERRORS";
+                    command.Parameters.Clear();
+                    
+                    using (var errorReader = await command.ExecuteReaderAsync())
+                    {
+                        while (await errorReader.ReadAsync())
+                        {
+                            hasErrors = true;
+                            var level = errorReader["Level"]?.ToString() ?? "N/A";
+                            var code = errorReader["Code"]?.ToString() ?? "N/A";
+                            var message = errorReader["Message"]?.ToString() ?? "N/A";
+                            errorDetails.Add($"Level: {level}, Code: {code}, Message: {message}");
+                        }
+                    }
+                }
+                catch (Exception errorCheckEx)
+                {
+                    LogManagerService.LogWarning($"DatabaseService: SHOW ERRORS 실행 실패: {errorCheckEx.Message}");
+                }
+
+                // 오류가 발생한 경우 상세 정보 로깅 및 실패 반환
+                if (hasErrors)
+                {
+                    var errorMessage = $"프로시저 '{procedureName}' 실행 중 오류 발생:\n{string.Join("\n", errorDetails)}";
+                    LogManagerService.LogError($"DatabaseService: {errorMessage}");
+                    return false;
+                }
+
+                // 4단계: 임시 테이블 삭제
+                command.CommandText = $"DROP TEMPORARY TABLE IF EXISTS {tempTableName}";
+                await command.ExecuteNonQueryAsync();
+                LogManagerService.LogInfo($"DatabaseService: 임시 테이블 '{tempTableName}' 삭제 완료");
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                LogManagerService.LogError($"DatabaseService: 프로시저 '{procedureName}' 실행 중 오류 발생: {ex.Message}");
+                LogManagerService.LogError($"DatabaseService: 오류 상세: {ex.StackTrace}");
+                LogManagerService.LogError($"DatabaseService: 프로시저명: {procedureName}");
+                LogManagerService.LogError($"DatabaseService: 데이터 행수: {dataTable.Rows.Count}");
+                LogManagerService.LogError($"DatabaseService: 데이터 컬럼수: {dataTable.Columns.Count}");
+                LogManagerService.LogError($"DatabaseService: 첫 번째 컬럼명: {dataTable.Columns[0]?.ColumnName ?? "NULL"}");
+                LogManagerService.LogError($"DatabaseService: 마지막 컬럼명: {dataTable.Columns[dataTable.Columns.Count - 1]?.ColumnName ?? "NULL"}");
+                
+                // 내부 예외 정보도 로깅
+                if (ex.InnerException != null)
+                {
+                    LogManagerService.LogError($"DatabaseService: 내부 예외: {ex.InnerException.Message}");
+                    LogManagerService.LogError($"DatabaseService: 내부 예외 상세: {ex.InnerException.StackTrace}");
+                }
+                
+                return false;
+            }
+            finally
+            {
+                // 리소스 해제
+                command?.Dispose();
+                connection?.Dispose();
+                LogManagerService.LogInfo("DatabaseService: 데이터베이스 연결 및 명령 객체 해제 완료");
+            }
+        }
+
+        /// <summary>
+        /// 임시 테이블 생성을 위한 SQL 문을 생성하는 내부 메서드
+        /// </summary>
+        /// <param name="tempTableName">임시 테이블명</param>
+        /// <param name="dataTable">DataTable 구조</param>
+        /// <returns>CREATE TABLE SQL 문</returns>
+        private string GenerateCreateTempTableSql(string tempTableName, DataTable dataTable)
+        {
+            var columns = new List<string>();
+            
+            foreach (DataColumn column in dataTable.Columns)
+            {
+                var columnName = column.ColumnName;
+                var dataType = GetMySqlDataType(column.DataType);
+                columns.Add($"`{columnName}` {dataType}");
+            }
+            
+            var sql = $"CREATE TEMPORARY TABLE `{tempTableName}` (\n" +
+                     $"  {string.Join(",\n  ", columns)}\n" +
+                     ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+            
+            return sql;
+        }
+
+        /// <summary>
+        /// 데이터 삽입을 위한 SQL 문을 생성하는 내부 메서드
+        /// </summary>
+        /// <param name="tempTableName">임시 테이블명</param>
+        /// <param name="dataTable">DataTable 구조</param>
+        /// <returns>INSERT SQL 문</returns>
+        private string GenerateInsertDataSql(string tempTableName, DataTable dataTable)
+        {
+            var columnNames = dataTable.Columns.Cast<DataColumn>()
+                .Select(c => $"`{c.ColumnName}`")
+                .ToArray();
+            
+            var sql = $"INSERT INTO `{tempTableName}` ({string.Join(", ", columnNames)}) VALUES ";
+            
+            // 배치 처리를 위한 VALUES 절 생성
+            var valuesList = new List<string>();
+            for (int i = 0; i < dataTable.Rows.Count; i++)
+            {
+                var placeholders = dataTable.Columns.Cast<DataColumn>()
+                    .Select((c, colIndex) => $"@p{i}_{colIndex}")
+                    .ToArray();
+                valuesList.Add($"({string.Join(", ", placeholders)})");
+            }
+            
+            sql += string.Join(", ", valuesList);
+            
+            return sql;
+        }
+
+        /// <summary>
+        /// .NET 데이터 타입을 MySQL 데이터 타입으로 변환하는 내부 메서드
+        /// </summary>
+        /// <param name="dotNetType">.NET 데이터 타입</param>
+        /// <returns>MySQL 데이터 타입</returns>
+        private string GetMySqlDataType(Type dotNetType)
+        {
+            if (dotNetType == typeof(string))
+                return "TEXT";
+            else if (dotNetType == typeof(int) || dotNetType == typeof(long))
+                return "BIGINT";
+            else if (dotNetType == typeof(decimal) || dotNetType == typeof(double) || dotNetType == typeof(float))
+                return "DECIMAL(18,6)";
+            else if (dotNetType == typeof(DateTime))
+                return "DATETIME";
+            else if (dotNetType == typeof(bool))
+                return "TINYINT(1)";
+            else
+                return "TEXT"; // 기본값
         }
 
         #endregion

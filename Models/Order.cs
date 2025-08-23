@@ -599,7 +599,11 @@ namespace LogisticManager.Models
                     
                     // 🔧 수정: 실제 엑셀 컬럼명에 맞춘 매핑
                     // 주문번호 관련
-                    if (availableColumns.Any(c => c.Contains("주문번호")))
+                    // [주문번호 매핑] 엑셀 컬럼 중 '주문번호'가 포함된 컬럼이 있는지 확인
+                    // - '주문번호'는 송장출력_사방넷원본변환 테이블의 주요 식별자 역할을 함
+                    // - 컬럼명이 '주문번호'를 포함하는 경우에만 매핑을 진행
+                    // - 예외 상황(컬럼이 없을 때)은 아래에서 별도 처리
+                    if (availableColumns.Any(columnName => columnName.Contains("주문번호")))
                     {
                         var orderNumberCol = availableColumns.First(c => c.Contains("주문번호"));
                         order.OrderNumber = row[orderNumberCol]?.ToString() ?? string.Empty;
@@ -623,6 +627,7 @@ namespace LogisticManager.Models
                     }
                     
                     // 송장명/상품명 관련
+                    
                     if (availableColumns.Any(c => c.Contains("송장명") || c.Contains("상품명") || c.Contains("품목명") || c.Contains("제품명")))
                     {
                         var productCol = availableColumns.First(c => c.Contains("송장명") || c.Contains("상품명") || c.Contains("품목명") || c.Contains("제품명"));

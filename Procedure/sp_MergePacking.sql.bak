@@ -5,49 +5,103 @@ DROP PROCEDURE IF EXISTS sp_MergePacking$$
 CREATE PROCEDURE sp_MergePacking()
 BEGIN
     /*--================================================================================
-	-- 합포장 처리
-    -- 각 단계별 처리된 행의 수를 반환하도록 수정
+	-- 합포장 처리, 사방넷 원본 주문 데이터 기본변경 처리
     --================================================================================*/
-    -- DECLARE 문은 다른 실행문보다 항상 먼저 와야 합니다.
     DECLARE v_sqlstate CHAR(5);
     DECLARE v_error_no INT;
     DECLARE v_error_message TEXT;
 
-    -- 오류 발생 시 자동으로 롤백하고 상세한 오류 메시지를 반환하는 코드 블록
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
-        -- 발생한 오류의 상세 정보를 가져옵니다.
         GET DIAGNOSTICS CONDITION 1
             v_sqlstate = RETURNED_SQLSTATE,
             v_error_no = MYSQL_ERRNO,
             v_error_message = MESSAGE_TEXT;
 
-        -- 트랜잭션을 롤백합니다.
         ROLLBACK;
 
-        -- 임시 테이블이 존재하면 삭제합니다.
         DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
 
-        -- 상세한 오류 메시지를 반환합니다.
         SELECT CONCAT(
             'Error (SQLSTATE: ', v_sqlstate, ', Error No: ', v_error_no, '): ', v_error_message, 
             ' | The transaction was rolled back.'
         ) AS ErrorMessage;
     END;
 
-    -- DECLARE 문들이 모두 끝난 후 임시 테이블 생성 및 기타 로직을 시작합니다.
     CREATE TEMPORARY TABLE IF NOT EXISTS sp_execution_log (
 		StepID INT AUTO_INCREMENT PRIMARY KEY,
 		OperationDescription VARCHAR(255),
 		AffectedRows INT
 	);
 
-    -- 트랜잭션 시작
     START TRANSACTION;
 
-    -- 임시 로그 테이블 초기화
     TRUNCATE TABLE sp_execution_log;
 
+    /*--================================================================================
+	-- 1. 사방넷 원본 주문 데이터 기본변경 처리
+    --================================================================================*/
+    /*UPDATE 송장출력_사방넷원본변환
+       SET 주소 = CONCAT(주소, '*')
+     WHERE 품목코드 IN (7710, 7720);
+	 
+    UPDATE 송장출력_사방넷원본변환
+       SET 송장명 = CONCAT('GC_', SUBSTRING(송장명, 4))
+     WHERE LEFT(송장명, 3) = 'BS_';
+
+    UPDATE 송장출력_사방넷원본변환
+       SET 수취인명 = '난난'
+     WHERE 수취인명 = 'nan';
+
+    UPDATE 송장출력_사방넷원본변환
+       SET 주소 = REPLACE(주소, '·', '')
+     WHERE 주소 LIKE '%·%';
+
+    UPDATE 송장출력_사방넷원본변환
+       SET 결제수단 = '0'
+     WHERE 쇼핑몰 = '배민상회';*/
+	 
+    UPDATE 송장출력_사방넷원본변환
+    SET 
+        -- 각 컬럼에 대한 변경 조건을 CASE 문으로 정의
+        주소 = CASE
+                 -- 1. 주소에 '·'가 포함된 경우, 먼저 모두 제거
+                 WHEN 주소 LIKE '%·%' THEN 
+                     CASE
+                         -- 1-1. 품목코드 조건도 만족하면, '·' 제거 후 '*' 추가
+                         WHEN 품목코드 IN ('7710', '7720') THEN CONCAT(REPLACE(주소, '·', ''), '*')
+                         -- 1-2. 품목코드 조건은 만족하지 않으면, '·'만 제거
+                         ELSE REPLACE(주소, '·', '')
+                     END
+                 -- 2. '·'는 없지만, 품목코드 조건만 만족하는 경우 '*' 추가
+                 WHEN 품목코드 IN ('7710', '7720') THEN CONCAT(주소, '*')
+                 -- 3. 아무 조건도 만족하지 않으면 원래 값 유지
+                 ELSE 주소
+             END,
+        송장명 = CASE
+                    WHEN LEFT(송장명, 3) = 'BS_' THEN CONCAT('GC_', SUBSTRING(송장명, 4))
+                    ELSE 송장명
+                END,
+        수취인명 = CASE
+                     WHEN 수취인명 = 'nan' THEN '난난'
+                     ELSE 수취인명
+                 END,
+        결제수단 = CASE
+                     WHEN 쇼핑몰 = '배민상회' THEN '0'
+                     ELSE 결제수단
+                 END
+    WHERE
+        품목코드 IN ('7710', '7720')
+        OR LEFT(송장명, 3) = 'BS_'
+        OR 수취인명 = 'nan'
+        OR 주소 LIKE '%·%'
+        OR 쇼핑몰 = '배민상회';
+		
+
+		
+    /*--================================================================================
+	-- 2. 합포장 처리
+    --================================================================================*/
     -- 대체코드1이 있는 데이터 처리
     INSERT INTO 송장출력_사방넷원본변환 (
         msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
@@ -69,11 +123,12 @@ BEGIN
     FROM 송장출력_사방넷원본변환 dev
     JOIN 송장출력_특수출력_합포장변경 spec ON dev.품목코드 = spec.품목코드
     WHERE spec.대체코드1 IS NOT NULL AND spec.대체코드1 != '';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 대체코드1 처리', ROW_COUNT());
+    
+	INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] (합포장 처리) 대체코드1 처리', ROW_COUNT());
 
     -- 대체코드2가 있는 데이터 처리
     INSERT INTO 송장출력_사방넷원본변환 (
-        msg1, msg2, msg3, msg4, msg5, msg6, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
+        msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
         수량, 배송메세지, 주문번호, 쇼핑몰, 수집시간, 송장명, 
         품목코드, 옵션명, 박스크기, 출력개수, 송장수량, 
         별표1, 별표2, 품목개수, 택배수량, 택배수량1, 택배수량합산,
@@ -92,11 +147,12 @@ BEGIN
     FROM 송장출력_사방넷원본변환 dev
     JOIN 송장출력_특수출력_합포장변경 spec ON dev.품목코드 = spec.품목코드
     WHERE spec.대체코드2 IS NOT NULL AND spec.대체코드2 != '';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 대체코드2 처리', ROW_COUNT());
+    
+	INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] (합포장 처리) 대체코드2 처리', ROW_COUNT());
 
     -- 대체코드3이 있는 데이터 처리
     INSERT INTO 송장출력_사방넷원본변환 (
-        msg1, msg2, msg3, msg4, msg5, msg6, dev.수취인명, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
+        msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
         수량, 배송메세지, 주문번호, 쇼핑몰, 수집시간, 송장명, 
         품목코드, 옵션명, 박스크기, 출력개수, 송장수량, 
         별표1, 별표2, 품목개수, 택배수량, 택배수량1, 택배수량합산,
@@ -115,11 +171,12 @@ BEGIN
     FROM 송장출력_사방넷원본변환 dev
     JOIN 송장출력_특수출력_합포장변경 spec ON dev.품목코드 = spec.품목코드
     WHERE spec.대체코드3 IS NOT NULL AND spec.대체코드3 != '';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 대체코드3 처리', ROW_COUNT());
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] (합포장 처리) 대체코드3 처리', ROW_COUNT());
 
     -- 대체코드4가 있는 데이터 처리
     INSERT INTO 송장출력_사방넷원본변환 (
-        msg1, msg2, msg3, msg4, msg5, msg6, dev.수취인명, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
+        msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 택배비용, 전화번호1, 전화번호2, 우편번호, 주소,
         수량, 배송메세지, 주문번호, 쇼핑몰, 수집시간, 송장명, 
         품목코드, 옵션명, 박스크기, 출력개수, 송장수량, 
         별표1, 별표2, 품목개수, 택배수량, 택배수량1, 택배수량합산,
@@ -138,7 +195,7 @@ BEGIN
     FROM 송장출력_사방넷원본변환 dev
     JOIN 송장출력_특수출력_합포장변경 spec ON dev.품목코드 = spec.품목코드
     WHERE spec.대체코드4 IS NOT NULL AND spec.대체코드4 != '';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 대체코드4 처리', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] (합포장 처리) 대체코드4 처리', ROW_COUNT());
 
     /*--================================================================================
 	-- 합포장 해제 후 후속 처리
@@ -147,29 +204,29 @@ BEGIN
     UPDATE 송장출력_사방넷원본변환 dev
 	  JOIN 품목등록 p ON dev.품목코드 = p.품목코드 
 	   SET dev.위치 = p.품목그룹2코드;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 품목 위치 정보 업데이트', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (합포장 처리) 품목 위치 정보 업데이트', ROW_COUNT());
 
     -- 택배 박스/낱개 구분
     UPDATE 송장출력_사방넷원본변환
 	   SET 택배수량1 = CASE WHEN CAST(택배수량 AS UNSIGNED) = 1 THEN '박스' ELSE '낱개' END 
 	 WHERE 택배수량 REGEXP '^[0-9]+$';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 택배 박스/낱개 구분', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (합포장 처리) 택배 박스/낱개 구분', ROW_COUNT());
 
     -- 출력개수, 택배비용 등 기본값 설정
     UPDATE 송장출력_사방넷원본변환
-       SET 택배비용 = IFNULL(택배비용, 2150), 
+       SET 택배비용 = IFNULL(택배비용, '2150'), 
            박스크기 = IFNULL(박스크기, '극소'), 
            출력개수 = IFNULL(출력개수, 1)
      WHERE 품목코드 IN (SELECT 대체코드1 FROM 송장출력_특수출력_합포장변경 WHERE 대체코드1 IS NOT NULL AND 대체코드1 != ''
                       UNION SELECT 대체코드2 FROM 송장출력_특수출력_합포장변경 WHERE 대체코드2 IS NOT NULL AND 대체코드2 != ''
                       UNION SELECT 대체코드3 FROM 송장출력_특수출력_합포장변경 WHERE 대체코드3 IS NOT NULL AND 대체코드3 != ''
                       UNION SELECT 대체코드4 FROM 송장출력_특수출력_합포장변경 WHERE 대체코드4 IS NOT NULL AND 대체코드4 != '');
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] 새로 추가된 품목 기본값 설정', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (합포장 처리) 새로 추가된 품목 기본값 설정', ROW_COUNT());
 
     -- 원본 합포장 주문 데이터를 삭제
     DELETE FROM 송장출력_사방넷원본변환
     WHERE 품목코드 IN (SELECT 품목코드 FROM 송장출력_특수출력_합포장변경);
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[DELETE] 원본 합포장 데이터(송장출력_사방넷원본변환) 삭제', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[DELETE] (합포장 처리) 원본 합포장 데이터(송장출력_사방넷원본변환) 삭제', ROW_COUNT());
     
     -- 작업 완료 후 커밋
     COMMIT;

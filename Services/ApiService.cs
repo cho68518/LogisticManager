@@ -57,6 +57,14 @@ namespace LogisticManager.Services
         {
             try
             {
+                // KakaoCheck 설정 확인 - 'Y'인 경우에만 카카오워크 메시지 전송
+                string kakaoCheck = ConfigurationManager.AppSettings["KakaoCheck"] ?? "N";
+                if (kakaoCheck.ToUpper() != "Y")
+                {
+                    LogManagerService.LogInfo($"⚠️ KakaoCheck 설정이 'Y'가 아닙니다 (현재: {kakaoCheck}). 카카오워크 메시지 전송을 건너뜁니다.");
+                    return true; // 메시지 전송 없이 정상 종료
+                }
+
                 var requestData = new
                 {
                     bot_key = _kakaoWorkApiKey,

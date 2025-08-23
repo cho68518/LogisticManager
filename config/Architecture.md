@@ -18,7 +18,7 @@
 ## 🎯 시스템 개요
 
 ### 📊 비즈니스 도메인
-**LogisticManager**는 전사 물류 관리 시스템의 핵심 송장 처리 자동화 애플리케이션입니다.
+**LogisticManager**는 전사 물류 관리 시스템의 핵심 송장 처리 자동화 프로그램입니다.
 
 - **주요 기능**: Excel 파일 기반 송장 데이터 처리 및 출고지별 분류
 - **처리 규모**: 수만 건 이상의 대용량 데이터 처리
@@ -743,7 +743,7 @@ LogisticManager/
 ├── settings.json                # 설정 파일
 ├── table_mappings.json          # 테이블 매핑 설정
 ├── column_mapping.json          # 컬럼 매핑 설정
-├── App.config                   # 애플리케이션 설정
+├── App.config                   # 프로그램 설정
 └── logs/                        # 로그 디렉토리
     └── app.log
 ```

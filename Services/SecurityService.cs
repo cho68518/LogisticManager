@@ -433,7 +433,7 @@ namespace LogisticManager.Services
                         Console.WriteLine($"   {message}");
                     }
                     
-                    // 필수값이 누락된 경우 애플리케이션 중단
+                    // 필수값이 누락된 경우 프로그램 중단
                     throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
                 }
                 

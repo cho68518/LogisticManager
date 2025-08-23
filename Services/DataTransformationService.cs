@@ -258,33 +258,33 @@ namespace LogisticManager.Services
                 }
             }
 
-            // 전화번호1 변환
-            if (dataTable.Columns.Contains("전화번호1"))
-            {
-                var originalValue = row["전화번호1"]?.ToString() ?? string.Empty;
-                var transformedValue = NormalizePhoneNumber(originalValue);
-                
-                if (originalValue != transformedValue)
-                {
-                    row["전화번호1"] = transformedValue;
-                    hasChanges = true;
-                    Console.WriteLine($"📞 [행{rowNumber}] 전화번호1 변환: '{originalValue}' → '{transformedValue}'");
-                }
-            }
+            // 전화번호1 변환 - 정규화 제거하여 원본 값 그대로 처리
+            // if (dataTable.Columns.Contains("전화번호1"))
+            // {
+            //     var originalValue = row["전화번호1"]?.ToString() ?? string.Empty;
+            //     var transformedValue = NormalizePhoneNumber(originalValue);
+            //     
+            //     if (originalValue != transformedValue)
+            //     {
+            //         row["전화번호1"] = transformedValue;
+            //         hasChanges = true;
+            //         Console.WriteLine($"📞 [행{rowNumber}] 전화번호1 변환: '{originalValue}' → '{transformedValue}'");
+            //     }
+            // }
 
-            // 전화번호2 변환
-            if (dataTable.Columns.Contains("전화번호2"))
-            {
-                var originalValue = row["전화번호2"]?.ToString() ?? string.Empty;
-                var transformedValue = NormalizePhoneNumber(originalValue);
-                
-                if (originalValue != transformedValue)
-                {
-                    row["전화번호2"] = transformedValue;
-                    hasChanges = true;
-                    Console.WriteLine($"📞 [행{rowNumber}] 전화번호2 변환: '{originalValue}' → '{transformedValue}'");
-                }
-            }
+            // 전화번호2 변환 - 정규화 제거하여 원본 값 그대로 처리
+            // if (dataTable.Columns.Contains("전화번호2"))
+            // {
+            //     var originalValue = row["전화번호2"]?.ToString() ?? string.Empty;
+            //     var transformedValue = NormalizePhoneNumber(originalValue);
+            //     
+            //     if (originalValue != transformedValue)
+            //     {
+            //         row["전화번호2"] = transformedValue;
+            //         hasChanges = true;
+            //         Console.WriteLine($"📞 [행{rowNumber}] 전화번호2 변환: '{originalValue}' → '{transformedValue}'");
+            //     }
+            // }
 
             // 우편번호 변환
             if (dataTable.Columns.Contains("우편번호"))
@@ -511,7 +511,7 @@ namespace LogisticManager.Services
         }
 
         /// <summary>
-        /// 전화번호 정규화 메서드
+        /// 전화번호 정규화 메서드 (사용하지 않음 - 원본 값 그대로 처리)
         /// 
         /// 🎯 주요 기능:
         /// - 다양한 형식의 전화번호를 표준 형식으로 변환
@@ -540,11 +540,18 @@ namespace LogisticManager.Services
         /// - 연락처 정보의 일관성 확보
         /// - 시스템 간 데이터 호환성 향상
         /// - 사용자 입력 오류 보정
+        /// 
+        /// 🚫 현재 상태: 전화번호 정규화를 사용하지 않음 (원본 값 그대로 처리)
         /// </summary>
         /// <param name="phoneNumber">정규화할 전화번호</param>
         /// <returns>정규화된 전화번호</returns>
         private string NormalizePhoneNumber(string phoneNumber)
         {
+            // 전화번호 정규화를 사용하지 않음 - 원본 값 그대로 반환
+            return phoneNumber;
+            
+            // 기존 정규화 로직 (주석 처리)
+            /*
             if (string.IsNullOrWhiteSpace(phoneNumber))
             {
                 return string.Empty;
@@ -570,6 +577,7 @@ namespace LogisticManager.Services
                 Console.WriteLine($"⚠️ [DataTransformationService] 전화번호 변환 실패: {phoneNumber} - {ex.Message}");
                 return phoneNumber; // 변환 실패 시 원본 반환
             }
+            */
         }
 
         /// <summary>

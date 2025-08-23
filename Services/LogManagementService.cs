@@ -90,7 +90,7 @@ namespace LogisticManager.Services
             }
             catch (Exception ex)
             {
-                // 로그 관리 중 오류가 발생해도 애플리케이션에 영향을 주지 않도록 처리
+                // 로그 관리 중 오류가 발생해도 프로그램에 영향을 주지 않도록 처리
                 Console.WriteLine($"[LogManagementService] 로그 파일 크기 체크 중 오류 발생: {ex.Message}");
             }
         }
@@ -188,7 +188,7 @@ namespace LogisticManager.Services
         /// - 스레드 안전한 로그 기록
         /// 
         /// 💡 사용 목적:
-        /// - 애플리케이션 동작 로그 기록
+        /// - 프로그램 동작 로그 기록
         /// - 오류 추적 및 디버깅
         /// - 시스템 모니터링
         /// </summary>
@@ -212,7 +212,7 @@ namespace LogisticManager.Services
             }
             catch (Exception ex)
             {
-                // 로그 기록 중 오류가 발생해도 애플리케이션에 영향을 주지 않도록 처리
+                // 로그 기록 중 오류가 발생해도 프로그램에 영향을 주지 않도록 처리
                 Console.WriteLine($"[LogManagementService] 로그 메시지 기록 중 오류 발생: {ex.Message}");
             }
         }
@@ -258,7 +258,7 @@ namespace LogisticManager.Services
         {
             Console.WriteLine("📁 로그 파일 경로 정보:");
             Console.WriteLine($"   현재 작업 디렉토리: {Environment.CurrentDirectory}");
-            Console.WriteLine($"   애플리케이션 기본 디렉토리: {AppDomain.CurrentDomain.BaseDirectory}");
+            Console.WriteLine($"   프로그램 기본 디렉토리: {AppDomain.CurrentDomain.BaseDirectory}");
             Console.WriteLine($"   프로젝트 루트 디렉토리: {Path.GetDirectoryName(Path.GetDirectoryName(Path.GetDirectoryName(AppDomain.CurrentDomain.BaseDirectory)))}");
             Console.WriteLine($"   최종 로그 파일 경로: {_logFilePath}");
         }

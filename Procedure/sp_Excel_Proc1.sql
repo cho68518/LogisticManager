@@ -1,0 +1,106 @@
+DELIMITER $$
+
+DROP PROCEDURE IF EXISTS sp_Excel_Proc1$$
+
+CREATE PROCEDURE sp_Excel_Proc1(IN tempTableName VARCHAR(255))
+BEGIN
+    /*--================================================================================
+    -- 엑셀 업로드 데이터 처리
+	--    사방넷 주문원본 엑셀파일을 읽어서 테이블 Insert
+    --================================================================================*/
+    DECLARE v_total_rows INT DEFAULT 0;
+    DECLARE v_inserted_rows INT DEFAULT 0;
+    
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        
+        SET @dropSql = CONCAT('DROP TEMPORARY TABLE IF EXISTS ', tempTableName);
+        PREPARE stmt FROM @dropSql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+        
+        SELECT '오류가 발생하여 작업이 롤백되었습니다. 아래는 오류 상세 정보입니다.' AS Message;
+        SHOW ERRORS;
+    END;
+    
+    START TRANSACTION;
+
+	TRUNCATE TABLE 송장출력_사방넷원본변환;
+	
+    -- 임시 테이블의 총 데이터 건수 확인
+    SET @countSql = CONCAT('SELECT COUNT(*) INTO @total_rows FROM ', tempTableName);
+    PREPARE stmt FROM @countSql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+    SET v_total_rows = @total_rows;
+
+    SET @processSql = CONCAT('
+        INSERT INTO 송장출력_사방넷원본변환 (
+            수취인명, 전화번호1, 전화번호2, 우편번호, 주소, 옵션명, 수량, 배송메세지, 
+            주문번호, 쇼핑몰, 수집시간, 송장명, 품목코드, 택배비용, 박스크기, 출력개수, 송장수량, 별표1, 별표2, 품목개수, 
+            택배수량, 택배수량1, 택배수량합산, 송장구분자, 송장구분, 송장구분최종, 위치, 위치변환,
+            `주문번호(쇼핑몰)`, 결제금액, 주문금액, 결제수단, 면과세구분, 주문상태, 배송송
+        )
+        SELECT 
+            수취인명,
+            전화번호1,
+            전화번호2,
+            우편번호,
+            주소,
+            옵션명,
+            CASE WHEN 수량 REGEXP ''^[0-9]+$'' THEN CAST(수량 AS SIGNED) ELSE 0 END,
+            배송메세지,
+            주문번호,
+            쇼핑몰,
+            수집시간,
+            송장명,
+            품목코드,
+            NULL, -- 택배비용
+			NULL, -- 박스크기
+			NULL, -- 출력개수
+			NULL, -- 송장수량
+			NULL, -- 별표1
+			NULL, -- 별표2
+			NULL, -- 품목개수
+			NULL, -- 택배수량
+			NULL, -- 택배수량1
+			NULL, -- 택배수량합산
+			NULL, -- 송장구분자
+			NULL, -- 송장구분
+			NULL, -- 송장구분최종
+			NULL, -- 위치
+			NULL, -- 위치변환
+			`주문번호(쇼핑몰)`,
+			결제금액,
+			주문금액,
+			결제수단,
+			면과세구분,
+			주문상태,
+			배송송
+        FROM ', tempTableName, '
+        -- WHERE 주문번호 IS NOT NULL AND 주문번호 != ''''
+    ');
+    
+    PREPARE stmt FROM @processSql;
+    EXECUTE stmt;
+    SET v_inserted_rows = ROW_COUNT();
+    DEALLOCATE PREPARE stmt;
+
+    COMMIT;
+    
+    SELECT 
+        '성공' AS 결과,
+        v_total_rows AS 총데이터건수,
+        v_inserted_rows AS 처리성공건수,
+        (v_total_rows - v_inserted_rows) AS 처리실패건수,
+        NOW() AS 완료시간;
+        
+    SET @dropSql = CONCAT('DROP TEMPORARY TABLE IF EXISTS ', tempTableName);
+    PREPARE stmt FROM @dropSql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+    
+END$$
+
+DELIMITER ;

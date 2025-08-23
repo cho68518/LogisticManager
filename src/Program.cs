@@ -5,16 +5,16 @@ using System.Text;
 namespace LogisticManager
 {
     /// <summary>
-    /// 송장 처리 자동화 애플리케이션의 진입점
+    /// 송장 처리 자동화 프로그램의 진입점
     /// 
     /// 주요 기능:
-    /// - 애플리케이션 초기화 및 설정
+    /// - 프로그램 초기화 및 설정
     /// - 데이터베이스 연결 테스트
-    /// - Windows Forms 애플리케이션 실행
+    /// - Windows Forms 프로그램 실행
     /// - 오류 처리 및 로깅
     /// 
     /// 실행 과정:
-    /// 1. 애플리케이션 시작 로그 기록
+    /// 1. 프로그램 시작 로그 기록
     /// 2. Windows Forms 설정
     /// 3. 설정 파일 리소스에서 로드
     /// 4. 데이터베이스 연결 테스트 (선택사항)
@@ -22,14 +22,14 @@ namespace LogisticManager
     /// 6. 오류 발생 시 사용자에게 알림
     /// 
     /// 오류 처리:
-    /// - 데이터베이스 연결 실패: 애플리케이션 계속 실행
+    /// - 데이터베이스 연결 실패: 프로그램 계속 실행
     /// - 폼 실행 실패: 치명적 오류로 처리
     /// - 예상치 못한 오류: 사용자에게 메시지 표시
     /// </summary>
     internal static class Program
     {
         /// <summary>
-        /// 애플리케이션의 메인 진입점
+        /// 프로그램의 메인 진입점
         /// 
         /// 실행 순서:
         /// 1. 로그 파일 초기화
@@ -40,7 +40,7 @@ namespace LogisticManager
         /// 6. 오류 처리
         /// 
         /// 특별한 설정:
-        /// - [STAThread]: Windows Forms 애플리케이션에 필요한 스레드 모델 설정
+        /// - [STAThread]: Windows Forms 프로그램에 필요한 스레드 모델 설정
         /// - Application.EnableVisualStyles(): 시각적 스타일 활성화
         /// - Application.SetCompatibleTextRenderingDefault(false): 텍스트 렌더링 호환성 설정
         /// </summary>
@@ -50,13 +50,13 @@ namespace LogisticManager
             // 로그 파일 경로 정보 출력
             LogPathManager.PrintLogPathInfo();
             LogPathManager.ValidateLogFileLocations();
-            LogManagerService.LogInfo($"=== 애플리케이션 시작: {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
+            LogManagerService.LogInfo($"=== 프로그램 시작: {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===");
             
             try
             {
-                LogManagerService.LogInfo("🔍 Program.Main: 애플리케이션 시작");
+                LogManagerService.LogInfo("🔍 Program.Main: 프로그램 시작");
                 
-                // Windows Forms 애플리케이션 설정
+                // Windows Forms 프로그램 설정
                 LogManagerService.LogInfo("🔍 Program.Main: Windows Forms 설정 시작");
                 Application.EnableVisualStyles(); // 시각적 스타일 활성화
                 Application.SetCompatibleTextRenderingDefault(false); // 텍스트 렌더링 호환성 설정
@@ -85,9 +85,9 @@ namespace LogisticManager
                         LogManagerService.LogError($"🔍 Program.Main: DB 내부 예외: {dbEx.InnerException.Message}");
                     }
                     
-                    // 데이터베이스 연결 실패해도 애플리케이션은 계속 실행
+                    // 데이터베이스 연결 실패해도 프로그램은 계속 실행
                     // (데이터베이스 기능이 선택사항이므로)
-                    LogManagerService.LogWarning("⚠️ Program.Main: 데이터베이스 연결 실패했지만 애플리케이션을 계속 실행합니다.");
+                    LogManagerService.LogWarning("⚠️ Program.Main: 데이터베이스 연결 실패했지만 프로그램을 계속 실행합니다.");
                 }
 
                 // 매핑 정보 출력
@@ -141,7 +141,7 @@ namespace LogisticManager
                 LogManagerService.LogError($"🔍 Program.Main: 치명적 예외 상세: {ex}");
                 
                 // 사용자에게 오류 메시지 표시
-                MessageBox.Show($"애플리케이션 실행 중 오류가 발생했습니다.\n{ex.Message}", 
+                MessageBox.Show($"프로그램 실행 중 오류가 발생했습니다.\n{ex.Message}", 
                     "치명적 오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

@@ -1,6 +1,6 @@
-# 📦 송장 처리 자동화 시스템 (LogisticManager)
+# 📦 송장 처리 시스템 (LogisticManager)
 
-사방넷 주문 엑셀 파일을 입력받아 데이터를 가공/분류하고, 출고지별 최종 송장 엑셀 파일을 생성한 후, Dropbox 업로드 및 카카오워크 알림을 보내는 데스크톱 애플리케이션입니다.
+사방넷 주문 엑셀 파일을 입력받아 데이터를 가공/분류하고, 출고지별 최종 송장 엑셀 파일을 생성한 후, Dropbox 업로드 및 카카오워크 알림을 보내는 데스크톱 프로그램입니다.
 
 ## 🎯 주요 기능
 
@@ -54,7 +54,7 @@ dotnet restore
 # 프로젝트 빌드
 dotnet build
 
-# 애플리케이션 실행
+# 프로그램 실행
 dotnet run
 ```
 
@@ -129,7 +129,7 @@ dotnet run
 
 ## 🎯 사용법
 
-### 1. 애플리케이션 실행
+### 1. 프로그램 실행
 
 ```bash
 dotnet run
@@ -188,7 +188,7 @@ LogisticManager/
 ├── App.config                      # 설정 파일
 ├── settings.json                   # 데이터베이스 설정 파일
 ├── column_mapping.json             # 컬럼 매핑 설정 파일
-├── Program.cs                      # 애플리케이션 진입점 (상세한 오류 처리)
+├── Program.cs                      # 프로그램 진입점 (상세한 오류 처리)
 ├── DatabaseTest.cs                 # 데이터베이스 연결 테스트
 └── README.md                       # 프로젝트 설명서
 ```

@@ -16,7 +16,7 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     
-    <!-- 애플리케이션 정보 -->
+    <!-- 프로그램 정보 -->
     <AssemblyTitle>LogisticManager</AssemblyTitle>
     <AssemblyDescription>물류 관리 시스템</AssemblyDescription>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
@@ -36,6 +36,9 @@
     
     <!-- 설정 파일 읽기 -->
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="8.0.0" />
+    
+    <!-- Visual Basic 상호운용성 (InputBox 등) -->
+    <PackageReference Include="Microsoft.VisualBasic" Version="10.3.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -14,7 +14,7 @@ namespace LogisticManager.Constants
         #region 필수 설정 검증 메시지
 
         /// <summary>
-        /// 필수 설정값 누락 시 표시할 메시지 (애플리케이션 중단)
+        /// 필수 설정값 누락 시 표시할 메시지 (프로그램 중단)
         /// </summary>
         public const string ERROR_MISSING_REQUIRED_SETTINGS = 
             "❌ 필수 설정값이 누락되었습니다.\n\n" +
@@ -24,7 +24,7 @@ namespace LogisticManager.Constants
             "• DB_USER: 데이터베이스 사용자명\n" +
             "• DB_PASSWORD: 데이터베이스 비밀번호\n" +
             "• DB_PORT: 데이터베이스 포트\n\n" +
-            "애플리케이션을 시작할 수 없습니다.\n" +
+            "프로그램을 시작할 수 없습니다.\n" +
             "올바른 설정 파일을 생성한 후 다시 시도해주세요.";
         
         /// <summary>
@@ -40,7 +40,7 @@ namespace LogisticManager.Constants
             "  \"DB_PASSWORD\": \"your-password\",\n" +
             "  \"DB_PORT\": \"3306\"\n" +
             "}\n\n" +
-            "파일 생성 후 애플리케이션을 다시 시작해주세요.";
+            "파일 생성 후 프로그램을 다시 시작해주세요.";
 
         #endregion
 
