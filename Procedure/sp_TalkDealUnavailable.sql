@@ -43,10 +43,8 @@ BEGIN
 	
     START TRANSACTION;
 
-	-- 임시 로그 테이블 초기화
     TRUNCATE TABLE sp_execution_log;
 	
-	-- Target 주소를 담을 임시테이블
 	CREATE TEMPORARY TABLE IF NOT EXISTS _target_addr (
 		주소 VARCHAR(255)
 	  ) ENGINE=Memory;

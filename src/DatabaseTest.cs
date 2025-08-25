@@ -121,7 +121,7 @@ namespace LogisticManager
                     throw new InvalidOperationException("설정 파일이 비어있습니다.");
                 }
                 
-                LogManagerService.LogInfo($"📄 DatabaseTest: settings.json 파일 내용: {jsonContent}");  
+                //LogManagerService.LogInfo($"📄 DatabaseTest: settings.json 파일 내용: {jsonContent}");  
                 
                 var settings = JsonConvert.DeserializeObject<Dictionary<string, string>>(jsonContent);
                 if (settings == null)

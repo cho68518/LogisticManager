@@ -37,13 +37,13 @@ namespace LogisticManager.Repositories
                 
                 // 먼저 테이블 존재 여부와 데이터 개수를 확인
                 var checkQuery = "SELECT COUNT(*) FROM CommonCode";
-                LogManagerService.LogInfo($"데이터 개수 확인 쿼리: {checkQuery}");
+                //LogManagerService.LogInfo($"데이터 개수 확인 쿼리: {checkQuery}");
                 
                 using var countCommand = new MySqlConnector.MySqlCommand(checkQuery, connection);
                 var countResult = await countCommand.ExecuteScalarAsync();
                 var totalCount = Convert.ToInt32(countResult);
                 
-                LogManagerService.LogInfo($"CommonCode 테이블 총 데이터 개수: {totalCount}");
+                //LogManagerService.LogInfo($"CommonCode 테이블 총 데이터 개수: {totalCount}");
 
                 if (totalCount == 0)
                 {
@@ -56,7 +56,7 @@ namespace LogisticManager.Repositories
                     FROM CommonCode 
                     ORDER BY GroupCode";
                 
-                LogManagerService.LogInfo($"그룹코드 조회 쿼리: {query}");
+                //LogManagerService.LogInfo($"그룹코드 조회 쿼리: {query}");
 
                 using var command = new MySqlConnector.MySqlCommand(query, connection);
                 using var reader = await command.ExecuteReaderAsync();
@@ -69,18 +69,18 @@ namespace LogisticManager.Repositories
                     var groupCode = reader["GroupCode"].ToString() ?? string.Empty;
                     groupCodes.Add(groupCode);
                     rowCount++;
-                    LogManagerService.LogInfo($"그룹코드 조회: '{groupCode}' (길이: {groupCode.Length})");
+                    //LogManagerService.LogInfo($"그룹코드 조회: '{groupCode}' (길이: {groupCode.Length})");
                 }
 
-                LogManagerService.LogInfo($"쿼리 실행 결과: {rowCount}개 행 반환됨");
-                LogManagerService.LogInfo($"총 {groupCodes.Count}개의 그룹코드 조회됨: [{string.Join(", ", groupCodes)}]");
-                LogManagerService.LogInfo("=== GetAllGroupCodesAsync 완료 ===");
+                //LogManagerService.LogInfo($"쿼리 실행 결과: {rowCount}개 행 반환됨");
+                //LogManagerService.LogInfo($"총 {groupCodes.Count}개의 그룹코드 조회됨: [{string.Join(", ", groupCodes)}]");
+                //LogManagerService.LogInfo("=== GetAllGroupCodesAsync 완료 ===");
                 return groupCodes;
             }
             catch (Exception ex)
             {
-                LogManagerService.LogError($"공통코드 그룹코드 조회 중 오류 발생: {ex.Message}");
-                LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
+                //LogManagerService.LogError($"공통코드 그룹코드 조회 중 오류 발생: {ex.Message}");
+                //LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
                 throw;
             }
         }
@@ -94,7 +94,7 @@ namespace LogisticManager.Repositories
         {
             try
             {
-                LogManagerService.LogInfo($"=== GetCommonCodesByGroupAsync 시작 - 그룹코드: '{groupCode}' ===");
+                //LogManagerService.LogInfo($"=== GetCommonCodesByGroupAsync 시작 - 그룹코드: '{groupCode}' ===");
 
                 // 단일 연결을 사용하여 모든 쿼리를 실행
                 using var connection = await _databaseService.GetConnectionAsync();
@@ -103,18 +103,18 @@ namespace LogisticManager.Repositories
                 // 먼저 해당 그룹의 데이터 개수 확인
                 var countQuery = "SELECT COUNT(*) FROM CommonCode WHERE GroupCode = @GroupCode";
                 
-                LogManagerService.LogInfo($"데이터 개수 확인 쿼리: {countQuery.Replace("@GroupCode", $"'{groupCode}'")}");
+                //LogManagerService.LogInfo($"데이터 개수 확인 쿼리: {countQuery.Replace("@GroupCode", $"'{groupCode}'")}");
                 
                 using var countCommand = new MySqlConnector.MySqlCommand(countQuery, connection);
                 countCommand.Parameters.Add(new MySqlConnector.MySqlParameter("@GroupCode", groupCode));
                 var countResult = await countCommand.ExecuteScalarAsync();
                 var groupCount = Convert.ToInt32(countResult);
                 
-                LogManagerService.LogInfo($"그룹코드 '{groupCode}'의 데이터 개수: {groupCount}");
+                //LogManagerService.LogInfo($"그룹코드 '{groupCode}'의 데이터 개수: {groupCount}");
 
                 if (groupCount == 0)
                 {
-                    LogManagerService.LogWarning($"그룹코드 '{groupCode}'에 데이터가 없습니다!");
+                    //LogManagerService.LogWarning($"그룹코드 '{groupCode}'에 데이터가 없습니다!");
                     return new List<CommonCode>();
                 }
 
@@ -126,7 +126,7 @@ namespace LogisticManager.Repositories
                     WHERE GroupCode = @GroupCode 
                     ORDER BY SortOrder, Code";
 
-                LogManagerService.LogInfo($"상세 조회 쿼리: {query.Replace("@GroupCode", $"'{groupCode}'")}");
+                //LogManagerService.LogInfo($"상세 조회 쿼리: {query.Replace("@GroupCode", $"'{groupCode}'")}");
                 
                 using var command = new MySqlConnector.MySqlCommand(query, connection);
                 command.Parameters.Add(new MySqlConnector.MySqlParameter("@GroupCode", groupCode));
@@ -138,12 +138,12 @@ namespace LogisticManager.Repositories
                 while (await reader.ReadAsync())
                 {
                     rowCount++;
-                    LogManagerService.LogInfo($"=== 행 데이터 처리 시작 (행 {rowCount}) ===");
+                    //LogManagerService.LogInfo($"=== 행 데이터 처리 시작 (행 {rowCount}) ===");
                     
                     // 원본 데이터 로깅
-                    LogManagerService.LogInfo($"원본 GroupCode: '{reader["GroupCode"]}' (타입: {reader["GroupCode"]?.GetType().Name})");
-                    LogManagerService.LogInfo($"원본 Code: '{reader["Code"]}' (타입: {reader["Code"]?.GetType().Name})");
-                    LogManagerService.LogInfo($"원본 CodeName: '{reader["CodeName"]}' (타입: {reader["CodeName"]?.GetType().Name})");
+                    //LogManagerService.LogInfo($"원본 GroupCode: '{reader["GroupCode"]}' (타입: {reader["GroupCode"]?.GetType().Name})");
+                    //LogManagerService.LogInfo($"원본 Code: '{reader["Code"]}' (타입: {reader["Code"]?.GetType().Name})");
+                    //LogManagerService.LogInfo($"원본 CodeName: '{reader["CodeName"]}' (타입: {reader["CodeName"]?.GetType().Name})");
                     
                     var commonCode = new CommonCode
                     {
@@ -163,19 +163,19 @@ namespace LogisticManager.Repositories
                     };
 
                     commonCodes.Add(commonCode);
-                    LogManagerService.LogInfo($"  - {commonCode.Code}: {commonCode.CodeName}");
-                    LogManagerService.LogInfo($"=== 행 데이터 처리 완료 (행 {rowCount}) ===");
+                    //LogManagerService.LogInfo($"  - {commonCode.Code}: {commonCode.CodeName}");
+                    //LogManagerService.LogInfo($"=== 행 데이터 처리 완료 (행 {rowCount}) ===");
                 }
 
-                LogManagerService.LogInfo($"쿼리 결과: {rowCount}개 행 반환됨");
-                LogManagerService.LogInfo($"그룹코드 '{groupCode}'에서 {commonCodes.Count}개의 공통코드 조회 완료");
-                LogManagerService.LogInfo($"=== GetCommonCodesByGroupAsync 완료 ===");
+                //LogManagerService.LogInfo($"쿼리 결과: {rowCount}개 행 반환됨");
+                //LogManagerService.LogInfo($"그룹코드 '{groupCode}'에서 {commonCodes.Count}개의 공통코드 조회 완료");
+                //LogManagerService.LogInfo($"=== GetCommonCodesByGroupAsync 완료 ===");
                 return commonCodes;
             }
             catch (Exception ex)
             {
-                LogManagerService.LogError($"공통코드 조회 중 오류 발생 (그룹코드: {groupCode}): {ex.Message}");
-                LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
+                //LogManagerService.LogError($"공통코드 조회 중 오류 발생 (그룹코드: {groupCode}): {ex.Message}");
+                //LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
                 throw;
             }
         }
@@ -189,7 +189,7 @@ namespace LogisticManager.Repositories
         {
             try
             {
-                LogManagerService.LogInfo($"공통코드 추가 시작: {commonCode.GroupCode}.{commonCode.Code}");
+                //LogManagerService.LogInfo($"공통코드 추가 시작: {commonCode.GroupCode}.{commonCode.Code}");
 
                 // 단일 연결을 사용하여 추가 처리
                 using var connection = await _databaseService.GetConnectionAsync();

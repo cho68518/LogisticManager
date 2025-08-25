@@ -90,21 +90,21 @@ namespace LogisticManager
                     LogManagerService.LogWarning("⚠️ Program.Main: 데이터베이스 연결 실패했지만 프로그램을 계속 실행합니다.");
                 }
 
-                // 매핑 정보 출력
-                try
-                {
-                    LogManagerService.LogInfo("🔍 Program.Main: 매핑 정보 확인 시작");
-                    
-                    var mappingService = new MappingService();
-                    mappingService.PrintMappingSummary();
-                    mappingService.PrintDetailedMapping("order_table");
-                    
-                    LogManagerService.LogInfo("✅ Program.Main: 매핑 정보 확인 완료!");
-                }
-                catch (Exception mappingEx)
-                {
-                    LogManagerService.LogError($"❌ Program.Main: 매핑 정보 확인 실패: {mappingEx.Message}");
-                }
+                // 매핑 정보 출력 (테이블매핑 기능 비활성화)
+                // try
+                // {
+                //     LogManagerService.LogInfo("🔍 Program.Main: 매핑 정보 확인 시작");
+                //     
+                //     var mappingService = null; // MappingService 제거
+                //     mappingService.PrintMappingSummary();
+                //     mappingService.PrintDetailedMapping("order_table");
+                //     
+                //     LogManagerService.LogInfo("✅ Program.Main: 매핑 정보 확인 완료!");
+                // }
+                // catch (Exception mappingEx)
+                // {
+                //     LogManagerService.LogError($"❌ Program.Main: 매핑 정보 확인 실패: {mappingEx.Message}");
+                // }
                 
                 try
                 {

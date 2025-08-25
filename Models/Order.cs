@@ -431,164 +431,197 @@ namespace LogisticManager.Models
                 var columnsMessage = string.Join(", ", availableColumns);
                 WriteLog($"[Order.FromDataRow] 🔍 사용 가능한 엑셀 컬럼: {columnsMessage}");
                 
-                // MappingService를 통해 column_mapping.json 로드
-                var mappingService = new MappingService();
-                var configuration = mappingService.GetConfiguration();
+                // MappingService를 통해 column_mapping.json 로드 (테이블매핑 기능 비활성화)
+                // var mappingService = null; // MappingService 제거
+                // var configuration = mappingService.GetConfiguration();
                 
-                if (configuration?.Mappings.TryGetValue("order_table", out var tableMapping) == true && tableMapping != null)
-                {
-                    WriteLog($"[매핑정보] 매핑 처리 시작: {tableMapping.MappingId}");
-                    WriteLog($"[매핑정보] 엑셀 컬럼 수: {tableMapping.Columns.Count}, 추가 DB 컬럼 수: {tableMapping.AdditionalColumns.Count}");
-                    
-                    // 매핑 정보를 사용하여 동적으로 변환
-                    foreach (var columnMapping in tableMapping.Columns)
-                    {
-                        var excelColumnName = columnMapping.Key;
-                        var dbColumnName = columnMapping.Value.DbColumn;
-                        
-                        // DataTable 컬럼명은 DB 컬럼명 기준으로 생성되므로 dbColumnName 기준으로 조회해야 함
-                        if (row.Table.Columns.Contains(dbColumnName))
-                        {
-                            var cellValue = row[dbColumnName];
-                            var stringValue = cellValue?.ToString() ?? string.Empty;
-                            
-                            WriteLog($"[매핑정보] 처리 중: {excelColumnName} → {dbColumnName} = '{stringValue}'");
-                            
-                            // 데이터베이스 컬럼명에 따라 속성 설정 (실제 테이블 구조에 맞춤)
-                            switch (dbColumnName.ToLower())
-                            {
-                                case "주문번호":
-                                    order.OrderNumber = stringValue;
-                                    break;
-                                case "주문번호(쇼핑몰)":
-                                    order.OrderNumberMall = stringValue;
-                                    break;
-                                case "수취인명":
-                                    order.RecipientName = stringValue;
-                                    break;
-                                case "전화번호1":
-                                    order.RecipientPhone1 = stringValue;
-                                    break;
-                                case "전화번호2":
-                                    order.RecipientPhone2 = stringValue;
-                                    break;
-                                case "우편번호":
-                                    order.ZipCode = stringValue;
-                                    break;
-                                case "주소":
-                                    order.Address = stringValue;
-                                    break;
-                                case "상세주소":
-                                    order.DetailAddress = stringValue;
-                                    break;
-                                case "옵션명":
-                                    order.OptionName = stringValue;
-                                    break;
-                                case "수량":
-                                    order.Quantity = int.TryParse(stringValue, out var qty) ? qty : 0;
-                                    break;
-                                case "단가":
-                                    order.UnitPrice = decimal.TryParse(stringValue, out var price) ? price : 0;
-                                    break;
-                                case "총액":
-                                    order.TotalPrice = decimal.TryParse(stringValue, out var total) ? total : 0;
-                                    break;
-                                case "배송메세지":
-                                    order.ShippingMessage = stringValue;
-                                    break;
-                                case "쇼핑몰":
-                                    order.MallName = stringValue;
-                                    break;
-                                case "수집시간":
-                                    if (DateTime.TryParse(stringValue, out var collectionTime))
-                                        order.CollectionTime = collectionTime;
-                                    break;
-                                case "송장명":
-                                    order.InvoiceName = stringValue;
-                                    break;
-                                case "품목코드":
-                                    order.ProductCode = stringValue;
-                                    break;
-                                case "택배비용":
-                                    order.DeliveryCost = stringValue;
-                                    break;
-                                case "박스크기":
-                                    order.BoxSize = stringValue;
-                                    break;
-                                case "출력개수":
-                                    order.PrintCount = stringValue;
-                                    break;
-                                case "송장수량":
-                                    order.InvoiceQuantity = stringValue;
-                                    break;
-                                case "별표1":
-                                    order.Star1 = stringValue;
-                                    break;
-                                case "별표2":
-                                    order.Star2 = stringValue;
-                                    break;
-                                case "품목개수":
-                                    order.ProductCount = stringValue;
-                                    break;
-                                case "택배수량":
-                                    order.DeliveryQuantity = stringValue;
-                                    break;
-                                case "택배수량1":
-                                    order.DeliveryQuantity1 = stringValue;
-                                    break;
-                                case "택배수량합산":
-                                    order.DeliveryQuantitySum = stringValue;
-                                    break;
-                                case "송장구분자":
-                                    order.InvoiceSeparator = stringValue;
-                                    break;
-                                case "송장구분":
-                                    order.InvoiceType = stringValue;
-                                    break;
-                                case "송장구분최종":
-                                    order.InvoiceTypeFinal = stringValue;
-                                    break;
-                                case "위치":
-                                    order.Location = stringValue;
-                                    break;
-                                case "위치변환":
-                                    order.LocationConverted = stringValue;
-                                    break;
-                                case "결제금액":
-                                    order.PaymentAmount = stringValue;
-                                    break;
-                                case "주문금액":
-                                    order.OrderAmount = stringValue;
-                                    break;
-                                case "결제수단":
-                                    order.PaymentMethod = stringValue;
-                                    break;
-                                case "면과세구분":
-                                    order.TaxType = stringValue;
-                                    break;
-                                case "주문상태":
-                                    order.OrderStatus = stringValue;
-                                    break;
-                                case "배송송":
-                                    order.DeliverySend = stringValue;
-                                    break;
-                                case "주문일자":
-                                    order.OrderDate = stringValue;
-                                    break;
-                                default:
-                                    WriteLog($"[매핑정보] ⚠️ 매핑되지 않은 컬럼: {dbColumnName}");
-                                    break;
-                            }
-                        }
-                        else
-                        {
-                            WriteLog($"[매핑정보] ⚠️ 엑셀에 없는 컬럼: {excelColumnName}");
-                        }
-                    }
-                    
-                    WriteLog($"[매핑정보] 매핑 처리 완료");
-                }
-                else
+                // if (configuration?.Mappings.TryGetValue("order_table", out var tableMapping) == true && tableMapping != null)
+                // {
+                //     WriteLog($"[매핑정보] 매핑 처리 시작: {tableMapping.MappingId}");
+                //     WriteLog($"[매핑정보] 엑셀 컬럼 수: {tableMapping.Columns.Count}, 추가 DB 컬럼 수: {tableMapping.AdditionalColumns.Count}");
+                //     
+                //     // 매핑 정보를 사용하여 동적으로 변환
+                //     foreach (var columnMapping in tableMapping.Columns)
+                //     {
+                //         var excelColumnName = columnMapping.Key;
+                //         var dbColumnName = columnMapping.Value.DbColumn;
+                //         
+                //         // DataTable 컬럼명은 DB 컬럼명 기준으로 생성되므로 dbColumnName 기준으로 조회해야 함
+                //         if (row.Table.Columns.Contains(dbColumnName))
+                //         {
+                //             var cellValue = row[dbColumnName];
+                //             var stringValue = cellValue?.ToString() ?? string.Empty;
+                //             
+                //             WriteLog($"[매핑정보] 처리 중: {excelColumnName} → {dbColumnName} = '{stringValue}'");
+                //             
+                //             // 데이터베이스 컬럼명에 따라 속성 설정 (실제 테이블 구조에 맞춤)
+                //         switch (dbColumnName.ToLower())
+                //         {
+                //             case "주문번호":
+                //                 order.OrderNumber = stringValue;
+                //                 break;
+                //             case "주문번호(쇼핑몰)":
+                //                 order.OrderNumberMall = stringValue;
+                //                 break;
+                //             case "수취인명":
+                //                 order.RecipientName = stringValue;
+                //                 break;
+                //             case "전화번호1":
+                //                 order.RecipientPhone1 = stringValue;
+                //                 break;
+                //             case "전화번호2":
+                //                 order.RecipientPhone2 = stringValue;
+                //                 break;
+                //             case "우편번호":
+                //                 order.ZipCode = stringValue;
+                //                 break;
+                //             case "주소":
+                //                 order.Address = stringValue;
+                //                 break;
+                //             case "상세주소":
+                //                 order.DetailAddress = stringValue;
+                //                 break;
+                //             case "옵션명":
+                //                 order.OptionName = stringValue;
+                //                 break;
+                //             case "수량":
+                //                 order.Quantity = int.TryParse(stringValue, out var qty) ? qty : 0;
+                //                 break;
+                //             case "단가":
+                //                 order.UnitPrice = decimal.TryParse(stringValue, switch (dbColumnName.ToLower())
+                //         {
+                //             case "주문번호":
+                //                 order.OrderNumber = stringValue;
+                //                 break;
+                //             case "주문번호(쇼핑몰)":
+                //                 order.OrderNumberMall = stringValue;
+                //                 break;
+                //             case "수취인명":
+                //                 order.RecipientName = stringValue;
+                //                 break;
+                //             case "전화번호1":
+                //                 order.RecipientPhone1 = stringValue;
+                //                 break;
+                //             case "전화번호2":
+                //                 order.RecipientPhone2 = stringValue;
+                //                 break;
+                //             case "우편번호":
+                //                 order.ZipCode = stringValue;
+                //                 break;
+                //             case "주소":
+                //                 order.Address = stringValue;
+                //                 break;
+                //             case "상세주소":
+                //                 order.DetailAddress = stringValue;
+                //                 break;
+                //             case "옵션명":
+                //                 order.OptionName = stringValue;
+                //                 break;
+                //             case "수량":
+                //                 order.Quantity = int.TryParse(stringValue, out var qty) ? qty : 0;
+                //                 break;
+                //             case "단가":
+                //                 order.UnitPrice = decimal.TryParse(stringValue, out var price) ? price : 0;
+                //                 break;
+                //             case "총액":
+                //                 order.TotalPrice = decimal.TryParse(stringValue, out var total) ? total : 0;
+                //                 break;
+                //             case "배송메세지":
+                //                 order.ShippingMessage = stringValue;
+                //                 break;
+                //             case "쇼핑몰":
+                //                 order.MallName = stringValue;
+                //                 break;
+                //             case "수집시간":
+                //                 if (DateTime.TryParse(stringValue, out var collectionTime))
+                //                     order.CollectionTime = collectionTime;
+                //                 break;
+                //             case "송장명":
+                //                 order.InvoiceName = stringValue;
+                //                 break;
+                //             case "품목코드":
+                //                 order.ProductCode = stringValue;
+                //                 break;
+                //             case "택배비용":
+                //                 order.DeliveryCost = stringValue;
+                //                 break;
+                //             case "박스크기":
+                //                 order.BoxSize = stringValue;
+                //                 break;
+                //             case "출력개수":
+                //                 order.PrintCount = stringValue;
+                //                 break;
+                //             case "송장수량":
+                //                 order.InvoiceQuantity = stringValue;
+                //                 break;
+                //             case "별표1":
+                //                 order.Star1 = stringValue;
+                //                 break;
+                //             case "별표2":
+                //                 order.Star2 = stringValue;
+                //                 break;
+                //             case "품목개수":
+                //                 order.ProductCount = stringValue;
+                //                 break;
+                //             case "택배수량":
+                //                 order.DeliveryQuantity = stringValue;
+                //                 break;
+                //         case "택배수량1":
+                //             order.DeliveryQuantity1 = stringValue;
+                //             break;
+                //         case "택배수량합산":
+                //             order.DeliveryQuantitySum = stringValue;
+                //             break;
+                //         case "송장구분자":
+                //             order.InvoiceSeparator = stringValue;
+                //             break;
+                //         case "송장구분":
+                //             order.InvoiceType = stringValue;
+                //             break;
+                //         case "송장구분최종":
+                //             order.InvoiceTypeFinal = stringValue;
+                //             break;
+                //         case "위치":
+                //             order.Location = stringValue;
+                //             break;
+                //         case "위치변환":
+                //             order.LocationConverted = stringValue;
+                //             break;
+                //         case "결제금액":
+                //             order.PaymentAmount = stringValue;
+                //             break;
+                //         case "주문금액":
+                //             order.OrderAmount = stringValue;
+                //             break;
+                //         case "결제수단":
+                //             order.PaymentMethod = stringValue;
+                //             break;
+                //         case "면과세구분":
+                //             order.TaxType = stringValue;
+                //             break;
+                //         case "주문상태":
+                //             order.OrderStatus = stringValue;
+                //             break;
+                //         case "배송송":
+                //             order.DeliverySend = stringValue;
+                //             break;
+                //         case "주문일자":
+                //             order.OrderDate = stringValue;
+                //             break;
+                //         default:
+                //             WriteLog($"[매핑정보] ⚠️ 매핑되지 않은 컬럼: {dbColumnName}");
+                //             break;
+                //     }
+                // }
+                // else
+                // {
+                //     WriteLog($"[매핑정보] ⚠️ 엑셀에 없는 컬럼: {excelColumnName}");
+                // }
+                // }
+                // 
+                // WriteLog($"[매핑정보] 매핑 처리 완료");
+                // }
+                // else
                 {
                     // 매핑 정보가 없는 경우 기본 매핑 사용 (하위 호환성)
                     WriteLog("⚠️ column_mapping.json을 찾을 수 없어 기본 매핑을 사용합니다.");

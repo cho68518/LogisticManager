@@ -34,7 +34,7 @@ namespace LogisticManager.Forms
         /// <summary>
         /// 데이터베이스 서비스 - MySQL 연결 및 쿼리 실행 담당
         /// </summary>
-        private readonly DatabaseService _databaseService;
+        private DatabaseService _databaseService;
         
         /// <summary>
         /// API 서비스 - Dropbox 업로드, Kakao Work 알림 담당
@@ -143,10 +143,16 @@ namespace LogisticManager.Forms
             
             // 서비스 객체들 초기화
             _fileService = new FileService();
-            _databaseService = new DatabaseService();
+            _databaseService = DatabaseService.Instance; // Singleton 인스턴스 사용
             _apiService = new ApiService();
             
             InitializeUI();
+            
+            // 통합 시간 관리자 이벤트 구독
+            ProcessingTimeManager.Instance.ProcessingStarted += OnProcessingStarted;
+            ProcessingTimeManager.Instance.ProcessingCompleted += OnProcessingCompleted;
+            ProcessingTimeManager.Instance.StepUpdated += OnStepUpdated;
+            ProcessingTimeManager.Instance.TimeUpdated += OnTimeUpdated;
             
             // 데이터베이스 연결 테스트 및 완료 메시지 표시
             TestDatabaseConnection();
@@ -704,6 +710,9 @@ namespace LogisticManager.Forms
 
             try
             {
+                // 통합 시간 관리자 시작 (송장처리 시작 버튼 클릭 시점)
+                ProcessingTimeManager.Instance.StartProcessing();
+                
                 // UI 상태 변경
                 btnStartProcess.Enabled = false;
                 btnSelectFile.Enabled = false;
@@ -758,6 +767,10 @@ namespace LogisticManager.Forms
                     LogMessage("✅ 송장 처리가 성공적으로 완료되었습니다!");
                     lblStatus.Text = "완료";
                     lblStatus.ForeColor = Color.FromArgb(46, 204, 113);
+                    
+                    // 진행상황 컨트롤에 처리 완료 상태 설정 (통합 시간 관리자에서 자동 처리됨)
+                    progressDisplayControl?.SetProcessingCompleted();
+                    
                     MessageBox.Show("송장 처리가 성공적으로 완료되었습니다!", "완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
@@ -766,6 +779,10 @@ namespace LogisticManager.Forms
                     LogMessage("⚠️ 송장 처리가 중단되었습니다. 처리 가능한 데이터가 없거나 파일 형식에 문제가 있을 수 있습니다.");
                     lblStatus.Text = "처리 중단";
                     lblStatus.ForeColor = Color.FromArgb(243, 156, 18);
+                    
+                    // 진행상황 컨트롤에 처리 완료 상태 설정 (처리시간 고정)
+                    progressDisplayControl?.SetProcessingCompleted();
+                    
                     MessageBox.Show("송장 처리가 중단되었습니다.\n\n확인사항:\n• 파일에 처리 가능한 주문 데이터가 있는지 확인\n• 파일 형식이 올바른지 확인\n• 헤더 행이 존재하는지 확인", "처리 중단", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }
@@ -775,6 +792,9 @@ namespace LogisticManager.Forms
                 LogMessage($"❌ 송장 처리 중 오류가 발생했습니다: {ex.Message}");
                 lblStatus.Text = "오류 발생";
                 lblStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                
+                // 진행상황 컨트롤에 처리 완료 상태 설정 (처리시간 고정)
+                progressDisplayControl?.SetProcessingCompleted();
                 
                 MessageBox.Show($"송장 처리 중 오류가 발생했습니다:\n{ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -820,6 +840,10 @@ namespace LogisticManager.Forms
                     LogMessage("✅ 판매입력 데이터 처리가 성공적으로 완료되었습니다!");
                     lblStatus.Text = "판매입력 데이터 처리 완료";
                     lblStatus.ForeColor = Color.FromArgb(46, 204, 113);
+                    
+                    // 진행상황 컨트롤에 처리 완료 상태 설정 (처리시간 고정)
+                    progressDisplayControl?.SetProcessingCompleted();
+                    
                     MessageBox.Show("판매입력 데이터 처리가 성공적으로 완료되었습니다!", "완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
@@ -827,6 +851,10 @@ namespace LogisticManager.Forms
                     LogMessage("❌ 판매입력 데이터 처리에 실패했습니다.");
                     lblStatus.Text = "판매입력 데이터 처리 실패";
                     lblStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                    
+                    // 진행상황 컨트롤에 처리 완료 상태 설정 (처리시간 고정)
+                    progressDisplayControl?.SetProcessingCompleted();
+                    
                     MessageBox.Show("판매입력 데이터 처리에 실패했습니다.\n\n로그 파일(app.log)을 확인하여 상세 오류 내용을 파악하세요.", "실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
@@ -835,6 +863,10 @@ namespace LogisticManager.Forms
                 LogMessage($"❌ 판매입력 데이터 처리 중 오류가 발생했습니다: {ex.Message}");
                 lblStatus.Text = "오류 발생";
                 lblStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                
+                // 진행상황 컨트롤에 처리 완료 상태 설정 (처리시간 고정)
+                progressDisplayControl?.SetProcessingCompleted();
+                
                 MessageBox.Show($"판매입력 데이터 처리 중 오류가 발생했습니다:\n{ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
@@ -880,6 +912,10 @@ namespace LogisticManager.Forms
                     LogMessage("✅ 디버그: 판매입력 데이터 처리가 성공적으로 완료되었습니다!");
                     lblStatus.Text = "디버그: 판매입력 데이터 처리 완료";
                     lblStatus.ForeColor = Color.FromArgb(46, 204, 113);
+                    
+                    // 진행상황 컨트롤에 처리 완료 상태 설정 (처리시간 고정)
+                    progressDisplayControl?.SetProcessingCompleted();
+                    
                     MessageBox.Show("디버그: 판매입력 데이터 처리가 성공적으로 완료되었습니다!", "디버그 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
@@ -887,6 +923,10 @@ namespace LogisticManager.Forms
                     LogMessage("❌ 디버그: 판매입력 데이터 처리에 실패했습니다.");
                     lblStatus.Text = "디버그: 판매입력 데이터 처리 실패";
                     lblStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                    
+                    // 진행상황 컨트롤에 처리 완료 상태 설정 (처리시간 고정)
+                    progressDisplayControl?.SetProcessingCompleted();
+                    
                     MessageBox.Show("디버그: 판매입력 데이터 처리에 실패했습니다.\n\n로그 파일(app.log)을 확인하여 상세 오류 내용을 파악하세요.", "디버그 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
@@ -896,6 +936,10 @@ namespace LogisticManager.Forms
                 LogMessage($"❌ 디버그: 상세 오류: {ex.StackTrace}");
                 lblStatus.Text = "디버그: 오류 발생";
                 lblStatus.ForeColor = Color.FromArgb(231, 76, 60);
+                
+                // 진행상황 컨트롤에 처리 완료 상태 설정 (처리시간 고정)
+                progressDisplayControl?.SetProcessingCompleted();
+                
                 MessageBox.Show($"디버그: 판매입력 데이터 처리 중 오류가 발생했습니다:\n{ex.Message}\n\n상세 오류:\n{ex.StackTrace}", "디버그 오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
@@ -1014,6 +1058,123 @@ namespace LogisticManager.Forms
 
         #endregion
 
+        #region 통합 시간 관리자 이벤트 핸들러 (Processing Time Manager Event Handlers)
+        
+        /// <summary>
+        /// 처리 시작 이벤트 핸들러
+        /// </summary>
+        private void OnProcessingStarted(object? sender, ProcessingTimeEventArgs e)
+        {
+            try
+            {
+                // UI 스레드에서 안전하게 실행
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(new Action(() => OnProcessingStarted(sender, e)));
+                    return;
+                }
+                
+                LogMessage("🕒 송장 처리 시간 측정이 시작되었습니다.");
+                LogMessage($"📊 목표 TestLevel: {ProcessingTimeManager.Instance.TargetTestLevel}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"OnProcessingStarted 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 처리 완료 이벤트 핸들러
+        /// </summary>
+        private void OnProcessingCompleted(object? sender, ProcessingTimeEventArgs e)
+        {
+            try
+            {
+                // UI 스레드에서 안전하게 실행
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(new Action(() => OnProcessingCompleted(sender, e)));
+                    return;
+                }
+                
+                var totalTime = ProcessingTimeManager.Instance.GetFormattedElapsedTime();
+                LogMessage("═══════════════════════════════════════");
+                LogMessage($"🏁 송장 처리 완료! 총 처리 시간: {totalTime}");
+                LogMessage($"📊 완료된 단계: {ProcessingTimeManager.Instance.CurrentStep}/{ProcessingTimeManager.Instance.TargetTestLevel}");
+                LogMessage("═══════════════════════════════════════");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"OnProcessingCompleted 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 단계 업데이트 이벤트 핸들러
+        /// </summary>
+        private void OnStepUpdated(object? sender, ProcessingStepEventArgs e)
+        {
+            try
+            {
+                // UI 스레드에서 안전하게 실행
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(new Action(() => OnStepUpdated(sender, e)));
+                    return;
+                }
+                
+                // 주요 단계마다 현재 처리시간 로그 출력 (5단계마다)
+                if (e.CurrentStep > 0 && e.CurrentStep % 5 == 0)
+                {
+                    var currentTime = ProcessingTimeManager.Instance.GetFormattedElapsedTime();
+                    var stepName = string.IsNullOrEmpty(e.StepName) ? $"단계 {e.CurrentStep}" : e.StepName;
+                    LogMessage($"📊 {stepName} 완료 | 경과 시간: {currentTime} | 진행률: {e.Progress:P0}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"OnStepUpdated 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 시간 업데이트 이벤트 핸들러 (실시간 동기화)
+        /// </summary>
+        private void OnTimeUpdated(object? sender, ProcessingTimeEventArgs e)
+        {
+            try
+            {
+                // UI 스레드에서 안전하게 실행
+                if (this.InvokeRequired)
+                {
+                    this.Invoke(new Action(() => OnTimeUpdated(sender, e)));
+                    return;
+                }
+                
+                // 10초마다 한 번씩 로그에 현재 처리시간 출력 (너무 자주 출력하지 않도록)
+                var timeManager = ProcessingTimeManager.Instance;
+                if (timeManager.IsProcessing)
+                {
+                    var elapsedSeconds = (int)timeManager.GetElapsedTime().TotalSeconds;
+                    if (elapsedSeconds > 0 && elapsedSeconds % 10 == 0) // 10초마다
+                    {
+                        var elapsedTime = timeManager.GetFormattedElapsedTime();
+                        var currentStep = timeManager.CurrentStep;
+                        var targetStep = timeManager.TargetTestLevel;
+                        LogMessage($"⏱️ 현재 처리 시간: {elapsedTime} | 진행: {currentStep}/{targetStep}단계");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"OnTimeUpdated 오류: {ex.Message}");
+            }
+        }
+        
+
+        
+        #endregion
+
         #region 데이터베이스 연결 테스트 (Database Connection Test)
 
         /// <summary>
@@ -1033,36 +1194,43 @@ namespace LogisticManager.Forms
                 LogMessage("🔗 데이터베이스 연결을 확인하고 있습니다...");
                 Console.WriteLine("🔄 MainForm: 데이터베이스 연결 테스트 시작");
                 
-                // DB 연결 정보 가져오기
-                var dbInfo = _databaseService.GetConnectionInfo();
-                
                 // 동기적으로 연결 테스트 실행 (UI 스레드에서 직접 실행)
                 try
                 {
-                    Console.WriteLine("📡 MainForm: 새로운 DatabaseService 생성");
+                    LogManagerService.LogInfo("📡 MainForm: DatabaseService Singleton 인스턴스 사용");
                     
-                    // 새로운 DatabaseService 인스턴스 생성 (최신 JSON 설정 적용)
-                    var freshDatabaseService = new DatabaseService();
+                    // 기존 _databaseService 정보 로그 출력
+                    var oldDbInfo = _databaseService.GetConnectionInfo();
+                    LogManagerService.LogInfo($"🔍 MainForm: 기존 DB 정보 - Server: {oldDbInfo.Server}");
+                    LogManagerService.LogInfo($"🔍 MainForm: 기존 DB 정보 - Database: {oldDbInfo.Database}");
+                    LogManagerService.LogInfo($"🔍 MainForm: 기존 DB 정보 - User: {oldDbInfo.User}");
+                    LogManagerService.LogInfo($"🔍 MainForm: 기존 DB 정보 - Port: {oldDbInfo.Port}");
                     
-                    Console.WriteLine("📡 MainForm: DatabaseService 연결 테스트 호출");
+                    // Singleton 인스턴스에서 연결 테스트 실행
+                    var testResult = _databaseService.TestConnectionWithDetailsAsync().GetAwaiter().GetResult();
                     
-                    // 연결 테스트 실행
-                    var testResult = freshDatabaseService.TestConnectionWithDetailsAsync().GetAwaiter().GetResult();
-                    
-                    Console.WriteLine($"📊 MainForm: 연결 테스트 결과 = {testResult.IsConnected}");
-                    Console.WriteLine($"📊 MainForm: 오류 메시지 = {testResult.ErrorMessage}");
+                    LogManagerService.LogInfo($"📊 MainForm: 연결 테스트 결과 = {testResult.IsConnected}");
+                    LogManagerService.LogInfo($"📊 MainForm: 메시지 = {testResult.ErrorMessage}");
                     
                     if (testResult.IsConnected)
                     {
                         LogMessage("✅ 데이터베이스 접속이 완료되었습니다!");
                         LogMessage("📊 송장 처리 시스템이 준비되었습니다.");
                         
-                        // 연결된 DB 서버 정보만 포함한 상태 메시지 생성
-                        var dbInfoText = $"✅ 데이터베이스 연결됨 ({dbInfo.Server})";
+                        // 최신 DB 연결 정보로 상태 메시지 생성
+                        var latestDbInfo = _databaseService.GetConnectionInfo();
+                        var dbInfoText = $"✅ 데이터베이스 연결됨 ({latestDbInfo.Server})";
+                        
+                        // 디버그 로그 추가
+                        LogManagerService.LogInfo($"🔍 MainForm: 최신 DB 정보 - Server: {latestDbInfo.Server}");
+                        LogManagerService.LogInfo($"🔍 MainForm: 최신 DB 정보 - Database: {latestDbInfo.Database}");
+                        LogManagerService.LogInfo($"🔍 MainForm: 최신 DB 정보 - User: {latestDbInfo.User}");
+                        LogManagerService.LogInfo($"🔍 MainForm: 최신 DB 정보 - Port: {latestDbInfo.Port}");
+                        
                         lblDbStatus.Text = dbInfoText;
                         lblDbStatus.ForeColor = Color.FromArgb(46, 204, 113);
                         lblDbStatus.BackColor = Color.Transparent; // 배경색을 투명하게
-                        Console.WriteLine("✅ MainForm: 연결 성공 처리 완료");
+                        LogManagerService.LogInfo("✅ MainForm: 연결 성공 처리 완료");
                     }
                     else
                     {
@@ -1072,20 +1240,20 @@ namespace LogisticManager.Forms
                         lblDbStatus.Text = "❌ 데이터베이스 연결 실패";
                         lblDbStatus.ForeColor = Color.FromArgb(231, 76, 60);
                         lblDbStatus.BackColor = Color.Transparent; // 배경색을 투명하게
-                        Console.WriteLine("❌ MainForm: 연결 실패 처리 완료");
+                        LogManagerService.LogInfo("❌ MainForm: 연결 실패 처리 완료");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"❌ MainForm: 연결 테스트 중 예외 발생: {ex.Message}");
-                    Console.WriteLine($"🔍 MainForm: 예외 상세: {ex}");
-                    Console.WriteLine($"🔍 MainForm: 예외 스택 트레이스: {ex.StackTrace}");
+                    LogManagerService.LogError($"❌ MainForm: 연결 테스트 중 예외 발생: {ex.Message}");
+                    LogManagerService.LogError($"🔍 MainForm: 예외 상세: {ex}");
+                    LogManagerService.LogError($"🔍 MainForm: 예외 스택 트레이스: {ex.StackTrace}");
                     
                     LogMessage($"❌ 데이터베이스 연결 중 오류가 발생했습니다: {ex.Message}");
                     if (ex.InnerException != null)
                     {
                         LogMessage($"🔍 상세 오류: {ex.InnerException.Message}");
-                        Console.WriteLine($"🔍 MainForm: 내부 예외: {ex.InnerException.Message}");
+                        LogManagerService.LogError($"🔍 MainForm: 내부 예외: {ex.InnerException.Message}");
                     }
                     LogMessage("💡 설정 화면에서 데이터베이스 정보를 확인해주세요.");
                     lblDbStatus.Text = "❌ 데이터베이스 연결 오류";
@@ -1096,8 +1264,8 @@ namespace LogisticManager.Forms
             catch (Exception ex)
             {
                 // 최상위 예외 처리
-                Console.WriteLine($"❌ MainForm: 최상위 예외 발생: {ex.Message}");
-                Console.WriteLine($"🔍 MainForm: 최상위 예외 상세: {ex}");
+                LogManagerService.LogError($"❌ MainForm: 최상위 예외 발생: {ex.Message}");
+                LogManagerService.LogError($"🔍 MainForm: 최상위 예외 상세: {ex}");
                 LogMessage($"❌ 데이터베이스 연결 테스트 중 오류 발생: {ex.Message}");
                 lblDbStatus.Text = "❌ 연결 오류";
                 lblDbStatus.ForeColor = Color.FromArgb(231, 76, 60);
@@ -1388,6 +1556,12 @@ namespace LogisticManager.Forms
         {
             try
             {
+                // 통합 시간 관리자 이벤트 구독 해제
+                ProcessingTimeManager.Instance.ProcessingStarted -= OnProcessingStarted;
+                ProcessingTimeManager.Instance.ProcessingCompleted -= OnProcessingCompleted;
+                ProcessingTimeManager.Instance.StepUpdated -= OnStepUpdated;
+                ProcessingTimeManager.Instance.TimeUpdated -= OnTimeUpdated;
+                
                 LogMessage("👋 프로그램을 종료합니다.");
                 
                 // 리소스 정리는 GC가 자동으로 처리하므로 별도 작업 불필요

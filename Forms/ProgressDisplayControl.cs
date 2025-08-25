@@ -1,5 +1,6 @@
 using System.Drawing.Drawing2D;
 using LogisticManager.Models;
+using LogisticManager.Services;
 
 namespace LogisticManager.Forms
 {
@@ -57,14 +58,9 @@ namespace LogisticManager.Forms
         private float _animationAngle = 0f;
         
         /// <summary>
-        /// 처리 시작 시간 (송장처리 시작 버튼 클릭 시점)
+        /// 통합 시간 관리자 (중앙 집중식 시간 관리)
         /// </summary>
-        private DateTime? _startTime;
-        
-        /// <summary>
-        /// 처리 완료 시간
-        /// </summary>
-        private DateTime? _endTime;
+        private readonly ProcessingTimeManager _timeManager;
         
         #endregion
 
@@ -130,14 +126,22 @@ namespace LogisticManager.Forms
         {
             InitializeComponent();
             
+            // 통합 시간 관리자 인스턴스 가져오기
+            _timeManager = ProcessingTimeManager.Instance;
+            
+            // 시간 관리자 이벤트 구독
+            _timeManager.TimeUpdated += OnTimeUpdated;
+            _timeManager.ProcessingCompleted += OnProcessingCompleted;
+            _timeManager.StepUpdated += OnStepUpdated;
+            
             // 펜 초기화
-            _progressPen = new Pen(Color.FromArgb(46, 204, 113), 8f) // 초록색
+            _progressPen = new Pen(Color.FromArgb(46, 204, 113), 10f) // 초록색
             {
                 StartCap = LineCap.Round,
                 EndCap = LineCap.Round
             };
             
-            _backgroundPen = new Pen(Color.FromArgb(236, 240, 241), 8f) // 연한 회색
+            _backgroundPen = new Pen(Color.FromArgb(236, 240, 241), 10f) // 연한 회색
             {
                 StartCap = LineCap.Round,
                 EndCap = LineCap.Round
@@ -154,9 +158,6 @@ namespace LogisticManager.Forms
             this.DoubleBuffered = true; // 깜빡임 방지
             this.BackColor = Color.Transparent;
             
-            // 처리 시작 시간은 송장처리 시작 시점에 설정 (현재는 null)
-            _startTime = null;
-            
             // 크기 조정 이벤트
             this.Resize += ProgressDisplayControl_Resize;
         }
@@ -172,6 +173,65 @@ namespace LogisticManager.Forms
         {
             this.SuspendLayout();
             this.ResumeLayout(false);
+        }
+        
+        #endregion
+
+        #region 시간 관리자 이벤트 핸들러 (Time Manager Event Handlers)
+        
+        /// <summary>
+        /// 시간 업데이트 이벤트 핸들러 (실시간 동기화)
+        /// </summary>
+        private void OnTimeUpdated(object? sender, ProcessingTimeEventArgs e)
+        {
+            // UI 스레드에서 실행되도록 보장
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(() => OnTimeUpdated(sender, e)));
+                return;
+            }
+            
+            // 화면 갱신 (시간 표시 업데이트)
+            Invalidate();
+        }
+        
+        /// <summary>
+        /// 처리 완료 이벤트 핸들러
+        /// </summary>
+        private void OnProcessingCompleted(object? sender, ProcessingTimeEventArgs e)
+        {
+            // UI 스레드에서 실행되도록 보장
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(() => OnProcessingCompleted(sender, e)));
+                return;
+            }
+            
+            // 애니메이션 중지
+            _animationTimer.Stop();
+            
+            // 화면 갱신
+            Invalidate();
+        }
+        
+        /// <summary>
+        /// 단계 업데이트 이벤트 핸들러
+        /// </summary>
+        private void OnStepUpdated(object? sender, ProcessingStepEventArgs e)
+        {
+            // UI 스레드에서 실행되도록 보장
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new Action(() => OnStepUpdated(sender, e)));
+                return;
+            }
+            
+            // 단계 정보 업데이트
+            _completedSteps = e.CurrentStep;
+            _currentStepIndex = e.CurrentStep < e.TotalSteps ? e.CurrentStep : -1;
+            
+            // 화면 갱신
+            Invalidate();
         }
         
         #endregion
@@ -234,13 +294,11 @@ namespace LogisticManager.Forms
         {
             if (stepIndex >= 0 && stepIndex < _totalSteps)
             {
-                _completedSteps = Math.Max(_completedSteps, stepIndex + 1);
+                // 통합 시간 관리자에 단계 업데이트 알림
+                _timeManager.UpdateStep(stepIndex + 1, _progressSteps.Count > stepIndex ? _progressSteps[stepIndex].Description : null);
                 
-                // 모든 단계가 완료되면 완료 시간 설정
-                if (_completedSteps >= _totalSteps && _endTime == null)
-                {
-                    _endTime = DateTime.Now;
-                }
+                // 로컬 상태 업데이트 (이벤트 핸들러에서도 업데이트되지만 즉시 반영을 위해)
+                _completedSteps = Math.Max(_completedSteps, stepIndex + 1);
                 
                 Invalidate();
             }
@@ -254,8 +312,10 @@ namespace LogisticManager.Forms
             _completedSteps = 0;
             _currentStepIndex = -1;
             _animationTimer.Stop();
-            _startTime = null; // 처리 시작 시간 초기화
-            _endTime = null; // 완료 시간 초기화
+            
+            // 통합 시간 관리자 초기화
+            _timeManager.Reset();
+            
             Invalidate();
         }
         
@@ -271,10 +331,10 @@ namespace LogisticManager.Forms
         {
             if (stepIndex >= 0 && stepIndex < _totalSteps)
             {
-                // 첫 번째 단계 시작 시 처리 시작 시간 설정
-                if (_startTime == null)
+                // 첫 번째 단계 시작 시 처리 시작 (통합 시간 관리자에서 관리)
+                if (!_timeManager.IsProcessing)
                 {
-                    _startTime = DateTime.Now;
+                    _timeManager.StartProcessing();
                 }
                 
                 CurrentStepIndex = stepIndex;
@@ -302,32 +362,28 @@ namespace LogisticManager.Forms
         }
         
         /// <summary>
-        /// 처리 시간을 초 단위로 포맷팅
+        /// 처리 완료 상태로 설정 (메시지 창 표시 시점에 호출)
+        /// </summary>
+        public void SetProcessingCompleted()
+        {
+            // 통합 시간 관리자에서 처리 완료 설정
+            if (_timeManager.IsProcessing)
+            {
+                _timeManager.CompleteProcessing();
+            }
+        }
+        
+        /// <summary>
+        /// 처리 시간을 초 단위로 포맷팅 (통합 시간 관리자 사용)
         /// </summary>
         /// <returns>포맷팅된 처리 시간 문자열</returns>
         private string GetFormattedProcessingTime()
         {
-            // 처리 시작 시간이 설정되지 않은 경우 0초 표시
-            if (_startTime == null)
-            {
-                return "0.0초";
-            }
-            
-            TimeSpan processingTime;
-            
-            if (_endTime.HasValue)
-            {
-                // 완료된 경우: 시작부터 완료까지의 시간
-                processingTime = _endTime.Value - _startTime.Value;
-            }
-            else
-            {
-                // 진행 중인 경우: 시작부터 현재까지의 시간
-                processingTime = DateTime.Now - _startTime.Value;
-            }
+            // 통합 시간 관리자에서 경과 시간 가져오기
+            var elapsedTime = _timeManager.GetElapsedTime();
             
             // 초 단위로 표시 (소수점 1자리)
-            return $"{processingTime.TotalSeconds:F1}초";
+            return $"{elapsedTime.TotalSeconds:F1}초";
         }
         
         #endregion
@@ -369,7 +425,10 @@ namespace LogisticManager.Forms
             int x = this.Width - rightMargin;
             int y = topMargin;
             
-            // 처리 시간 텍스트 생성 (이모지 제거하여 빈 네모박스 문제 해결)
+            // 시계 아이콘 추가 (가장 안전한 유니코드 문자 사용)
+            string clockIcon = "⏰";
+            
+            // 처리 시간 텍스트 생성
             string timeText = $"총 처리 시간: {GetFormattedProcessingTime()}";
             
             // 폰트 크기를 더 작게 조정 (화면 크기에 따라)
@@ -383,7 +442,14 @@ namespace LogisticManager.Forms
                 // 텍스트 크기 측정
                 SizeF textSize = g.MeasureString(timeText, font);
                 
-                // 텍스트 그리기 (배경 없이 투명하게)
+                // 시계 아이콘 크기 측정
+                SizeF iconSize = g.MeasureString(clockIcon, font);
+                
+                // 시계 아이콘 그리기 (텍스트 왼쪽에 배치)
+                g.DrawString(clockIcon, font, Brushes.DarkSlateGray, 
+                    new RectangleF(x - textSize.Width - iconSize.Width - 5, y, iconSize.Width, iconSize.Height), sf);
+                
+                // 텍스트 그리기 (아이콘 오른쪽에 배치)
                 g.DrawString(timeText, font, Brushes.DarkSlateGray, 
                     new RectangleF(x - textSize.Width, y, textSize.Width, textSize.Height), sf);
             }
@@ -415,8 +481,8 @@ namespace LogisticManager.Forms
                 centerY = (this.Height / 5) + 60;
             }
             
-            // 펜 두께를 아주 약간 더 두껍게 조정 (원형 차트의 시각적 임팩트 향상)
-            float penWidth = Math.Max(10f, Math.Min(18f, radius / 5f));
+            // 펜 두께를 더 두껍게 조정 (원형 차트의 시각적 임팩트 향상)
+            float penWidth = Math.Max(12f, Math.Min(22f, radius / 4f));
             _progressPen.Width = penWidth;
             _backgroundPen.Width = penWidth;
             
@@ -545,7 +611,7 @@ namespace LogisticManager.Forms
                 FontStyle descFontStyle = (i < _completedSteps) ? FontStyle.Bold : FontStyle.Regular;
                 using (Font descFont = new Font("맑은 고딕", descFontSize, descFontStyle))
                 {
-                    g.DrawString(stepDescription, descFont, new SolidBrush(Color.DarkSlateGray), x + 90, y);
+                    g.DrawString(stepDescription, descFont, new SolidBrush(stepColor), x + 90, y);
                 }
             }
         }
@@ -562,6 +628,11 @@ namespace LogisticManager.Forms
         {
             if (disposing)
             {
+                // 시간 관리자 이벤트 구독 해제
+                _timeManager.TimeUpdated -= OnTimeUpdated;
+                _timeManager.ProcessingCompleted -= OnProcessingCompleted;
+                _timeManager.StepUpdated -= OnStepUpdated;
+                
                 _progressPen?.Dispose();
                 _backgroundPen?.Dispose();
                 _animationTimer?.Dispose();

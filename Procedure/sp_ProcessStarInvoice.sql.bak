@@ -5,13 +5,14 @@ DROP PROCEDURE IF EXISTS sp_ProcessStarInvoice$$
 CREATE PROCEDURE sp_ProcessStarInvoice()
 BEGIN
     /*--================================================================================
-	-- ¼ÛÀåÃâ·Â°ü¸® Ã³¸®
+	-- ì†¡ìž¥ì¶œë ¥ê´€ë¦¬ ì²˜ë¦¬
+	-- ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤
     --==================================================================================*/
-	DECLARE var_°ü¸®ÀÚ¸Þ¼¼Áö VARCHAR(255);
+	DECLARE var_ê´€ë¦¬ìžë©”ì„¸ì§€ VARCHAR(255);
 	DECLARE done_msg BOOLEAN DEFAULT FALSE;
     DECLARE loop_updated_rows INT DEFAULT 0;
 
-	DECLARE cur_msg CURSOR FOR SELECT TRIM(¹è¼Û¸Þ¼¼Áö) FROM ¼ÛÀåÃâ·Â_°ü¸®ÀÚ_¹è¼Û¸Þ¼¼Áö WHERE TRIM(¹è¼Û¸Þ¼¼Áö) != '';
+	DECLARE cur_msg CURSOR FOR SELECT TRIM(ë°°ì†¡ë©”ì„¸ì§€) FROM ì†¡ìž¥ì¶œë ¥_ê´€ë¦¬ìž_ë°°ì†¡ë©”ì„¸ì§€ WHERE TRIM(ë°°ì†¡ë©”ì„¸ì§€) != '';
 	
 	DECLARE CONTINUE HANDLER FOR NOT FOUND SET done_msg = TRUE;
 	
@@ -20,14 +21,14 @@ BEGIN
 		DECLARE error_info TEXT DEFAULT '';
 		DECLARE error_code INT DEFAULT 0;
 		
-		-- MySQL ¿À·ù Á¤º¸ ¼öÁý
+		-- MySQL ì˜¤ë¥˜ ì •ë³´ ìˆ˜ì§‘
 		GET DIAGNOSTICS CONDITION 1
 			error_code = MYSQL_ERRNO,
 			error_info = MESSAGE_TEXT;
 			
         ROLLBACK;
         DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
-        SELECT '¿À·ù°¡ ¹ß»ýÇÏ¿© ¸ðµç ÀÛ¾÷ÀÌ ·Ñ¹éµÇ¾ú½À´Ï´Ù.' AS ErrorMessage,
+        SELECT 'ì˜¤ë¥˜ê°€ ë°œìƒí•˜ì—¬ ëª¨ë“  ìž‘ì—…ì´ ë¡¤ë°±ë˜ì—ˆìŠµë‹ˆë‹¤.' AS ErrorMessage,
 		        error_code AS MySQLErrorCode,
                 error_info AS MySQLErrorMessage;
     END;
@@ -42,344 +43,379 @@ BEGIN
 
     TRUNCATE TABLE sp_execution_log;
 
-    TRUNCATE TABLE ¼ÛÀåÃâ·Â_°ü¸®ÀÚ;
-    TRUNCATE TABLE ¼ÛÀåÃâ·Â_°ü¸®ÀÚ_¹è¼Û¸Þ¼¼Áö;
-    TRUNCATE TABLE ¼ÛÀåÃâ·Â_°ü¸®ÀÚ_ÀÌ¸§;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('°ü¸®ÀÚ Å×ÀÌºí 3°³ ÃÊ±âÈ­ (TRUNCATE)', 0);
+    TRUNCATE TABLE ì†¡ìž¥ì¶œë ¥_ê´€ë¦¬ìž;
+    TRUNCATE TABLE ì†¡ìž¥ì¶œë ¥_ê´€ë¦¬ìž_ë°°ì†¡ë©”ì„¸ì§€;
+    TRUNCATE TABLE ì†¡ìž¥ì¶œë ¥_ê´€ë¦¬ìž_ì´ë¦„;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('ê´€ë¦¬ìž í…Œì´ë¸” 3ê°œ ì´ˆê¸°í™” (TRUNCATE)', 0);
 
-    -- Ç°¹øÄÚµå ¶Ç´Â »óÇ°¸í
-    INSERT INTO ¼ÛÀåÃâ·Â_°ü¸®ÀÚ (Ç°ÀýÁ¦Ç°ÄÚµå, »óÇ°¸í)
-         SELECT TRIM(Ç°¹øÄÚµå), TRIM(»óÇ°¸í) FROM º°Ç¥¼ÛÀå
-          WHERE (TRIM(Ç°¹øÄÚµå) IS NOT NULL AND TRIM(Ç°¹øÄÚµå) != '') OR (TRIM(»óÇ°¸í) IS NOT NULL AND TRIM(»óÇ°¸í) != '');
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] °ü¸®ÀÚ_Ç°ÀýÁ¦Ç°ÄÚµå/»óÇ°¸í', ROW_COUNT());
+    -- í’ˆë²ˆì½”ë“œ ë˜ëŠ” ìƒí’ˆëª…
+    INSERT INTO ì†¡ìž¥ì¶œë ¥_ê´€ë¦¬ìž (í’ˆì ˆì œí’ˆì½”ë“œ, ìƒí’ˆëª…)
+        SELECT TRIM(í’ˆë²ˆì½”ë“œ), TRIM(ìƒí’ˆëª…) FROM ë³„í‘œì†¡ìž¥
+        WHERE (TRIM(í’ˆë²ˆì½”ë“œ) IS NOT NULL AND TRIM(í’ˆë²ˆì½”ë“œ) != '') OR (TRIM(ìƒí’ˆëª…) IS NOT NULL AND TRIM(ìƒí’ˆëª…) != '');
+		
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ê´€ë¦¬ìž_í’ˆì ˆì œí’ˆì½”ë“œ/ìƒí’ˆëª…', ROW_COUNT());
 
-    -- ¹è¼Û¸Þ¼¼Áö
-    INSERT INTO ¼ÛÀåÃâ·Â_°ü¸®ÀÚ_¹è¼Û¸Þ¼¼Áö (¹è¼Û¸Þ¼¼Áö)
-         SELECT TRIM(¹è¼Û¸Þ¼¼Áö) FROM º°Ç¥¼ÛÀå
-          WHERE TRIM(¹è¼Û¸Þ¼¼Áö) IS NOT NULL AND TRIM(¹è¼Û¸Þ¼¼Áö) != '';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] °ü¸®ÀÚ_¹è¼Û¸Þ¼¼Áö', ROW_COUNT());
+    -- ë°°ì†¡ë©”ì„¸ì§€
+    INSERT INTO ì†¡ìž¥ì¶œë ¥_ê´€ë¦¬ìž_ë°°ì†¡ë©”ì„¸ì§€ (ë°°ì†¡ë©”ì„¸ì§€)
+        SELECT TRIM(ë°°ì†¡ë©”ì„¸ì§€) FROM ë³„í‘œì†¡ìž¥
+        WHERE TRIM(ë°°ì†¡ë©”ì„¸ì§€) IS NOT NULL AND TRIM(ë°°ì†¡ë©”ì„¸ì§€) != '';
+		
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ê´€ë¦¬ìž_ë°°ì†¡ë©”ì„¸ì§€', ROW_COUNT());
 
-    -- ¼öÃëÀÎ¸í
-    INSERT INTO ¼ÛÀåÃâ·Â_°ü¸®ÀÚ_ÀÌ¸§ (¼öÃëÀÎ¸í)
-         SELECT TRIM(¼öÃëÀÎ¸í) FROM º°Ç¥¼ÛÀå
-          WHERE TRIM(¼öÃëÀÎ¸í) IS NOT NULL AND TRIM(¼öÃëÀÎ¸í) != '';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] °ü¸®ÀÚ_¼öÃëÀÎ¸í', ROW_COUNT());
+    -- ìˆ˜ì·¨ì¸ëª…
+    INSERT INTO ì†¡ìž¥ì¶œë ¥_ê´€ë¦¬ìž_ì´ë¦„ (ìˆ˜ì·¨ì¸ëª…)
+        SELECT TRIM(ìˆ˜ì·¨ì¸ëª…) FROM ë³„í‘œì†¡ìž¥
+        WHERE TRIM(ìˆ˜ì·¨ì¸ëª…) IS NOT NULL AND TRIM(ìˆ˜ì·¨ì¸ëª…) != '';
+		
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ê´€ë¦¬ìž_ìˆ˜ì·¨ì¸ëª…', ROW_COUNT());
 
     /*--=============================================================
-    -- ¹è¼Û¸Þ¼¼Áö¿¡¼­ º°Ç¥Áö¿ì±â
+    -- ë°°ì†¡ë©”ì„¸ì§€ì—ì„œ ë³„í‘œì§€ìš°ê¸°
     --=============================================================*/
-    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯
-       SET ¹è¼Û¸Þ¼¼Áö = REPLACE(¹è¼Û¸Þ¼¼Áö, '¡Ú', '')
-     WHERE ¹è¼Û¸Þ¼¼Áö LIKE '%¡Ú%';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ¹è¼Û¸Þ¼¼Áö º°Ç¥ Á¦°Å', ROW_COUNT());
+    UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜
+       SET ë°°ì†¡ë©”ì„¸ì§€ = REPLACE(ë°°ì†¡ë©”ì„¸ì§€, 'â˜…', '')
+     WHERE ë°°ì†¡ë©”ì„¸ì§€ LIKE '%â˜…%';
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ë°°ì†¡ë©”ì„¸ì§€ ë³„í‘œ ì œê±°', ROW_COUNT());
 
 	/*--=============================================================
-	-- º°Ç¥ Ç°¸ñÄÚµå µ¥ÀÌÅÍÀÔ·Â
+	-- ë³„í‘œ í’ˆëª©ì½”ë“œ ë°ì´í„°ìž…ë ¥
     --===============================================================*/
-    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ AS s 
-	  JOIN ¼ÛÀåÃâ·Â_°ü¸®ÀÚ AS a ON s.Ç°¸ñÄÚµå = a.Ç°ÀýÁ¦Ç°ÄÚµå 
-	   SET s.º°Ç¥1 = '¡Ú¡Ú¡Ú';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] º°Ç¥ Ç°¸ñÄÚµå ÀÔ·Â', ROW_COUNT());
+    UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ AS s 
+	  JOIN ì†¡ìž¥ì¶œë ¥_ê´€ë¦¬ìž AS a ON s.í’ˆëª©ì½”ë“œ = a.í’ˆì ˆì œí’ˆì½”ë“œ 
+	   SET s.ë³„í‘œ1 = 'â˜…â˜…â˜…';
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ë³„í‘œ í’ˆëª©ì½”ë“œ ìž…ë ¥', ROW_COUNT());
 
     /*--============================================================================================================
-    -- ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ Å×ÀÌºíÀÇ ¹è¼Û¸Þ¼¼Áö¿¡ ¼ÛÀåÃâ·Â_°ü¸®ÀÚ_¹è¼Û¸Þ¼¼Áö Å×ÀÌºíÀÇ ¹è¼Û¸Þ¼¼Áö°¡
-    --    TRIM ÇÔ¼ö¸¦ ÀÌ¿ëÇØ ºóÄ­À» Á¦°ÅÇÑ ÈÄ Æ÷ÇÔµÇ´Â °æ¿ì¿¡
-    --    ÇØ´çÇÏ´Â ÇàÀ» Ã£°í, ±×¿¡ ÇØ´çÇÏ´Â ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ Å×ÀÌºíÀÇ º°Ç¥1 ÄÃ·³¿¡ º°Ç¥ ¼¼ °³¸¦ ³Ö¾îÁÝ´Ï´Ù.
+    -- ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ í…Œì´ë¸”ì˜ ë°°ì†¡ë©”ì„¸ì§€ì— ì†¡ìž¥ì¶œë ¥_ê´€ë¦¬ìž_ë°°ì†¡ë©”ì„¸ì§€ í…Œì´ë¸”ì˜ ë°°ì†¡ë©”ì„¸ì§€ê°€
+    --   TRIM í•¨ìˆ˜ë¥¼ ì´ìš©í•´ ë¹ˆì¹¸ì„ ì œê±°í•œ í›„ í¬í•¨ë˜ëŠ” ê²½ìš°ì—
+    --   í•´ë‹¹í•˜ëŠ” í–‰ì„ ì°¾ê³ , ê·¸ì— í•´ë‹¹í•˜ëŠ” ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ í…Œì´ë¸”ì˜ ë³„í‘œ1 ì»¬ëŸ¼ì— ë³„í‘œ ì„¸ ê°œë¥¼ ë„£ì–´ì¤ë‹ˆë‹¤.
     --============================================================================================================*/
+	
 	OPEN cur_msg;
 
 	msg_loop: LOOP
-		FETCH cur_msg INTO var_°ü¸®ÀÚ¸Þ¼¼Áö;
+		FETCH cur_msg INTO var_ê´€ë¦¬ìžë©”ì„¸ì§€;
 		IF done_msg THEN
 			LEAVE msg_loop;
 		END IF;
 
-		-- FULLTEXT ÀÎµ¦½º¸¦ »ç¿ëÇÏ¿© ¸Å¿ì ºü¸£°Ô °Ë»öÇÏ°í ¾÷µ¥ÀÌÆ®ÇÕ´Ï´Ù.
-		UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯
-		   SET º°Ç¥1 = '¡Ú¡Ú¡Ú'
-		 WHERE MATCH(¹è¼Û¸Þ¼¼Áö) AGAINST(var_°ü¸®ÀÚ¸Þ¼¼Áö IN BOOLEAN MODE);
+		UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜
+		   SET ë³„í‘œ1 = 'â˜…â˜…â˜…'
+		 WHERE ë°°ì†¡ë©”ì„¸ì§€ LIKE CONCAT('%', var_ê´€ë¦¬ìžë©”ì„¸ì§€, '%');
+
         SET loop_updated_rows = loop_updated_rows + ROW_COUNT();
 	END LOOP;
 
 	CLOSE cur_msg;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ¹è¼Û¸Þ¼¼Áö °Ë»öÀ¸·Î º°Ç¥ ÀÔ·Â (·çÇÁ ÃÑÇÕ)', loop_updated_rows);
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ë°°ì†¡ë©”ì„¸ì§€ ê²€ìƒ‰ìœ¼ë¡œ ë³„í‘œ ìž…ë ¥', loop_updated_rows);
 
     /*--=============================================================
-    -- º°Ç¥ ¼öÃëÀÎ µ¥ÀÌÅÍÀÔ·Â
+    -- ë³„í‘œ ìˆ˜ì·¨ì¸ ë°ì´í„°ìž…ë ¥
     --===============================================================*/
-    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ AS s 
-	  JOIN ¼ÛÀåÃâ·Â_°ü¸®ÀÚ_ÀÌ¸§ AS a 
-	    ON s.¼öÃëÀÎ¸í = a.¼öÃëÀÎ¸í 
-	   SET s.º°Ç¥1 = '¡Ú¡Ú¡Ú';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] º°Ç¥ ¼öÃëÀÎ ÀÔ·Â', ROW_COUNT());
+    UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ AS s 
+	  JOIN ì†¡ìž¥ì¶œë ¥_ê´€ë¦¬ìž_ì´ë¦„ AS a 
+	    ON s.ìˆ˜ì·¨ì¸ëª… = a.ìˆ˜ì·¨ì¸ëª… 
+	   SET s.ë³„í‘œ1 = 'â˜…â˜…â˜…';
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ë³„í‘œ ìˆ˜ì·¨ì¸ ìž…ë ¥', ROW_COUNT());
 
     /*--=============================================================	
-    -- º°Ç¥ Á¦ÁÖµµ
+    -- ë³„í‘œ ì œì£¼ë„
     --===============================================================*/
-    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ 
-	   SET º°Ç¥2 = 'Á¦ÁÖ' 
-	 WHERE ÁÖ¼Ò LIKE '%Á¦ÁÖÆ¯º°%' OR ÁÖ¼Ò LIKE '%Á¦ÁÖ Á¦ÁÖ%';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] Á¦ÁÖµµ ÁÖ¼Ò Ç¥½Ã', ROW_COUNT());
+    UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ 
+	   SET ë³„í‘œ2 = 'ì œì£¼' 
+	 WHERE ì£¼ì†Œ LIKE '%ì œì£¼íŠ¹ë³„%' OR ì£¼ì†Œ LIKE '%ì œì£¼ ì œì£¼%';
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ì œì£¼ë„ ì£¼ì†Œ í‘œì‹œ', ROW_COUNT());
 
     /*--=============================================================	
-    -- º°Ç¥ °í°´ °øÅë ¸¶Å·
+    -- ë³„í‘œ ê³ ê° ê³µí†µ ë§ˆí‚¹
     --===============================================================*/
-    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ AS t1 
-	  JOIN (SELECT ÁÖ¼Ò, ¼öÃëÀÎ¸í FROM ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ WHERE º°Ç¥1 = '¡Ú¡Ú¡Ú') AS t2 
-        ON t1.ÁÖ¼Ò = t2.ÁÖ¼Ò AND t1.¼öÃëÀÎ¸í = t2.¼öÃëÀÎ¸í 
- 	   SET t1.º°Ç¥1 = '¡Ú¡Ú¡Ú';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] º°Ç¥ °í°´ °øÅë ¸¶Å·', ROW_COUNT());
+    UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ AS t1 
+	  JOIN (SELECT ì£¼ì†Œ, ìˆ˜ì·¨ì¸ëª… FROM ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ WHERE ë³„í‘œ1 = 'â˜…â˜…â˜…') AS t2 
+        ON t1.ì£¼ì†Œ = t2.ì£¼ì†Œ AND t1.ìˆ˜ì·¨ì¸ëª… = t2.ìˆ˜ì·¨ì¸ëª… 
+ 	   SET t1.ë³„í‘œ1 = 'â˜…â˜…â˜…';
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ë³„í‘œ ê³ ê° ê³µí†µ ë§ˆí‚¹', ROW_COUNT());
 
     /*--=============================================================		
-    -- ¹Ú½º»óÇ° ¸íÄªº¯°æ	
+    -- ë°•ìŠ¤ìƒí’ˆ ëª…ì¹­ë³€ê²½	
     --===============================================================*/
-    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ 
-	   SET ¼ÛÀå¸í = CONCAT('¢É¢Ê¢Ë ', ¼ÛÀå¸í) 
-	 WHERE ¼ÛÀå¸í LIKE '%¹Ú½º%';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ¹Ú½º»óÇ° ¸íÄª º¯°æ', ROW_COUNT());
+    UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ 
+	   SET ì†¡ìž¥ëª… = CONCAT('â–¨â–§â–¦ ', ì†¡ìž¥ëª…) 
+	 WHERE ì†¡ìž¥ëª… LIKE '%ë°•ìŠ¤%';
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ë°•ìŠ¤ìƒí’ˆ ëª…ì¹­ ë³€ê²½', ROW_COUNT());
 
 	/*--=============================================================		
-	-- ÅÃ¹è ¹Ú½º ³¹°³ ³ª´©±â (sp_MergePacking ¿¡¼­ Ã³¸®)
-    --===============================================================
-    -- ÅÃ¹è¼ö·® ÄÃ·³ÀÇ °ªÀÌ 1ÀÎ °æ¿ì¿¡´Â '¹Ú½º', ±× ¿ÜÀÇ °æ¿ì¿¡´Â '³¹°³'·Î º¯°æ.
-    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ 
-	   SET ÅÃ¹è¼ö·®1 = CASE WHEN CAST(ÅÃ¹è¼ö·® AS UNSIGNED) = 1 THEN '¹Ú½º' ELSE '³¹°³' END 
-	 WHERE ÅÃ¹è¼ö·® REGEXP '^[0-9]+$';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ÅÃ¹è ¹Ú½º/³¹°³ ±¸ºÐ', ROW_COUNT());*/
+	-- íƒë°° ë°•ìŠ¤ ë‚±ê°œ ë‚˜ëˆ„ê¸° (sp_MergePacking ì—ì„œ ì²˜ë¦¬)
+    --===============================================================*/
+    -- íƒë°°ìˆ˜ëŸ‰ ì»¬ëŸ¼ì˜ ê°’ì´ 1ì¸ ê²½ìš°ì—ëŠ” 'ë°•ìŠ¤', ê·¸ ì™¸ì˜ ê²½ìš°ì—ëŠ” 'ë‚±ê°œ'ë¡œ ë³€ê²½.
+    UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ 
+	   SET íƒë°°ìˆ˜ëŸ‰1 = CASE WHEN CAST(íƒë°°ìˆ˜ëŸ‰ AS UNSIGNED) = 1 THEN 'ë°•ìŠ¤' ELSE 'ë‚±ê°œ' END 
+	 WHERE íƒë°°ìˆ˜ëŸ‰ REGEXP '^[0-9]+$';
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] íƒë°° ë°•ìŠ¤/ë‚±ê°œ êµ¬ë¶„', ROW_COUNT());
 
 	/*--=============================================================		
-	-- ¼ÛÀå Ãâ°íÁöº°·Î ±¸ºÐ
+	-- ì†¡ìž¥ ì¶œê³ ì§€ë³„ë¡œ êµ¬ë¶„
     --===============================================================*/
-    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ 
-	   SET ¼ÛÀå±¸ºÐÃÖÁ¾ = CONCAT(¼ÛÀå±¸ºÐ, IFNULL(ÅÃ¹è¼ö·®1, ''));
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ¼ÛÀå±¸ºÐÃÖÁ¾ ¼³Á¤', ROW_COUNT());
+    UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ 
+	   SET ì†¡ìž¥êµ¬ë¶„ìµœì¢… = CONCAT(ì†¡ìž¥êµ¬ë¶„, IFNULL(íƒë°°ìˆ˜ëŸ‰1, ''));
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ì†¡ìž¥êµ¬ë¶„ìµœì¢… ì„¤ì •', ROW_COUNT());
 
     /*--=============================================================		
-    -- ³Ãµ¿ ·º À§Ä¡ ÀÔ·Â
+    -- ëƒ‰ë™ ë ‰ ìœ„ì¹˜ ìž…ë ¥
     --===============================================================*/
-    -- Ç°¸ñµî·Ï Å×ÀÌºí°ú ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ Å×ÀÌºíÀ» JOINÇÏ¿©
-    -- 'Ç°¸ñÄÚµå'°¡ ÀÏÄ¡ÇÏ´Â °æ¿ì, 'Ç°¸ñµî·Ï' Å×ÀÌºíÀÇ 'Ç°¸ñ±×·ì2ÄÚµå' °ªÀ¸·Î
-    -- '¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯' Å×ÀÌºíÀÇ 'À§Ä¡' ÇÊµå¸¦ ÇÑ ¹ø¿¡ ¾÷µ¥ÀÌÆ®.
-    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ AS s 
-	  JOIN Ç°¸ñµî·Ï AS p 
-	    ON s.Ç°¸ñÄÚµå = p.Ç°¸ñÄÚµå 
-	   SET s.À§Ä¡     = p.Ç°¸ñ±×·ì2ÄÚµå;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ³Ãµ¿ ·º À§Ä¡ ÀÔ·Â', ROW_COUNT());
+    -- í’ˆëª©ë“±ë¡ í…Œì´ë¸”ê³¼ ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ í…Œì´ë¸”ì„ JOINí•˜ì—¬
+    -- 'í’ˆëª©ì½”ë“œ'ê°€ ì¼ì¹˜í•˜ëŠ” ê²½ìš°, 'í’ˆëª©ë“±ë¡' í…Œì´ë¸”ì˜ 'í’ˆëª©ê·¸ë£¹2ì½”ë“œ' ê°’ìœ¼ë¡œ
+    -- 'ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜' í…Œì´ë¸”ì˜ 'ìœ„ì¹˜' í•„ë“œë¥¼ í•œ ë²ˆì— ì—…ë°ì´íŠ¸.
+    UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ AS s 
+	  JOIN í’ˆëª©ë“±ë¡ AS p 
+	    ON s.í’ˆëª©ì½”ë“œ = p.í’ˆëª©ì½”ë“œ 
+	   SET s.ìœ„ì¹˜      = p.í’ˆëª©ê·¸ë£¹2ì½”ë“œ;
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ëƒ‰ë™ ë ‰ ìœ„ì¹˜ ìž…ë ¥', ROW_COUNT());
 
 	/*--=============================================================	
-	-- ºó À§Ä¡ ¾÷µ¥ÀÌÆ®
+	-- ë¹ˆ ìœ„ì¹˜ ì—…ë°ì´íŠ¸
     --=============================================================*/
-    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯ 
-	   SET À§Ä¡ = '99-1' 
-	 WHERE À§Ä¡ IS NULL OR À§Ä¡ = '';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ºó À§Ä¡¸¦ 99-1·Î ¼³Á¤', ROW_COUNT());
+    UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜ 
+	   SET ìœ„ì¹˜ = '99-1' 
+	 WHERE ìœ„ì¹˜ IS NULL OR ìœ„ì¹˜ = '';
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ë¹ˆ ìœ„ì¹˜ë¥¼ 99-1ë¡œ ì„¤ì •', ROW_COUNT());
 
 	/*--=============================================================
-	-- 'À§Ä¡º¯È¯' ¾÷µ¥ÀÌÆ®
+	-- 'ìœ„ì¹˜ë³€í™˜' ì—…ë°ì´íŠ¸
     --=============================================================*/
-    -- 'À§Ä¡' °ª¿¡ µû¶ó 'À§Ä¡º¯È¯' ÄÃ·³À» Á¶°ÇºÎ·Î ¾÷µ¥ÀÌÆ®.
-    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯
-       SET À§Ä¡º¯È¯ =
+    -- 'ìœ„ì¹˜' ê°’ì— ë”°ë¼ 'ìœ„ì¹˜ë³€í™˜' ì»¬ëŸ¼ì„ ì¡°ê±´ë¶€ë¡œ ì—…ë°ì´íŠ¸.
+    UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜
+       SET ìœ„ì¹˜ë³€í™˜ =
            CASE
-               WHEN À§Ä¡ = '°ø2' THEN CONCAT(À§Ä¡, Ç°¸ñÄÚµå, LPAD(¼ö·®, 2, '0'), ¼öÃëÀÎ¸í, ÁÖ¼Ò, ÀüÈ­¹øÈ£1)
-               ELSE CONCAT(À§Ä¡, '0', Ç°¸ñÄÚµå, LPAD(¼ö·®, 2, '0'), ¼öÃëÀÎ¸í, ÁÖ¼Ò, ÀüÈ­¹øÈ£1)
+               WHEN ìœ„ì¹˜ = 'ê³µ2' THEN CONCAT(ìœ„ì¹˜, í’ˆëª©ì½”ë“œ, LPAD(ìˆ˜ëŸ‰, 2, '0'), ìˆ˜ì·¨ì¸ëª…, ì£¼ì†Œ, ì „í™”ë²ˆí˜¸1)
+               ELSE CONCAT(ìœ„ì¹˜, '0', í’ˆëª©ì½”ë“œ, LPAD(ìˆ˜ëŸ‰, 2, '0'), ìˆ˜ì·¨ì¸ëª…, ì£¼ì†Œ, ì „í™”ë²ˆí˜¸1)
            END;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] À§Ä¡º¯È¯ ¼³Á¤', ROW_COUNT());
+		
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ìœ„ì¹˜ë³€í™˜ ì„¤ì •', ROW_COUNT());
 
     /*--=============================================================
-    -- ³Ãµ¿ °ø»ê Á¦Ç° Áß ÀÛÀº Ç°¸ñ ÇÕÆ÷ÀåÃ³¸®
+    -- ëƒ‰ë™ ê³µì‚° ì œí’ˆ ì¤‘ ìž‘ì€ í’ˆëª© í•©í¬ìž¥ì²˜ë¦¬
     --=============================================================*/
-    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯
-       SET À§Ä¡ = '°ø3'
-     WHERE À§Ä¡ = '°ø2' AND ÅÃ¹è¼ö·® BETWEEN 20 AND 1000000;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ÇÕÆ÷Àå Ã³¸® (°ø3)', ROW_COUNT());
-
-    /*--=============================================================
-    -- ³Ãµ¿Ã¢°í °ø»êÇ° ¼ÛÀåºÐ¸®ÀÔ·Â
-    --=============================================================*/
-    UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯
-       SET ÁÖ¼Ò = CONCAT(ÁÖ¼Ò, '¡Ù')
-     WHERE À§Ä¡ = '°ø2';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ³Ãµ¿Ã¢°í °ø»êÇ° ¼ÛÀåºÐ¸® (ÁÖ¼Ò¿¡ ¡Ù Ãß°¡)', ROW_COUNT());
-
-    /*--=============================================================
-    -- °øÅë¹Ú½º ºÐ·ùÀÛ¾÷
-    --=============================================================*/
-    TRUNCATE TABLE ¼ÛÀåÃâ·Â_°øÅë¹Ú½º;
-	INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('°øÅë¹Ú½º Å×ÀÌºí ÃÊ±âÈ­ (TRUNCATE)', 0);
+    UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜
+       SET ìœ„ì¹˜ = 'ê³µ3'
+     WHERE ìœ„ì¹˜ = 'ê³µ2' AND CAST(íƒë°°ìˆ˜ëŸ‰ AS UNSIGNED) BETWEEN 20 AND 1000000;
 	
-	-- ¼ö·®ÀÌ 2 ÀÌ»óÀÎ Çà¸¸À» º¹»çÇÏ¿© Ãß°¡
-    INSERT INTO ¼ÛÀåÃâ·Â_°øÅë¹Ú½º (
-	            msg1, msg2, msg3, msg4, msg5, msg6, ¼öÃëÀÎ¸í, ÀüÈ­¹øÈ£1, ÀüÈ­¹øÈ£2, ¿ìÆí¹øÈ£, ÁÖ¼Ò, ¿É¼Ç¸í, ¼ö·®, 
-				¹è¼Û¸Þ¼¼Áö, ÁÖ¹®¹øÈ£, ¼îÇÎ¸ô, ¼öÁý½Ã°£, ¼ÛÀå¸í, Ç°¸ñÄÚµå, ÅÃ¹èºñ¿ë, ¹Ú½ºÅ©±â, Ãâ·Â°³¼ö, ¼ÛÀå¼ö·®, 
-				º°Ç¥1, º°Ç¥2, Ç°¸ñ°³¼ö, ÅÃ¹è¼ö·®, ÅÃ¹è¼ö·®1, ÅÃ¹è¼ö·®ÇÕ»ê, ¼ÛÀå±¸ºÐÀÚ, ¼ÛÀå±¸ºÐ, ¼ÛÀå±¸ºÐÃÖÁ¾, À§Ä¡, 
-				À§Ä¡º¯È¯)
-         SELECT msg1, msg2, msg3, msg4, msg5, msg6, ¼öÃëÀÎ¸í, ÀüÈ­¹øÈ£1, ÀüÈ­¹øÈ£2, ¿ìÆí¹øÈ£, ÁÖ¼Ò, ¿É¼Ç¸í, ¼ö·®, 
-		        ¹è¼Û¸Þ¼¼Áö, ÁÖ¹®¹øÈ£, ¼îÇÎ¸ô, ¼öÁý½Ã°£, ¼ÛÀå¸í, Ç°¸ñÄÚµå, ÅÃ¹èºñ¿ë, ¹Ú½ºÅ©±â, Ãâ·Â°³¼ö, ¼ÛÀå¼ö·®, 
-				º°Ç¥1, º°Ç¥2, Ç°¸ñ°³¼ö, ÅÃ¹è¼ö·®, ÅÃ¹è¼ö·®1, ÅÃ¹è¼ö·®ÇÕ»ê, ¼ÛÀå±¸ºÐÀÚ, ¼ÛÀå±¸ºÐ, ¼ÛÀå±¸ºÐÃÖÁ¾, À§Ä¡, 
-				À§Ä¡º¯È¯
-           FROM ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯
-          WHERE ÅÃ¹è¼ö·®1 = '¹Ú½º';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] °øÅë¹Ú½º µ¥ÀÌÅÍ º¹»ç', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] í•©í¬ìž¥ ì²˜ë¦¬ (ê³µ3)', ROW_COUNT());
+
+    /*--=============================================================
+    -- ëƒ‰ë™ì°½ê³  ê³µì‚°í’ˆ ì†¡ìž¥ë¶„ë¦¬ìž…ë ¥
+    --=============================================================*/
+    UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜
+       SET ì£¼ì†Œ = CONCAT(ì£¼ì†Œ, 'â˜†')
+     WHERE ìœ„ì¹˜ = 'ê³µ2';
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ëƒ‰ë™ì°½ê³  ê³µì‚°í’ˆ ì†¡ìž¥ë¶„ë¦¬ (ì£¼ì†Œì— â˜† ì¶”ê°€)', ROW_COUNT());
+
+    /*--=============================================================
+    -- ê³µí†µë°•ìŠ¤ ë¶„ë¥˜ìž‘ì—…
+    --=============================================================*/
+    TRUNCATE TABLE ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤;
+	INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ í…Œì´ë¸” ì´ˆê¸°í™” (TRUNCATE)', 0);
+	
+    INSERT INTO ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ (
+	            msg1, msg2, msg3, msg4, msg5, msg6, ìˆ˜ì·¨ì¸ëª…, ì „í™”ë²ˆí˜¸1, ì „í™”ë²ˆí˜¸2, ìš°íŽ¸ë²ˆí˜¸, ì£¼ì†Œ, ì˜µì…˜ëª…, ìˆ˜ëŸ‰, 
+				ë°°ì†¡ë©”ì„¸ì§€, ì£¼ë¬¸ë²ˆí˜¸, ì‡¼í•‘ëª°, ìˆ˜ì§‘ì‹œê°„, ì†¡ìž¥ëª…, í’ˆëª©ì½”ë“œ, íƒë°°ë¹„ìš©, ë°•ìŠ¤í¬ê¸°, ì¶œë ¥ê°œìˆ˜, ì†¡ìž¥ìˆ˜ëŸ‰, 
+				ë³„í‘œ1, ë³„í‘œ2, í’ˆëª©ê°œìˆ˜, íƒë°°ìˆ˜ëŸ‰, íƒë°°ìˆ˜ëŸ‰1, íƒë°°ìˆ˜ëŸ‰í•©ì‚°, ì†¡ìž¥êµ¬ë¶„ìž, ì†¡ìž¥êµ¬ë¶„, ì†¡ìž¥êµ¬ë¶„ìµœì¢…, ìœ„ì¹˜, 
+				ìœ„ì¹˜ë³€í™˜)
+         SELECT msg1, msg2, msg3, msg4, msg5, msg6, ìˆ˜ì·¨ì¸ëª…, ì „í™”ë²ˆí˜¸1, ì „í™”ë²ˆí˜¸2, ìš°íŽ¸ë²ˆí˜¸, ì£¼ì†Œ, ì˜µì…˜ëª…, ìˆ˜ëŸ‰, 
+		        ë°°ì†¡ë©”ì„¸ì§€, ì£¼ë¬¸ë²ˆí˜¸, ì‡¼í•‘ëª°, ìˆ˜ì§‘ì‹œê°„, ì†¡ìž¥ëª…, í’ˆëª©ì½”ë“œ, íƒë°°ë¹„ìš©, ë°•ìŠ¤í¬ê¸°, ì¶œë ¥ê°œìˆ˜, ì†¡ìž¥ìˆ˜ëŸ‰, 
+				ë³„í‘œ1, ë³„í‘œ2, í’ˆëª©ê°œìˆ˜, íƒë°°ìˆ˜ëŸ‰, íƒë°°ìˆ˜ëŸ‰1, íƒë°°ìˆ˜ëŸ‰í•©ì‚°, ì†¡ìž¥êµ¬ë¶„ìž, ì†¡ìž¥êµ¬ë¶„, ì†¡ìž¥êµ¬ë¶„ìµœì¢…, ìœ„ì¹˜, 
+				ìœ„ì¹˜ë³€í™˜
+           FROM ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜
+          WHERE íƒë°°ìˆ˜ëŸ‰1 = 'ë°•ìŠ¤'
+		  ORDER BY  í’ˆëª©ì½”ë“œ ASC, ìˆ˜ì·¨ì¸ëª… ASC, ìœ„ì¹˜ ASC;
+		
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ ë°ì´í„° ë³µì‚¬', ROW_COUNT());
 
 	/*--=============================================================	
-	-- ¹Ú½º °øÅë´Ã¸®±â
+	-- ë°•ìŠ¤ ê³µí†µëŠ˜ë¦¬ê¸°
     --=============================================================*/
-    INSERT INTO ¼ÛÀåÃâ·Â_°øÅë¹Ú½º (
-        msg1, msg2, msg3, msg4, msg5, msg6, ¼öÃëÀÎ¸í, ÀüÈ­¹øÈ£1, ÀüÈ­¹øÈ£2,
-        ¿ìÆí¹øÈ£, ÁÖ¼Ò, ¿É¼Ç¸í, ¼ö·®, ¹è¼Û¸Þ¼¼Áö, ÁÖ¹®¹øÈ£, ¼îÇÎ¸ô, ¼öÁý½Ã°£,
-        ¼ÛÀå¸í, Ç°¸ñÄÚµå, ÅÃ¹èºñ¿ë, ¹Ú½ºÅ©±â, Ãâ·Â°³¼ö, ¼ÛÀå¼ö·®, º°Ç¥1, º°Ç¥2,
-        Ç°¸ñ°³¼ö, ÅÃ¹è¼ö·®, ÅÃ¹è¼ö·®1, ÅÃ¹è¼ö·®ÇÕ»ê, ¼ÛÀå±¸ºÐÀÚ, ¼ÛÀå±¸ºÐ,
-        ¼ÛÀå±¸ºÐÃÖÁ¾, À§Ä¡, À§Ä¡º¯È¯
+    INSERT INTO ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ (
+        msg1, msg2, msg3, msg4, msg5, msg6, ìˆ˜ì·¨ì¸ëª…, ì „í™”ë²ˆí˜¸1, ì „í™”ë²ˆí˜¸2,
+        ìš°íŽ¸ë²ˆí˜¸, ì£¼ì†Œ, ì˜µì…˜ëª…, ìˆ˜ëŸ‰, ë°°ì†¡ë©”ì„¸ì§€, ì£¼ë¬¸ë²ˆí˜¸, ì‡¼í•‘ëª°, ìˆ˜ì§‘ì‹œê°„,
+        ì†¡ìž¥ëª…, í’ˆëª©ì½”ë“œ, íƒë°°ë¹„ìš©, ë°•ìŠ¤í¬ê¸°, ì¶œë ¥ê°œìˆ˜, ì†¡ìž¥ìˆ˜ëŸ‰, ë³„í‘œ1, ë³„í‘œ2,
+        í’ˆëª©ê°œìˆ˜, íƒë°°ìˆ˜ëŸ‰, íƒë°°ìˆ˜ëŸ‰1, íƒë°°ìˆ˜ëŸ‰í•©ì‚°, ì†¡ìž¥êµ¬ë¶„ìž, ì†¡ìž¥êµ¬ë¶„,
+        ì†¡ìž¥êµ¬ë¶„ìµœì¢…, ìœ„ì¹˜, ìœ„ì¹˜ë³€í™˜
         )
 		SELECT
-			t.msg1, t.msg2, t.msg3, t.msg4, t.msg5, t.msg6, t.¼öÃëÀÎ¸í, t.ÀüÈ­¹øÈ£1, t.ÀüÈ­¹øÈ£2,
-			t.¿ìÆí¹øÈ£, t.ÁÖ¼Ò, t.¿É¼Ç¸í, t.¼ö·®, t.¹è¼Û¸Þ¼¼Áö, t.ÁÖ¹®¹øÈ£, t.¼îÇÎ¸ô, t.¼öÁý½Ã°£,
-			t.¼ÛÀå¸í, t.Ç°¸ñÄÚµå, t.ÅÃ¹èºñ¿ë, t.¹Ú½ºÅ©±â, t.Ãâ·Â°³¼ö, t.¼ÛÀå¼ö·®, t.º°Ç¥1, t.º°Ç¥2,
-			t.Ç°¸ñ°³¼ö, t.ÅÃ¹è¼ö·®, t.ÅÃ¹è¼ö·®1, t.ÅÃ¹è¼ö·®ÇÕ»ê, t.¼ÛÀå±¸ºÐÀÚ, t.¼ÛÀå±¸ºÐ,
-			t.¼ÛÀå±¸ºÐÃÖÁ¾, t.À§Ä¡, t.À§Ä¡º¯È¯
+			t.msg1, t.msg2, t.msg3, t.msg4, t.msg5, t.msg6, t.ìˆ˜ì·¨ì¸ëª…, t.ì „í™”ë²ˆí˜¸1, t.ì „í™”ë²ˆí˜¸2,
+			t.ìš°íŽ¸ë²ˆí˜¸, t.ì£¼ì†Œ, t.ì˜µì…˜ëª…, t.ìˆ˜ëŸ‰, t.ë°°ì†¡ë©”ì„¸ì§€, t.ì£¼ë¬¸ë²ˆí˜¸, t.ì‡¼í•‘ëª°, t.ìˆ˜ì§‘ì‹œê°„,
+			t.ì†¡ìž¥ëª…, t.í’ˆëª©ì½”ë“œ, t.íƒë°°ë¹„ìš©, t.ë°•ìŠ¤í¬ê¸°, t.ì¶œë ¥ê°œìˆ˜, t.ì†¡ìž¥ìˆ˜ëŸ‰, t.ë³„í‘œ1, t.ë³„í‘œ2,
+			t.í’ˆëª©ê°œìˆ˜, t.íƒë°°ìˆ˜ëŸ‰, t.íƒë°°ìˆ˜ëŸ‰1, t.íƒë°°ìˆ˜ëŸ‰í•©ì‚°, t.ì†¡ìž¥êµ¬ë¶„ìž, t.ì†¡ìž¥êµ¬ë¶„,
+			t.ì†¡ìž¥êµ¬ë¶„ìµœì¢…, t.ìœ„ì¹˜, t.ìœ„ì¹˜ë³€í™˜
 		FROM
-			¼ÛÀåÃâ·Â_°øÅë¹Ú½º AS t
-		-- ¼ýÀÚ Å×ÀÌºí°ú Á¶ÀÎÇÏ¿© ÇàÀ» º¹Á¦
+			ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ AS t
+		-- ìˆ«ìž í…Œì´ë¸”ê³¼ ì¡°ì¸í•˜ì—¬ í–‰ì„ ë³µì œ
 		JOIN
-			Numbers AS n ON n.n <= (t.¼ö·® - 1)
+			Numbers AS n ON n.n <= (t.ìˆ˜ëŸ‰ - 1)
 		WHERE
-			t.¼ö·® > 1;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ¹Ú½º ¼ö·®¸¸Å­ Çà º¹»ç', ROW_COUNT());
+			t.ìˆ˜ëŸ‰ > 1;
+			
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ ìˆ˜ëŸ‰ë§Œí¼ í–‰ ë³µì‚¬', ROW_COUNT());
 
     /*--=============================================================	
-    -- ¹Ú½ºÁÖ¹® ¼ø¹ø ¸Å±â±â	1
+    -- ë°•ìŠ¤ì£¼ë¬¸ ìˆœë²ˆ ë§¤ê¸°ê¸°	1
     --=============================================================*/
-    -- »ç¿ëÀÚ º¯¼ö¸¦ ÀÌ¿ëÇÑ UPDATE
-    -- ¼­ºêÄõ¸®¿¡¼­ À§Ä¡º¯È¯, id ¼øÀ¸·Î Á¤·Ä ÈÄ,
-    -- @current_location º¯¼ö·Î ±×·ìÀÌ ¹Ù²î´Â °ÍÀ» °¨ÁöÇÏ¿©
-    -- @seq º¯¼ö¸¦ 1·Î ÃÊ±âÈ­ÇÏ°Å³ª 1¾¿ Áõ°¡½ÃÅ´
-	-- ¼ÛÀåÃâ·Â_°øÅë¹Ú½º Å×ÀÌºíÀÇ ¼ÛÀå±¸ºÐÀÚ ¾÷µ¥ÀÌÆ®
+    -- ì‚¬ìš©ìž ë³€ìˆ˜ë¥¼ ì´ìš©í•œ UPDATE
+    -- ì„œë¸Œì¿¼ë¦¬ì—ì„œ ìœ„ì¹˜ë³€í™˜, id ìˆœìœ¼ë¡œ ì •ë ¬ í›„,
+    -- @current_location ë³€ìˆ˜ë¡œ ê·¸ë£¹ì´ ë°”ë€ŒëŠ” ê²ƒì„ ê°ì§€í•˜ì—¬
+    -- @seq ë³€ìˆ˜ë¥¼ 1ë¡œ ì´ˆê¸°í™”í•˜ê±°ë‚˜ 1ì”© ì¦ê°€ì‹œí‚´
+	-- ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ í…Œì´ë¸”ì˜ ì†¡ìž¥êµ¬ë¶„ìž ì—…ë°ì´íŠ¸
     UPDATE
-        ¼ÛÀåÃâ·Â_°øÅë¹Ú½º AS t
+        ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ AS t
         JOIN
         (
             SELECT
                 id,
-                -- @current_location º¯¼ö¿Í ÇöÀç ÇàÀÇ À§Ä¡º¯È¯ °ªÀ» ºñ±³
-                -- °°À¸¸é ¼ø¹ø(@seq)À» 1 Áõ°¡, ´Ù¸£¸é 1·Î ÃÊ±âÈ­
-                @seq := IF(@current_location = À§Ä¡º¯È¯, @seq + 1, 1) AS sequence_num,
-                -- @current_location º¯¼ö¿¡ ÇöÀç À§Ä¡º¯È¯ °ªÀ» ÇÒ´çÇÏ¿© ´ÙÀ½ Çà¿¡¼­ ºñ±³ÇÒ ¼ö ÀÖµµ·Ï ÁØºñ
-                @current_location := À§Ä¡º¯È¯
+                -- @current_location ë³€ìˆ˜ì™€ í˜„ìž¬ í–‰ì˜ ìœ„ì¹˜ë³€í™˜ ê°’ì„ ë¹„êµ
+                -- ê°™ìœ¼ë©´ ìˆœë²ˆ(@seq)ì„ 1 ì¦ê°€, ë‹¤ë¥´ë©´ 1ë¡œ ì´ˆê¸°í™”
+                @seq := IF(@current_location = ìœ„ì¹˜ë³€í™˜, @seq + 1, 1) AS sequence_num,
+                -- @current_location ë³€ìˆ˜ì— í˜„ìž¬ ìœ„ì¹˜ë³€í™˜ ê°’ì„ í• ë‹¹í•˜ì—¬ ë‹¤ìŒ í–‰ì—ì„œ ë¹„êµí•  ìˆ˜ ìžˆë„ë¡ ì¤€ë¹„
+                @current_location := ìœ„ì¹˜ë³€í™˜
             FROM
-                ¼ÛÀåÃâ·Â_°øÅë¹Ú½º,
-                -- ÇÁ·Î½ÃÀú ³»¿¡¼­ »ç¿ëÇÒ »ç¿ëÀÚ º¯¼ö ÃÊ±âÈ­
+                ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤,
+                -- í”„ë¡œì‹œì € ë‚´ì—ì„œ ì‚¬ìš©í•  ì‚¬ìš©ìž ë³€ìˆ˜ ì´ˆê¸°í™”
                 (SELECT @seq := 0, @current_location := '') AS vars
             ORDER BY
-                À§Ä¡º¯È¯, id
+                ìœ„ì¹˜ë³€í™˜, id
         ) AS s ON t.id = s.id
     SET
-        t.¼ÛÀå±¸ºÐÀÚ = CONCAT('(', s.sequence_num, ')');
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ¹Ú½ºÁÖ¹® ¼ø¹ø ¸Å±â±â 1', ROW_COUNT());
+        t.ì†¡ìž¥êµ¬ë¶„ìž = CONCAT('(', s.sequence_num, ')');
+		
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ ìˆœë²ˆ ë§¤ê¸°ê¸° 1', ROW_COUNT());
 
 	/*--=============================================================
-	-- ¹Ú½ºÁÖ¹® ÁÖ¼Ò¾÷µ¥ÀÌÆ®
+	-- ë°•ìŠ¤ì£¼ë¬¸ ì£¼ì†Œì—…ë°ì´íŠ¸
     --=============================================================*/
-	UPDATE ¼ÛÀåÃâ·Â_°øÅë¹Ú½º SET ÁÖ¼Ò = CONCAT(ÁÖ¼Ò, ¼ÛÀå±¸ºÐÀÚ);
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ¹Ú½ºÁÖ¹® ÁÖ¼Ò¿¡ ¼ø¹ø Ãß°¡', ROW_COUNT());
+	UPDATE ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ SET ì£¼ì†Œ = CONCAT(ì£¼ì†Œ, ì†¡ìž¥êµ¬ë¶„ìž);
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ ì£¼ì†Œì— ìˆœë²ˆ ì¶”ê°€', ROW_COUNT());
 
     /*--=============================================================	
-    -- ¹Ú½ºÁÖ¹® ¼ø¹ø ¸Å±â±â	2
+    -- ë°•ìŠ¤ì£¼ë¬¸ ìˆœë²ˆ ë§¤ê¸°ê¸°	2
     --=============================================================*/
-	-- µ¿ÀÏÇÑ ÁÖ¼Ò ±×·ì ³»¿¡¼­ Ã¹ ¹øÂ° ÁÖ¼Ò´Â ±×´ë·Î µÎ°í, µÎ ¹øÂ° ÁÖ¼ÒºÎÅÍ ¼ø¹øÀ» (2), (3)... Çü½ÄÀ¸·Î ºÙÀÌ´Â °Í
-	-- »ç¿ëÀÚ º¯¼ö¸¦ È°¿ëÇÏ¿© µ¿ÀÏ ÁÖ¼Ò ±×·ì¿¡ ¼ø¹øÀ» ¸Å±â°í,
-    -- ¼ø¹øÀÌ 2 ÀÌ»óÀÎ °æ¿ì¿¡¸¸ ÁÖ¼Ò µÚ¿¡ '(¼ø¹ø)'À» Ãß°¡ÇÕ´Ï´Ù.
-	-- ¼ÛÀåÃâ·Â_°øÅë¹Ú½º Å×ÀÌºíÀÇ ÁÖ¼Ò ¾÷µ¥ÀÌÆ®
+	-- ë™ì¼í•œ ì£¼ì†Œ ê·¸ë£¹ ë‚´ì—ì„œ ì²« ë²ˆì§¸ ì£¼ì†ŒëŠ” ê·¸ëŒ€ë¡œ ë‘ê³ , ë‘ ë²ˆì§¸ ì£¼ì†Œë¶€í„° ìˆœë²ˆì„ (2), (3)... í˜•ì‹ìœ¼ë¡œ ë¶™ì´ëŠ” ê²ƒ
+	-- ì‚¬ìš©ìž ë³€ìˆ˜ë¥¼ í™œìš©í•˜ì—¬ ë™ì¼ ì£¼ì†Œ ê·¸ë£¹ì— ìˆœë²ˆì„ ë§¤ê¸°ê³ ,
+    -- ìˆœë²ˆì´ 2 ì´ìƒì¸ ê²½ìš°ì—ë§Œ ì£¼ì†Œ ë’¤ì— '(ìˆœë²ˆ)'ì„ ì¶”ê°€í•©ë‹ˆë‹¤.
+	-- ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ í…Œì´ë¸”ì˜ ì£¼ì†Œ ì—…ë°ì´íŠ¸
     UPDATE
-        ¼ÛÀåÃâ·Â_°øÅë¹Ú½º AS t
+        ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ AS t
         JOIN
         (
             SELECT
                 id,
-                -- ¿øº» ÁÖ¼Ò °ªÀ» º¸Á¸ÇÏ¿© CONCAT¿¡ »ç¿ë
-                ÁÖ¼Ò AS original_address,
-                -- @current_address º¯¼ö¿Í ÇöÀç ÇàÀÇ ÁÖ¼Ò °ªÀ» ºñ±³
-                -- °°À¸¸é ¼ø¹ø(@seq)À» 1 Áõ°¡, ´Ù¸£¸é 1·Î ÃÊ±âÈ­ÇÏ¿© ¼ø¹ø(rn) »ý¼º
-                @seq := IF(@current_address = ÁÖ¼Ò, @seq + 1, 1) AS rn,
-                -- @current_address º¯¼ö¿¡ ÇöÀç ÁÖ¼Ò °ªÀ» ÇÒ´çÇÏ¿© ´ÙÀ½ Çà¿¡¼­ ºñ±³
-                @current_address := ÁÖ¼Ò
+                -- ì›ë³¸ ì£¼ì†Œ ê°’ì„ ë³´ì¡´í•˜ì—¬ CONCATì— ì‚¬ìš©
+                ì£¼ì†Œ AS original_address,
+                -- @current_address ë³€ìˆ˜ì™€ í˜„ìž¬ í–‰ì˜ ì£¼ì†Œ ê°’ì„ ë¹„êµ
+                -- ê°™ìœ¼ë©´ ìˆœë²ˆ(@seq)ì„ 1 ì¦ê°€, ë‹¤ë¥´ë©´ 1ë¡œ ì´ˆê¸°í™”í•˜ì—¬ ìˆœë²ˆ(rn) ìƒì„±
+                @seq := IF(@current_address = ì£¼ì†Œ, @seq + 1, 1) AS rn,
+                -- @current_address ë³€ìˆ˜ì— í˜„ìž¬ ì£¼ì†Œ ê°’ì„ í• ë‹¹í•˜ì—¬ ë‹¤ìŒ í–‰ì—ì„œ ë¹„êµ
+                @current_address := ì£¼ì†Œ
             FROM
-                ¼ÛÀåÃâ·Â_°øÅë¹Ú½º,
-                -- ÇÁ·Î½ÃÀú ½ÇÇà Àü, »ç¿ëÀÚ º¯¼ö¸¦ 0°ú ºó ¹®ÀÚ¿­·Î ÃÊ±âÈ­
+                ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤,
+                -- í”„ë¡œì‹œì € ì‹¤í–‰ ì „, ì‚¬ìš©ìž ë³€ìˆ˜ë¥¼ 0ê³¼ ë¹ˆ ë¬¸ìžì—´ë¡œ ì´ˆê¸°í™”
                 (SELECT @seq := 0, @current_address := '') AS vars
             ORDER BY
-                ÁÖ¼Ò, id
+                ì£¼ì†Œ, id
         ) AS s ON t.id = s.id
     SET
-        t.ÁÖ¼Ò = CONCAT(s.original_address, ' (', s.rn, ')')
-    -- °è»êµÈ ¼ø¹ø(rn)ÀÌ 1º¸´Ù Å«, Áï ±×·ì ³» µÎ ¹øÂ° ÀÌ»óÀÎ µ¥ÀÌÅÍ¸¸ ¾÷µ¥ÀÌÆ®
+        t.ì£¼ì†Œ = CONCAT(s.original_address, ' (', s.rn, ')')
+    -- ê³„ì‚°ëœ ìˆœë²ˆ(rn)ì´ 1ë³´ë‹¤ í°, ì¦‰ ê·¸ë£¹ ë‚´ ë‘ ë²ˆì§¸ ì´ìƒì¸ ë°ì´í„°ë§Œ ì—…ë°ì´íŠ¸
     WHERE
         s.rn > 1;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ¹Ú½ºÁÖ¹® ¼ø¹ø ¸Å±â±â 2', ROW_COUNT());
+		
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ ìˆœë²ˆ ë§¤ê¸°ê¸° 2', ROW_COUNT());
 
 	/*--================================================================================
-	-- ¹Ú½ºÁÖ¹® ¼ö·®1·Îº¯°æ
+	-- ë°•ìŠ¤ì£¼ë¬¸ ìˆ˜ëŸ‰1ë¡œë³€ê²½
     --================================================================================*/
-    UPDATE ¼ÛÀåÃâ·Â_°øÅë¹Ú½º SET ¼ö·® = 1;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ¹Ú½ºÁÖ¹® ¼ö·®À» 1·Î º¯°æ', ROW_COUNT());
+    UPDATE ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ SET ìˆ˜ëŸ‰ = 1;
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ ìˆ˜ëŸ‰ 1ë¡œ ë³€ê²½', ROW_COUNT());
 
 	/*--================================================================================
-	-- ¹Ú½ºÁÖ¹® À¯ÀÏÀÚ¼³Á¤ (À§Ä¡º¯È¯)
+	-- ë°•ìŠ¤ì£¼ë¬¸ ìœ ì¼ìžì„¤ì • (ìœ„ì¹˜ë³€í™˜)
     --================================================================================*/
-	UPDATE ¼ÛÀåÃâ·Â_°øÅë¹Ú½º 
-	   SET À§Ä¡º¯È¯ = CONCAT('0',À§Ä¡, Ç°¸ñÄÚµå, LPAD(¼ö·®, 2, '0'), ¼öÃëÀÎ¸í, ÁÖ¼Ò, ÀüÈ­¹øÈ£1);
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ¹Ú½ºÁÖ¹® À§Ä¡º¯È¯ Àç¼³Á¤', ROW_COUNT());
+	UPDATE ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ 
+	   SET ìœ„ì¹˜ë³€í™˜ = CONCAT('0',ìœ„ì¹˜, í’ˆëª©ì½”ë“œ, LPAD(ìˆ˜ëŸ‰, 2, '0'), ìˆ˜ì·¨ì¸ëª…, ì£¼ì†Œ, ì „í™”ë²ˆí˜¸1);
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ ë°•ìŠ¤ì£¼ë¬¸ ìœ„ì¹˜ë³€í™˜', ROW_COUNT());
 
 	/*--================================================================================
-	--°øÅë¹Ú½º ¼ö·® Ã³¸® (Ç°¸ñÄÚµåº°·Î ¼ö·®À» ÇÕ»êÇÏ¿© Ãâ·Â°³¼ö¿¡ ¾÷µ¥ÀÌÆ®)
+	--ê³µí†µë°•ìŠ¤ ìˆ˜ëŸ‰ ì²˜ë¦¬ (í’ˆëª©ì½”ë“œë³„ë¡œ ìˆ˜ëŸ‰ì„ í•©ì‚°í•˜ì—¬ ì¶œë ¥ê°œìˆ˜ì— ì—…ë°ì´íŠ¸)
     --================================================================================*/
-	UPDATE ¼ÛÀåÃâ·Â_°øÅë¹Ú½º AS t1 
+	UPDATE ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ AS t1 
         INNER JOIN (
-            SELECT Ç°¸ñÄÚµå, SUM(¼ö·®) AS total_quantity
-            FROM ¼ÛÀåÃâ·Â_°øÅë¹Ú½º
-            GROUP BY Ç°¸ñÄÚµå
-        ) AS t2 ON t1.Ç°¸ñÄÚµå = t2.Ç°¸ñÄÚµå
-        SET t1.Ç°¸ñ°³¼ö = t2.total_quantity;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] °øÅë¹Ú½º Ç°¸ñ°³¼ö ÇÕ»ê', ROW_COUNT());
+            SELECT í’ˆëª©ì½”ë“œ, SUM(ìˆ˜ëŸ‰) AS total_quantity
+            FROM ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤
+            GROUP BY í’ˆëª©ì½”ë“œ
+        ) AS t2 ON t1.í’ˆëª©ì½”ë“œ = t2.í’ˆëª©ì½”ë“œ
+        SET t1.í’ˆëª©ê°œìˆ˜ = t2.total_quantity;
+		
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ í’ˆëª©ê°œìˆ˜ í•©ì‚°', ROW_COUNT());
 
 	/*--================================================================================
-	-- °³º°ÀÛ¾÷1	(¼ÛÀå±¸ºÐÃÖÁ¾ ¾÷µ¥ÀÌÆ®)
-	--   : ¼­¿ï³¹°³ Áß ¼­¿ï ÁÖ¼Ò + ¼îÇÎ¸ô Á¶°Ç
-	--   : ¼­¿ï¹Ú½º Áß ¼­¿ï ÁÖ¼Ò + ¼îÇÎ¸ô Á¶°Ç
+	-- ê°œë³„ìž‘ì—…1	(ì†¡ìž¥êµ¬ë¶„ìµœì¢… ì—…ë°ì´íŠ¸)
+	--  : ì„œìš¸ë‚±ê°œ ì¤‘ ì„œìš¸ ì£¼ì†Œ + ì‡¼í•‘ëª° ì¡°ê±´
+	--  : ì„œìš¸ë°•ìŠ¤ ì¤‘ ì„œìš¸ ì£¼ì†Œ + ì‡¼í•‘ëª° ì¡°ê±´
     --================================================================================*/
-	UPDATE ¼ÛÀåÃâ·Â_»ç¹æ³Ý¿øº»º¯È¯
+	UPDATE ì†¡ìž¥ì¶œë ¥_ì‚¬ë°©ë„·ì›ë³¸ë³€í™˜
 	   SET
-			¼ÛÀå±¸ºÐÃÖÁ¾ = CASE ¼ÛÀå±¸ºÐÃÖÁ¾
-				WHEN '³Ãµ¿³¹°³' THEN '¼­¿ï³¹°³'
-				WHEN '³Ãµ¿¹Ú½º' THEN '¼­¿ï¹Ú½º'
+			ì†¡ìž¥êµ¬ë¶„ìµœì¢… = CASE ì†¡ìž¥êµ¬ë¶„ìµœì¢…
+				WHEN 'ëƒ‰ë™ë‚±ê°œ' THEN 'ì„œìš¸ë‚±ê°œ'
+				WHEN 'ëƒ‰ë™ë°•ìŠ¤' THEN 'ì„œìš¸ë°•ìŠ¤'
 			END
 	   WHERE
-			¼ÛÀå±¸ºÐÃÖÁ¾ IN ('³Ãµ¿³¹°³', '³Ãµ¿¹Ú½º')
+			ì†¡ìž¥êµ¬ë¶„ìµœì¢… IN ('ëƒ‰ë™ë‚±ê°œ', 'ëƒ‰ë™ë°•ìŠ¤')
 			AND SUBSTRING(
-					TRIM(SUBSTRING_INDEX(ÁÖ¼Ò, ']', -1)), 1, 2
-				) = '¼­¿ï'
-			AND ¼îÇÎ¸ô IN ('Cafe24(½Å)', 'Gfresh');
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] °³º°ÀÛ¾÷ 1 (¼­¿ï³¹°³/¼­¿ï¹Ú½º)', ROW_COUNT());
+					TRIM(SUBSTRING_INDEX(ì£¼ì†Œ, ']', -1)), 1, 2
+				) = 'ì„œìš¸'
+			AND ì‡¼í•‘ëª° IN ('Cafe24(ì‹ )', 'Gfresh');
+			
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ (ì„œìš¸ë‚±ê°œ/ì„œìš¸ë°•ìŠ¤)', ROW_COUNT());
 			
 	/*--================================================================================
-	-- °³º°ÀÛ¾÷2	(¼ÛÀå±¸ºÐÃÖÁ¾ ¾÷µ¥ÀÌÆ®)
-	--   : ¼­¿ï¹Ú½º Áß ¼­¿ï ÁÖ¼Ò ¡æ ¼­¿ï¹Ú½º
+	-- ê°œë³„ìž‘ì—…2	(ì†¡ìž¥êµ¬ë¶„ìµœì¢… ì—…ë°ì´íŠ¸)
+	--  : ì„œìš¸ë°•ìŠ¤ ì¤‘ ì„œìš¸ ì£¼ì†Œ â†’ ì„œìš¸ë°•ìŠ¤
     --================================================================================*/
-    UPDATE ¼ÛÀåÃâ·Â_°øÅë¹Ú½º
-       SET ¼ÛÀå±¸ºÐÃÖÁ¾ = '¼­¿ï¹Ú½º'
-     WHERE ¼ÛÀå±¸ºÐÃÖÁ¾ = '³Ãµ¿¹Ú½º'
+    UPDATE ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤
+       SET ì†¡ìž¥êµ¬ë¶„ìµœì¢… = 'ì„œìš¸ë°•ìŠ¤'
+     WHERE ì†¡ìž¥êµ¬ë¶„ìµœì¢… = 'ëƒ‰ë™ë°•ìŠ¤'
        AND SUBSTRING(
-           TRIM(SUBSTRING_INDEX(ÁÖ¼Ò, ']', -1)), 1, 2
-           ) = '¼­¿ï'
-       AND ¼îÇÎ¸ô IN ('Cafe24(½Å)', 'Gfresh');
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] °³º°ÀÛ¾÷ 2 (°øÅë¹Ú½º ¡æ ¼­¿ï¹Ú½º)', ROW_COUNT());
+           TRIM(SUBSTRING_INDEX(ì£¼ì†Œ, ']', -1)), 1, 2
+           ) = 'ì„œìš¸'
+       AND ì‡¼í•‘ëª° IN ('Cafe24(ì‹ )', 'Gfresh');
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ (ê³µí†µë°•ìŠ¤ â†’ ì„œìš¸ë°•ìŠ¤)', ROW_COUNT());
 
+	/*--================================================================================
+	-- ì†¡ìž¥êµ¬ë¶„ìžê°€ "(1)" ì´ ì•„ë‹Œ ê²½ìš° ì£¼ë¬¸ë²ˆí˜¸ë¥¼ '1234567890' ìœ¼ë¡œ ë³€ê²½
+    --================================================================================*/
+    UPDATE ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤
+       SET ì£¼ë¬¸ë²ˆí˜¸ = '1234567890'
+     WHERE ì†¡ìž¥êµ¬ë¶„ìž IS NULL OR ì†¡ìž¥êµ¬ë¶„ìž <> '(1)';
+    
+	INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] ì†¡ìž¥ì¶œë ¥_ê³µí†µë°•ìŠ¤ ì£¼ë¬¸ë²ˆí˜¸(1234567890)', ROW_COUNT());
+	
     COMMIT;
 
-    -- ÃÖÁ¾ °á°ú¸¦ SELECT ¹®À¸·Î ¹ÝÈ¯
+    -- ìµœì¢… ê²°ê³¼ë¥¼ SELECT ë¬¸ìœ¼ë¡œ ë°˜í™˜
     SELECT StepID, OperationDescription, AffectedRows FROM sp_execution_log ORDER BY StepID;
 
-    -- ÇÁ·Î½ÃÀú Á¾·á Àü ÀÓ½Ã Å×ÀÌºí »èÁ¦
+    -- í”„ë¡œì‹œì € ì¢…ë£Œ ì „ ìž„ì‹œ í…Œì´ë¸” ì‚­ì œ
     DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
 
 END$$

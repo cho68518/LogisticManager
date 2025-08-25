@@ -1845,7 +1845,7 @@ namespace LogisticManager.Forms
                 if (File.Exists(settingsPath))
                 {
                     var jsonContent = File.ReadAllText(settingsPath);
-                    Console.WriteLine($"📄 SettingsForm: settings.json 파일 내용: {jsonContent}");
+                    //Console.WriteLine($"📄 SettingsForm: settings.json 파일 내용: {jsonContent}");
                     
                     var settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
                     if (settings != null)

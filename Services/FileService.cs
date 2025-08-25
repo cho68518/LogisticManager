@@ -52,10 +52,10 @@ namespace LogisticManager.Services
         private readonly string _outputFolderPath;
 
         /// <summary>
-        /// 컬럼 매핑 설정을 관리하는 서비스
+        /// 컬럼 매핑 설정을 관리하는 서비스 (테이블매핑 기능 제거됨)
         /// Excel 컬럼명과 데이터베이스 컬럼명 간의 매핑 처리
         /// </summary>
-        private readonly MappingService _mappingService;
+        // private readonly MappingService? _mappingService; // 테이블매핑 기능 제거
 
         /// <summary>
         /// 데이터 변환 서비스 인스턴스
@@ -122,8 +122,8 @@ namespace LogisticManager.Services
             // EPPlus 라이센스 설정 (상업용 사용 시 필요)
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
             
-            // MappingService 인스턴스 생성
-            _mappingService = new MappingService();
+            // MappingService 인스턴스 생성 (테이블매핑 기능 제거됨)
+            // _mappingService = null; // MappingService 제거
             
             // DataTransformationService 인스턴스 생성
             _transformationService = new DataTransformationService();
@@ -333,26 +333,7 @@ namespace LogisticManager.Services
         /// <returns>데이터 타입</returns>
         private Type GetColumnDataType(string excelColumnName, string tableMappingKey)
         {
-            // 매핑 설정에서 데이터 타입 확인
-            var configuration = _mappingService.GetConfiguration();
-            if (configuration?.Mappings.TryGetValue(tableMappingKey, out var tableMapping) == true)
-            {
-                if (tableMapping.Columns.TryGetValue(excelColumnName, out var columnMapping))
-                {
-                    return columnMapping.DataType.ToLower() switch
-                    {
-                        "int" => typeof(int),
-                        "decimal" => typeof(decimal),
-                        "double" => typeof(double),
-                        "date" => typeof(DateTime),
-                        "datetime" => typeof(DateTime),
-                        "bool" => typeof(bool),
-                        _ => typeof(string)
-                    };
-                }
-            }
-            
-            // 기본값은 문자열
+            // 테이블매핑 기능이 제거되어 항상 문자열 타입 반환
             return typeof(string);
         }
 
@@ -367,38 +348,12 @@ namespace LogisticManager.Services
         {
             if (string.IsNullOrEmpty(cellValue))
             {
-                // 기본값 확인
-                var configuration = _mappingService.GetConfiguration();
-                if (configuration?.Mappings.TryGetValue(tableMappingKey, out var tableMapping) == true)
-                {
-                    if (tableMapping.Columns.TryGetValue(excelColumnName, out var columnMapping))
-                    {
-                        return columnMapping.DefaultValue ?? DBNull.Value;
-                    }
-                }
+                // 테이블매핑 기능이 제거되어 DBNull 반환
                 return DBNull.Value;
             }
 
-            // 매핑 설정에서 데이터 타입 확인
-            var dataType = GetColumnDataType(excelColumnName, tableMappingKey);
-            
-            try
-            {
-                return dataType.Name switch
-                {
-                    "Int32" => int.TryParse(cellValue, out var intValue) ? intValue : 0,
-                    "Decimal" => decimal.TryParse(cellValue, out var decimalValue) ? decimalValue : 0m,
-                    "Double" => double.TryParse(cellValue, out var doubleValue) ? doubleValue : 0.0,
-                    "DateTime" => DateTime.TryParse(cellValue, out var dateValue) ? dateValue : DateTime.MinValue,
-                    "Boolean" => bool.TryParse(cellValue, out var boolValue) ? boolValue : false,
-                    _ => cellValue
-                };
-            }
-            catch
-            {
-                // 변환 실패 시 원본 값 반환
-                return cellValue;
-            }
+            // 테이블매핑 기능이 제거되어 항상 원본 문자열 값 반환
+            return cellValue;
         }
 
         #endregion

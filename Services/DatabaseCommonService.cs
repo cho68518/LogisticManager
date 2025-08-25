@@ -24,18 +24,18 @@ namespace LogisticManager.Services
     public class DatabaseCommonService
     {
         private readonly DatabaseService _databaseService;
-        private readonly MappingService _mappingService;
+        // private readonly MappingService _mappingService; // 테이블매핑 기능 제거
         private readonly LoggingCommonService _loggingService;
 
         /// <summary>
         /// DatabaseCommonService 생성자
         /// </summary>
         /// <param name="databaseService">데이터베이스 서비스 인스턴스</param>
-        /// <param name="mappingService">매핑 서비스 인스턴스</param>
-        public DatabaseCommonService(DatabaseService databaseService, MappingService mappingService)
+        /// <param name="mappingService">매핑 서비스 인스턴스 (테이블매핑 기능 제거됨)</param>
+        public DatabaseCommonService(DatabaseService databaseService, object? mappingService)
         {
             _databaseService = databaseService ?? throw new ArgumentNullException(nameof(databaseService));
-            _mappingService = mappingService ?? throw new ArgumentNullException(nameof(mappingService));
+            // _mappingService = mappingService ?? throw new ArgumentNullException(nameof(mappingService)); // 테이블매핑 기능 제거
             _loggingService = new LoggingCommonService();
         }
 
@@ -608,203 +608,13 @@ namespace LogisticManager.Services
         /// <param name="tableName">삽입할 테이블명</param>
         /// <param name="progress">진행률 보고자</param>
         /// <returns>처리된 행 수</returns>
-        private async Task<int> ProcessBatchDataAsync(MySqlConnection connection, DataTable batchData, string tableName, IProgress<string>? progress)
+        private Task<int> ProcessBatchDataAsync(MySqlConnection connection, DataTable batchData, string tableName, IProgress<string>? progress)
         {
-            try
-            {
-                if (batchData.Rows.Count == 0)
-                    return 0;
+            if (batchData.Rows.Count == 0)
+                return Task.FromResult(0);
 
-                var processedRows = 0;
-                
-                // 테이블 매핑 정보에서 컬럼 정보 가져오기 (런타임 쿼리 실행 없음)
-                var tableMapping = _mappingService.GetTableMapping(tableName);
-                if (tableMapping == null || tableMapping.Columns == null || tableMapping.Columns.Count == 0)
-                {
-                    throw new InvalidOperationException($"테이블 '{tableName}'의 매핑 정보를 찾을 수 없습니다. table_mappings.json을 확인해주세요.");
-                }
-
-                // INSERT에서 제외할 컬럼 필터링 (id, excludeFromInsert=true 등)
-                var insertColumns = tableMapping.Columns
-                    .Where(col => !col.ExcludeFromInsert && !col.IsPrimaryKey)
-                    .Select(col => col.DatabaseColumn)
-                    .ToList();
-
-                if (insertColumns.Count == 0)
-                {
-                    throw new InvalidOperationException($"테이블 '{tableName}'에 삽입 가능한 컬럼이 없습니다.");
-                }
-
-                //progress?.Report($"🔧 테이블 매핑 정보 로드 완료: {tableName} ({insertColumns.Count}개 컬럼)");
-                progress?.Report($"🔧 테이블 매핑 정보 로드 완료: ({insertColumns.Count}개 컬럼)");
-
-                // 배치 INSERT 쿼리 생성
-                var insertQuery = GenerateInsertQueryFromMapping(tableName, insertColumns);
-                //progress?.Report($"🔧 INSERT 쿼리 생성 완료: {tableName}");
-                
-                // 상세 로깅: SQL 쿼리 및 컬럼 정보
-                var debugInfo = $"[DEBUG] 생성된 INSERT 쿼리: {insertQuery}\n" +
-                               $"[DEBUG] 삽입할 컬럼들: {string.Join(", ", insertColumns)}\n" +
-                               $"[DEBUG] 백틱으로 감싼 컬럼들: {string.Join(", ", insertColumns.Select(c => $"`{c}`"))}\n" +
-                               $"[DEBUG] Excel 컬럼들: {string.Join(", ", batchData.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}";
-                
-                _loggingService.WriteLogWithFlush("logs/current/app.log", debugInfo);
-                Console.WriteLine(debugInfo);
-                
-                // 상세 디버깅: 각 컬럼별 매핑 결과
-                var mappingInfo = new StringBuilder();
-                foreach (var column in insertColumns)
-                {
-                    var excelColumnName = FindExcelColumnName(column, batchData);
-                    var mappingLine = $"[DEBUG] 컬럼 매핑: '{column}' → Excel: '{excelColumnName ?? "매핑 실패"}'";
-                    mappingInfo.AppendLine(mappingLine);
-                    Console.WriteLine(mappingLine);
-                }
-                
-                _loggingService.WriteLogWithFlush("logs/current/app.log", mappingInfo.ToString());
-                
-                // 🚨 쇼핑몰 컬럼 특별 디버깅
-                if (insertColumns.Contains("쇼핑몰"))
-                {
-                    var excelColumnName = FindExcelColumnName("쇼핑몰", batchData);
-                    var specialDebug = $"[DEBUG] 🚨 쇼핑몰 컬럼 매핑: DB '쇼핑몰' → Excel '{excelColumnName ?? "NULL"}'";
-                    _loggingService.WriteLogWithFlush("logs/current/app.log", specialDebug);
-                    Console.WriteLine(specialDebug);
-                }
-
-                // 🚨 수취인명 컬럼 특별 디버깅
-                if (insertColumns.Contains("수취인명"))
-                {
-                    var excelColumnName = FindExcelColumnName("수취인명", batchData);
-                    var specialDebug = $"[DEBUG] 🚨 수취인명 컬럼 매핑: DB '수취인명' → Excel '{excelColumnName ?? "NULL"}'";
-                    _loggingService.WriteLogWithFlush("logs/current/app.log", specialDebug);
-                    Console.WriteLine(specialDebug);
-                }
-
-                // 배치 데이터 처리
-                foreach (DataRow row in batchData.Rows)
-                {
-                    try
-                    {
-                        // 각 행마다 새로운 command 생성 (트랜잭션 문제 해결)
-                        using (var command = new MySqlCommand(insertQuery, connection))
-                        {
-                            // 매개변수 추가 (안전한 이름 사용)
-                            foreach (var column in insertColumns)
-                            {
-                                var safeParameterName = GetSafeParameterName(column);
-                                command.Parameters.Add($"@{safeParameterName}", MySqlDbType.VarChar);
-                            }
-
-                            // 매개변수 값 설정
-                            var valuesLog = new StringBuilder();
-                            valuesLog.AppendLine($"[DEBUG] 🚨 행 {processedRows + 1} VALUES 데이터:");
-                            
-                            for (int i = 0; i < insertColumns.Count; i++)
-                            {
-                                var columnName = insertColumns[i];
-                                var safeParameterName = GetSafeParameterName(columnName);
-                                var parameterName = $"@{safeParameterName}";
-                                
-                                // Excel 컬럼명과 데이터베이스 컬럼명 매핑 시도
-                                var excelColumnName = FindExcelColumnName(columnName, row.Table);
-                                if (!string.IsNullOrEmpty(excelColumnName))
-                                {
-                                    var value = row[excelColumnName];
-                                    var parameterValue = value == DBNull.Value ? (object)DBNull.Value : value.ToString();
-                                    command.Parameters[parameterName].Value = parameterValue;
-                                    
-                                    // VALUES 로그에 기록
-                                    valuesLog.AppendLine($"  {columnName}: '{parameterValue}' (Excel 컬럼: '{excelColumnName}')");
-                                }
-                                else
-                                {
-                                    // 매핑되는 Excel 컬럼을 찾을 수 없으면 빈 값으로 설정
-                                    command.Parameters[parameterName].Value = DBNull.Value;
-                                    valuesLog.AppendLine($"  {columnName}: NULL (Excel 컬럼: 매핑 실패)");
-                                }
-                            }
-                            
-                            // VALUES 로그를 파일에 기록
-                            _loggingService.WriteLogWithFlush("logs/current/app.log", valuesLog.ToString());
-                            Console.WriteLine(valuesLog.ToString());
-                            
-                            // 🚨 쇼핑몰 컬럼 특별 로그
-                            if (insertColumns.Contains("쇼핑몰"))
-                            {
-                                var safeParameterName = GetSafeParameterName("쇼핑몰");
-                                var storeNameValue = command.Parameters[$"@{safeParameterName}"].Value;
-                                var storeNameLog = $"[DEBUG] 🚨 쇼핑몰 컬럼 특별 로그 - 행 {processedRows + 1}: '{storeNameValue}'";
-                                _loggingService.WriteLogWithFlush("logs/current/app.log", storeNameLog);
-                                Console.WriteLine(storeNameLog);
-                            }
-
-                            // 🚨 수취인명 컬럼 특별 로그 (김신영 케이스 추적)
-                            if (insertColumns.Contains("수취인명"))
-                            {
-                                var safeParameterName = GetSafeParameterName("수취인명");
-                                var recipientNameValue = command.Parameters[$"@{safeParameterName}"].Value;
-                                var recipientNameLog = $"[DEBUG] 🚨 수취인명 컬럼 특별 로그 - 행 {processedRows + 1}: '{recipientNameValue}'";
-                                _loggingService.WriteLogWithFlush("logs/current/app.log", recipientNameLog);
-                                Console.WriteLine(recipientNameLog);
-                                
-                                // 김신영 케이스 특별 추적
-                                if (recipientNameValue?.ToString() == "김신영")
-                                {
-                                    var kimLog = $"[DEBUG] 🚨 김신영 수취인 발견 - 행 {processedRows + 1}:\n" +
-                                                $"  수취인명: '{recipientNameValue}'\n" +
-                                                $"  매개변수명: @{safeParameterName}\n" +
-                                                $"  전체 VALUES: {valuesLog}";
-                                    _loggingService.WriteLogWithFlush("logs/current/app.log", kimLog);
-                                    Console.WriteLine(kimLog);
-                                }
-                            }
-
-                            // 🚨 김신영 수취인 INSERT 실행 전 최종 검증
-                            if (insertColumns.Contains("수취인명"))
-                            {
-                                var safeParameterName = GetSafeParameterName("수취인명");
-                                var recipientNameValue = command.Parameters[$"@{safeParameterName}"].Value;
-                                
-                                if (recipientNameValue?.ToString() == "김신영")
-                                {
-                                    var finalCheckLog = $"[DEBUG] 🚨 김신영 수취인 INSERT 실행 전 최종 검증:\n" +
-                                                       $"  행 번호: {processedRows + 1}\n" +
-                                                       $"  수취인명: '{recipientNameValue}'\n" +
-                                                       $"  매개변수명: @{safeParameterName}\n" +
-                                                       $"  SQL 쿼리: {insertQuery}\n" +
-                                                       $"  매개변수 개수: {command.Parameters.Count}";
-                                    _loggingService.WriteLogWithFlush("logs/current/app.log", finalCheckLog);
-                                    Console.WriteLine(finalCheckLog);
-                                }
-                            }
-
-                            // INSERT 실행
-                            await command.ExecuteNonQueryAsync();
-                            
-                            processedRows++;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        var errorMessage = $"⚠️ 행 {processedRows + 1} 삽입 실패: {ex.Message}";
-                        progress?.Report(errorMessage);
-                        
-                        // 오류 로그 기록
-                        _loggingService.WriteLogWithFlush("logs/current/app.log", $"[ERROR] {errorMessage}");
-                        _loggingService.WriteLogWithFlush("logs/current/app.log", $"[ERROR] 상세 오류: {ex}");
-                        
-                        // 개별 행 실패는 로그만 남기고 계속 진행
-                    }
-                }
-
-                return processedRows;
-            }
-            catch (Exception ex)
-            {
-                progress?.Report($"❌ 배치 데이터 처리 실패: {ex.Message}");
-                throw;
-            }
+            // 테이블 매핑 기능이 제거되어 프로시저 기반 처리만 지원
+            throw new InvalidOperationException("테이블매핑 기능이 제거되었습니다. 프로시저 기반 처리를 사용하세요.");
         }
 
         /// <summary>

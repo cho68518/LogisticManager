@@ -43,10 +43,16 @@
 
   <ItemGroup>
     <!-- 필요한 설정 파일들만 포함 -->
-    <EmbeddedResource Include="App.config" />
-    <EmbeddedResource Include="config\column_mapping.json" />
-    <EmbeddedResource Include="config\table_mappings.json" />
-    <EmbeddedResource Include="config\settings.json" />
+    <EmbeddedResource Include="App.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 설정 파일을 출력 디렉토리로 복사 -->
+    <None Include="config\settings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

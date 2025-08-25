@@ -9,21 +9,36 @@ BEGIN
     -- =================================================================================
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
+        GET DIAGNOSTICS CONDITION 1
+            @sqlstate = RETURNED_SQLSTATE,
+            @errno    = MYSQL_ERRNO,
+            @text     = MESSAGE_TEXT;
+
+        INSERT INTO error_log (procedure_name, error_code, error_message)
+        VALUES ('sp_GamcheonProcessF', @errno, @text);
+
         ROLLBACK;
-        DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
-        DROP TEMPORARY TABLE IF EXISTS temp_invoices;
-        DROP TEMPORARY TABLE IF EXISTS temp_additional_invoices;
-        SELECT '오류가 발생하여 모든 작업이 롤백되었습니다. 아래는 오류 상세 정보입니다.' AS Message;
+        DROP TEMPORARY TABLE IF EXISTS sp_execution_log, temp_sorted_data;
+        SELECT '오류가 발생하여 모든 작업이 롤백되었습니다.' AS Message;
+
         SHOW ERRORS;
     END;
 
     CREATE TEMPORARY TABLE sp_execution_log ( StepID INT AUTO_INCREMENT PRIMARY KEY, OperationDescription VARCHAR(255), AffectedRows INT );
     START TRANSACTION;
 
-    -- =================================================================================
-    -- 1. 임시 작업 테이블 생성 및 초기 데이터 적재
-    -- =================================================================================
-	CALL sp_CreateWorkTables();
+    TRUNCATE TABLE error_log;	
+		
+    /*-- =================================================================================
+    -- 임시 작업 테이블 생성
+    -- =================================================================================*/
+    DROP TEMPORARY TABLE IF EXISTS temp_invoices;
+	DROP TEMPORARY TABLE IF EXISTS temp_additional_invoices;
+	DROP TEMPORARY TABLE IF EXISTS temp_sorted_data;
+
+    CREATE TEMPORARY TABLE temp_sorted_data LIKE 송장출력_감천냉동_최종;
+	CREATE TEMPORARY TABLE temp_invoices LIKE 송장출력_감천냉동;
+	CREATE TEMPORARY TABLE temp_additional_invoices LIKE 송장출력_감천냉동;
 	
     /*--================================================================================
 	-- (감천냉동) 감천냉동낱개 분류
@@ -40,24 +55,20 @@ BEGIN
         FROM 송장출력_사방넷원본변환 WHERE 송장구분최종 = '감천낱개';
 
 		
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[TEMP] temp_invoices 생성 및 감천냉동낱개 데이터 분류', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] (감천냉동) 생성 및 감천냉동낱개 데이터 분류', ROW_COUNT());
 
-    -- =================================================================================
-    -- 2. 임시 작업 테이블 내에서 데이터 변환 (모든 UPDATE 작업)
-    -- (기존: 송장출력_감천냉동변환 테이블에서 수행하던 모든 UPDATE)
-    -- =================================================================================
     /*--=====================================================================================================
 	-- (감천냉동) 택배수량 계산 및 송장구분자 업데이트
 	--             택배수량을 이용하여 1을 나눈 결과를 소수점 세 자리에서 내림하여 송장구분자 컬럼에 업데이트
     --======================================================================================================*/
-    UPDATE temp_invoices SET 송장구분자 = FLOOR((1 / IFNULL(NULLIF(택배수량, 0), 10)) * 1000) / 1000;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 택배수량으로 송장구분자 계산', ROW_COUNT());
+    UPDATE temp_invoices SET 송장구분자 = FLOOR((1 / IFNULL(NULLIF(CAST(택배수량 AS DECIMAL), 0), 10)) * 1000) / 1000;
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (감천냉동) 택배수량으로 송장구분자 계산', ROW_COUNT());
 
     /*--================================================================================
 	-- (감천냉동) 송장구분자와 수량 곱 업데이트
     --================================================================================*/
     UPDATE temp_invoices SET 송장구분자 = 송장구분자 * 수량;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 송장구분자에 수량 적용', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (감천냉동) 송장구분자에 수량 적용', ROW_COUNT());
 
     /*--================================================================================
 	-- (감천냉동) 주소 + 수취인명 기반 송장구분자 합산
@@ -67,19 +78,19 @@ BEGIN
           FROM temp_invoices GROUP BY 주소, 수취인명
 		) AS s ON t.주소 = s.주소 AND t.수취인명 = s.수취인명
 		SET t.택배수량1 = s.구분자합;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 주소/수취인명별 송장구분자 합산', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (감천냉동) 주소/수취인명별 송장구분자 합산', ROW_COUNT());
 
     /*--================================================================================
 	-- (감천냉동) 택배수량1 올림 처리  ('낱개' 로 남아있는 행이 있음)
     --================================================================================*/
     UPDATE temp_invoices SET 택배수량1 = CEIL(IFNULL(택배수량1, 1));
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 택배수량 올림 처리', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (감천냉동) 택배수량 올림 처리', ROW_COUNT());
 
     /*--================================================================================
 	-- (감천냉동) 택배수량1에 따른 송장구분 업데이트
     --================================================================================*/
     UPDATE temp_invoices SET 송장구분 = CASE WHEN 택배수량1 > 1 THEN '추가' ELSE '1장' END;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 송장구분 설정 (추가/1장)', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (감천냉동) 송장구분 설정 (추가/1장)', ROW_COUNT());
 
     /*--================================================================================
 	-- (감천냉동) 주소 및 수취인명 유일성에 따른 송장구분 업데이트 시작
@@ -89,7 +100,7 @@ BEGIN
         SELECT 주소, 수취인명 FROM temp_invoices WHERE 송장구분 = '1장' GROUP BY 주소, 수취인명 HAVING COUNT(*) = 1
 		) AS unique_address ON t1.주소 = unique_address.주소 AND t1.수취인명 = unique_address.수취인명
 		SET t1.송장구분 = '단일' WHERE t1.송장구분 = '1장';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 송장구분 설정 (단일)', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (감천냉동) 송장구분 설정 (단일)', ROW_COUNT());
 
     /*--================================================================================
 	-- (감천냉동) 품목코드별 수량 합산 및 품목개수 (단일 데이터 대상)
@@ -101,18 +112,24 @@ BEGIN
 		SET t1.품목개수 = t2.total_quantity WHERE t1.송장구분 = '단일';
     INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 단일 데이터 품목개수 합산', ROW_COUNT());
 
-    -- =================================================================================
-    -- 3. '추가' 송장 생성 (별도 임시 테이블 사용)
-    -- =================================================================================
     /*--================================================================================
 	-- (감천냉동) 감천냉동추가송장 테이블로 유니크 주소 행 이동
     --================================================================================*/
-    INSERT INTO temp_additional_invoices
-		SELECT * FROM (
+	INSERT INTO temp_additional_invoices (msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 
+	                                      우편번호, 주소, 옵션명, 수량, 배송메세지, 주문번호, 쇼핑몰, 수집시간, 
+										  송장명, 품목코드, 택배비용, 박스크기, 출력개수, 송장수량, 별표1, 별표2, 
+										  품목개수, 택배수량, 택배수량1, 택배수량합산, 송장구분자, 송장구분, 송장구분최종, 
+										  위치, 위치변환)
+		SELECT msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 주소,
+			   옵션명, 수량, 배송메세지, 주문번호, 쇼핑몰, 수집시간, 송장명, 품목코드, 택배비용,
+			   박스크기, 출력개수, 송장수량, 별표1, 별표2, 품목개수, 택배수량, 택배수량1, 택배수량합산,
+			   송장구분자, 송장구분, 송장구분최종, 위치, 위치변환
+		FROM (
 			SELECT *, ROW_NUMBER() OVER (PARTITION BY 주소 ORDER BY id ASC) AS rn
 			FROM temp_invoices WHERE 송장구분 = '추가'
 		) AS subquery WHERE subquery.rn = 1;
-	INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] temp_additional_invoices, 추가송장 기본 데이터 생성', ROW_COUNT());
+		
+	INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] (감천냉동) 추가송장 기본 데이터 생성', ROW_COUNT());
 	
     /*--================================================================================
 	-- (감천냉동) 감천냉동추가송장 추가송장 업데이트
@@ -120,14 +137,23 @@ BEGIN
     --================================================================================*/
     UPDATE temp_additional_invoices
     SET 수량 = 1, 송장명 = '+++', 옵션명 = '+++', 품목코드 = '0000', 주문번호 = '1234567890';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_additional_invoices, 추가송장 내용 변경 (+++)', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (감천냉동) 수량, 송장명, 옵션명, 품목코드, 주문번호', ROW_COUNT());
 
     /*--================================================================================
 	-- (감천냉동) 감천냉동 추가송장 늘리기
     --================================================================================*/
-    INSERT INTO temp_additional_invoices
-    SELECT t.* FROM temp_additional_invoices AS t JOIN Numbers AS n ON n.n <= (t.택배수량1 - 1) WHERE t.택배수량1 > 1;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] temp_additional_invoices, 추가송장 늘리기', ROW_COUNT());
+    INSERT INTO temp_additional_invoices 
+		(msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 
+		 주소, 옵션명, 수량, 배송메세지, 주문번호, 쇼핑몰, 수집시간, 송장명, 품목코드, 
+		 택배비용, 박스크기, 출력개수, 송장수량, 별표1, 별표2, 품목개수, 택배수량, 택배수량1, 
+		 택배수량합산, 송장구분자, 송장구분, 송장구분최종, 위치, 위치변환)
+		SELECT t.msg1, t.msg2, t.msg3, t.msg4, t.msg5, t.msg6, t.수취인명, t.전화번호1, t.전화번호2, t.우편번호, 
+		       t.주소, t.옵션명, t.수량, t.배송메세지, t.주문번호, t.쇼핑몰, t.수집시간, t.송장명, t.품목코드, 
+			   t.택배비용, t.박스크기, t.출력개수, t.송장수량, t.별표1, t.별표2, t.품목개수, t.택배수량, t.택배수량1, 
+			   t.택배수량합산, t.송장구분자, t.송장구분, t.송장구분최종, t.위치, t.위치변환
+        FROM temp_additional_invoices AS t JOIN Numbers AS n ON n.n <= (t.택배수량1 - 1) WHERE t.택배수량1 > 1;
+		
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] (감천냉동) 추가송장 늘리기', ROW_COUNT());
     
     /*--================================================================================
 	-- (감천냉동) 감천냉동 추가송장 순번 매기기
@@ -137,100 +163,92 @@ BEGIN
         FROM temp_additional_invoices, (SELECT @seq := 0, @current_group := '') AS vars ORDER BY 주소, id
     ) AS s ON t.id = s.id
     SET t.송장구분자 = CONCAT('[', s.rn, ']');
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_additional_invoices, 추가송장 순번 매기기', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (감천냉동) 추가송장 순번 매기기', ROW_COUNT());
 
     /*--================================================================================
 	-- (감천냉동) 감천냉동 추가송장 주소업데이트
     --================================================================================*/
     UPDATE temp_additional_invoices SET 주소 = CONCAT(주소, 송장구분자);
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_additional_invoices, 추가송장 주소에 순번 추가', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (감천냉동) 추가송장 주소에 순번 추가', ROW_COUNT());
 
-    -- =================================================================================
-    -- 4. 최종 테이블에 데이터 통합 삽입
-    -- =================================================================================
     /*--================================================================================
 	-- (감천냉동) 감천냉동 테이블 마지막정리
     --================================================================================*/
-    TRUNCATE TABLE 송장출력_감천냉동_최종;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('(감천냉동) 송장출력_감천냉동_최종 초기화', 0);
-    
-	INSERT INTO 송장출력_감천냉동_최종 (
-		    msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호,
-		    주소, 송장명, 수량, 배송메세지, 주문번호, 쇼핑몰, 품목코드,
-		    택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수
-		)
-		SELECT
-			msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호,
-			주소, 송장명, 수량, 배송메세지, 주문번호, 쇼핑몰, 품목코드,
-			택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수
+	INSERT INTO temp_sorted_data
+		SELECT msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2,
+               우편번호, 주소, 송장명, 수량, 배송메세지, 주문번호, 쇼핑몰, 품목코드,
+               택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수
 		FROM (
-			-- (감천냉동) 감천냉동 단일 분류
-			SELECT msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 주소, 송장명, 수량, 
-			       배송메세지, 주문번호, 쇼핑몰, 품목코드, 택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수 
-		      FROM temp_invoices WHERE 송장구분 = '단일'
+			SELECT msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 
+			       우편번호, 주소, 송장명, 수량, 배송메세지, 주문번호, 쇼핑몰, 품목코드,
+                   택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수
+			  FROM temp_invoices WHERE 송장구분 = '단일'
 			UNION ALL
-			-- (감천냉동) 청과박스 데이터 (외부 테이블)
-			SELECT msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 주소, 송장명, 수량, 
-			       배송메세지, 주문번호, 쇼핑몰, 품목코드, 택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수 
+			SELECT msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 
+			       우편번호, 주소, 송장명, 수량, 배송메세지, 주문번호, 쇼핑몰, 품목코드,
+                   택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수
 			  FROM 송장출력_공통박스 WHERE 송장구분최종 = '감천박스'
 			UNION ALL
-			-- (감천냉동) 감천냉동 1장 분류
-			SELECT msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 주소, 송장명, 수량, 
-			       배송메세지, 주문번호, 쇼핑몰, 품목코드, 택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수 
+			SELECT msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 
+			       우편번호, 주소, 송장명, 수량, 배송메세지, 주문번호, 쇼핑몰, 품목코드,
+                   택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수
 			  FROM temp_invoices WHERE 송장구분 = '1장'
 			UNION ALL
-			-- (감천냉동) 감천냉동 추가 (원본 + 추가 송장)
-			SELECT msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 주소, 송장명, 수량, 
-			       배송메세지, 주문번호, 쇼핑몰, 품목코드, 택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수 
+			SELECT msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 
+			       우편번호, 주소, 송장명, 수량, 배송메세지, 주문번호, 쇼핑몰, 품목코드,
+                   택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수
 			  FROM temp_invoices WHERE 송장구분 = '추가'
 			UNION ALL
-			SELECT msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 주소, 송장명, 수량, 
-			       배송메세지, 주문번호, 쇼핑몰, 품목코드, 택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수 
+			SELECT msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 
+			       우편번호, 주소, 송장명, 수량, 배송메세지, 주문번호, 쇼핑몰, 품목코드,
+                   택배비용, 박스크기, 출력개수, 별표1, 별표2, 품목개수
 			  FROM temp_additional_invoices
 		) AS final_union
-		/*--================================================================================
-		-- (감천냉동) 별표 행 이동 및 정렬
-		--================================================================================*/
 		ORDER BY
 			CASE WHEN 별표1 <> '' OR 별표2 <> '' THEN 0 ELSE 1 END,
-			주소 ASC, 옵션명 ASC;
-			
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] 최종 테이블에 모든 데이터 통합 및 정렬', ROW_COUNT());
-
-    /*--=========================================================================================================
-	-- (감천냉동) 송장출력_감천냉동_최종 테이블 업데이트 (추가: 20250822)
-	--            '드라이아이스 추가' 송장의 비어있는 주소를, 같은 사람의 다른 주문에 있는 실제 주소로 채워준다.
-    --=========================================================================================================*/
-	-- '드라이아이스 추가' 송장의 주소를 동일인(키)의 다른 주소로 업데이트
-    UPDATE 송장출력_감천냉동_최종 AS d
-    JOIN (
-        -- '주소 기증자' 그룹 정의: 동일인(전화번호1,2/우편번호/수취인명) 그룹별로 대표 주소 1개를 선정
-        SELECT 
-            IFNULL(전화번호1, '') AS 전화번호1,
-            IFNULL(전화번호2, '') AS 전화번호2,
-            IFNULL(우편번호, '') AS 우편번호,
-            IFNULL(수취인명, '') AS 수취인명,
-            MAX(주소) AS 주소  -- 그룹 내 여러 주소 중 임의의 주소 하나를 대표로 선택
-        FROM 송장출력_감천냉동_최종
-        WHERE 
-            송장명 <> '드라이아이스 추가' -- '드라이아이스 추가'가 아닌 주문 중에서만 주소를 찾음
-            AND 주소 IS NOT NULL
-            AND 주소 <> ''
-        GROUP BY 
-            IFNULL(전화번호1, ''),
-            IFNULL(전화번호2, ''),
-            IFNULL(우편번호, ''),
-            IFNULL(수취인명, '')
-    ) AS src
-    -- '주소 수혜자'(d)와 '주소 기증자'(src)를 동일인 키로 연결
-    ON  IFNULL(d.전화번호1, '') = src.전화번호1
-    AND IFNULL(d.전화번호2, '') = src.전화번호2
-    AND IFNULL(d.우편번호, '') = src.우편번호
-    AND IFNULL(d.수취인명, '') = src.수취인명
+			/*주소 ASC, 옵션명 ASC;*/
+			주소 ASC, 송장명 ASC;
     
-    -- '드라이아이스 추가' 송장의 주소를 기증자의 주소로 업데이트
-    SET d.주소 = src.주소
-    WHERE d.송장명 = '드라이아이스 추가';	
+    TRUNCATE TABLE 송장출력_감천냉동_최종;
+	
+    INSERT INTO 송장출력_감천냉동_최종 SELECT * FROM temp_sorted_data;
+	
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] (감천냉동) 최종 테이블 데이터 통합', ROW_COUNT());
+	
+    -- =================================================================================
+    -- 같은 고객의 주문 중에 하나는 '드라이아이스 추가' 송장명이고 
+	--    다른 하나는 정상적인 송장명인데 주소 정보가 있다면, '드라이아이스 추가' 행의 
+	--    비어있는 주소 필드를 정상적인 주소로 채운다.
+    -- =================================================================================
+	-- 주소 업데이트 로직
+	UPDATE 송장출력_감천냉동_최종 AS d
+		JOIN (
+			-- (정상주문건)동일 고객 그룹 내에서 유효한 주소를 가진 행을 찾음
+			SELECT
+				IFNULL(전화번호1, '') AS 전화번호1,
+				IFNULL(전화번호2, '') AS 전화번호2,
+				IFNULL(우편번호,  '') AS 우편번호,
+				IFNULL(수취인명,  '') AS 수취인명,
+				MAX(주소)             AS 주소 -- 비어있지 않은 주소 중 하나를 선택
+			FROM 송장출력_감천냉동_최종
+			WHERE
+				송장명 <> '드라이아이스 추가' AND
+				주소 IS NOT NULL AND
+				주소 <> ''
+			GROUP BY
+				IFNULL(전화번호1, ''),
+				IFNULL(전화번호2, ''),
+				IFNULL(우편번호,  ''),
+				IFNULL(수취인명,  '')
+		) AS src ON
+			IFNULL(d.전화번호1, '') = src.전화번호1 AND
+			IFNULL(d.전화번호2, '') = src.전화번호2 AND
+			IFNULL(d.우편번호,  '') = src.우편번호  AND
+			IFNULL(d.수취인명,  '') = src.수취인명
+		SET d.주소 = src.주소  -- 정상주문건의 주소로 업데이트
+		WHERE d.송장명 = '드라이아이스 추가' AND d.주소 IS NULL;
+		
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (감천냉동) 드라이아이스 추가건 주소업데이트', ROW_COUNT());
 
     -- =================================================================================
     -- (감천냉동) 공통코드의 택배비용, 박스크기, 출력개수를 적용
@@ -248,10 +266,10 @@ BEGIN
     
     SELECT StepID, OperationDescription, AffectedRows FROM sp_execution_log ORDER BY StepID;
     
-    DROP TEMPORARY TABLE IF EXISTS temp_invoices;
-    DROP TEMPORARY TABLE IF EXISTS temp_additional_invoices;
     DROP TEMPORARY TABLE sp_execution_log;
-
+    DROP TEMPORARY TABLE temp_invoices;
+    DROP TEMPORARY TABLE temp_additional_invoices;
+	DROP TEMPORARY TABLE IF EXISTS temp_sorted_data;
 
 END$$
 

@@ -1,150 +1,48 @@
-﻿2025-08-22 22:09:34 [INFO] === 프로그램 시작: 2025-08-22 22:09:34 ===
-2025-08-22 22:09:34 [INFO] 🔍 Program.Main: 프로그램 시작
-2025-08-22 22:09:34 [INFO] 🔍 Program.Main: Windows Forms 설정 시작
-2025-08-22 22:09:34 [INFO] ✅ Program.Main: Windows Forms 설정 완료
-2025-08-22 22:09:34 [INFO] 🔍 Program.Main: 데이터베이스 연결 테스트 시작
-2025-08-22 22:09:34 [INFO] ✅ Program.Main: 데이터베이스 연결 테스트 완료!
-2025-08-22 22:09:34 [INFO] 🔍 Program.Main: 매핑 정보 확인 시작
-2025-08-22 22:09:34 [INFO] ✅ Program.Main: 매핑 정보 확인 완료!
-2025-08-22 22:09:34 [INFO] 🔍 Program.Main: MainForm 생성 시작
-2025-08-22 22:09:34 [INFO] === GetCommonCodesByGroupAsync 시작 - 그룹코드: 'PG_PROC' ===
-2025-08-22 22:09:34 [INFO] ✅ Program.Main: MainForm 생성 완료
-2025-08-22 22:09:34 [INFO] 🔍 Program.Main: MainForm 실행 시작
-2025-08-22 22:09:34 [INFO] 데이터 개수 확인 쿼리: SELECT COUNT(*) FROM CommonCode WHERE GroupCode = 'PG_PROC'
-2025-08-22 22:09:34 [INFO] 그룹코드 'PG_PROC'의 데이터 개수: 21
-2025-08-22 22:09:34 [INFO] 상세 조회 쿼리: 
-                    SELECT GroupCode, Code, CodeName, Description, SortOrder, 
-                           IsUsed, Attribute1, Attribute2, CreatedBy, CreatedAt, 
-                           UpdatedBy, UpdatedAt, GroupCodeNm
-                    FROM CommonCode 
-                    WHERE GroupCode = 'PG_PROC' 
-                    ORDER BY SortOrder, Code
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 1) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-1' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-1]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-1: [4-1]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 1) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 2) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-2' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-2]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-2: [4-2]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 2) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 3) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-3' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-3]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-3: [4-3]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 3) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 4) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-4' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-4]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-4: [4-4]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 4) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 5) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-5' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-5]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-5: [4-5]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 5) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 6) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-6' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-6]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-6: [4-6]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 6) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 7) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-7' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-7]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-7: [4-7]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 7) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 8) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-8' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-8]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-8: [4-8]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 8) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 9) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-9' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-9]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-9: [4-9]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 9) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 10) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-10' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-10]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-10: [4-10]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 10) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 11) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-11' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-11]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-11: [4-11]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 11) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 12) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-12' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-12]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-12: [4-12]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 12) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 13) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-13' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-13]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-13: [4-13]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 13) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 14) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-14' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-14]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-14: [4-14]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 14) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 15) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-15' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-15]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-15: [4-15]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 15) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 16) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-16' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-16]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-16: [4-16]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 16) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 17) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-17' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-17]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-17: [4-17]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 17) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 18) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-18' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-18]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-18: [4-18]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 18) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 19) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-19' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-19]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-19: [4-19]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 19) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 20) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-20' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-20]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-20: [4-20]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 20) ===
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 시작 (행 21) ===
-2025-08-22 22:09:34 [INFO] 원본 GroupCode: 'PG_PROC' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 Code: '4-21' (타입: String)
-2025-08-22 22:09:34 [INFO] 원본 CodeName: '[4-21]' (타입: String)
-2025-08-22 22:09:34 [INFO]   - 4-21: [4-21]
-2025-08-22 22:09:34 [INFO] === 행 데이터 처리 완료 (행 21) ===
-2025-08-22 22:09:34 [INFO] 쿼리 결과: 21개 행 반환됨
-2025-08-22 22:09:34 [INFO] 그룹코드 'PG_PROC'에서 21개의 공통코드 조회 완료
-2025-08-22 22:09:34 [INFO] === GetCommonCodesByGroupAsync 완료 ===
+﻿2025-08-25 13:12:06 [INFO] === 프로그램 시작: 2025-08-25 13:12:06 ===
+2025-08-25 13:12:06 [INFO] 🔍 Program.Main: 프로그램 시작
+2025-08-25 13:12:06 [INFO] 🔍 Program.Main: Windows Forms 설정 시작
+2025-08-25 13:12:06 [INFO] ✅ Program.Main: Windows Forms 설정 완료
+2025-08-25 13:12:06 [INFO] 🔍 Program.Main: 데이터베이스 연결 테스트 시작
+2025-08-25 13:12:06 [INFO] ✅ Program.Main: 데이터베이스 연결 테스트 완료!
+2025-08-25 13:12:06 [INFO] 🔍 Program.Main: MainForm 생성 시작
+2025-08-25 13:12:06 [INFO] 🔍 DatabaseService: settings.json에서 직접 데이터베이스 설정을 읽어옵니다.
+2025-08-25 13:12:06 [INFO] 🔍 DatabaseService: 프로젝트 루트 경로: C:\Work\LogisticManager
+2025-08-25 13:12:06 [INFO] 🔍 DatabaseService: 프로젝트 루트 config/settings.json 사용: C:\Work\LogisticManager\config\settings.json
+2025-08-25 13:12:06 [INFO] ✅ settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.
+2025-08-25 13:12:06 [INFO] ✅ 설정 파일을 성공적으로 읽었습니다.
+
+데이터베이스 연결 정보가 올바르게 설정되었습니다.
+2025-08-25 13:12:06 [INFO] 🔍 DatabaseService: settings.json에서 읽어온 설정값
+2025-08-25 13:12:06 [INFO]    DB_SERVER: 'gramwonlogis2.mycafe24.com' (길이: 26)
+2025-08-25 13:12:06 [INFO]    DB_NAME: 'gramwonlogis2' (길이: 13)
+2025-08-25 13:12:06 [INFO]    DB_USER: 'gramwonlogis2' (길이: 13)
+2025-08-25 13:12:06 [INFO]    DB_PASSWORD: 'jung5516!' (길이: 9)
+2025-08-25 13:12:06 [INFO]    DB_PORT: '3306' (길이: 4)
+2025-08-25 13:12:06 [INFO] 🔗 DatabaseService: 최종 설정값
+2025-08-25 13:12:06 [INFO]    서버: gramwonlogis2.mycafe24.com
+2025-08-25 13:12:06 [INFO]    데이터베이스: gramwonlogis2
+2025-08-25 13:12:06 [INFO]    사용자: gramwonlogis2
+2025-08-25 13:12:06 [INFO]    포트: 3306
+2025-08-25 13:12:06 [INFO] 🔗 연결 문자열: Server=gramwonlogis2.mycafe24.com;Database=gramwonlogis2;User Id=gramwonlogis2;Password=ju***;Port=3306;CharSet=utf8;Convert Zero Datetime=True;Allow User Variables=True;
+2025-08-25 13:12:06 [INFO] 📊 DatabaseService: 연결 정보 상세
+2025-08-25 13:12:06 [INFO]    서버: gramwonlogis2.mycafe24.com
+2025-08-25 13:12:06 [INFO]    데이터베이스: gramwonlogis2
+2025-08-25 13:12:06 [INFO]    사용자: gramwonlogis2
+2025-08-25 13:12:06 [INFO]    포트: 3306
+2025-08-25 13:12:06 [INFO]    연결 문자열 길이: 174
+2025-08-25 13:12:06 [INFO] ✅ DatabaseService 초기화 완료
+2025-08-25 13:12:06 [INFO] 📡 MainForm: DatabaseService Singleton 인스턴스 사용
+2025-08-25 13:12:06 [INFO] 🔍 MainForm: 기존 DB 정보 - Server: gramwonlogis2.mycafe24.com
+2025-08-25 13:12:06 [INFO] 🔍 MainForm: 기존 DB 정보 - Database: gramwonlogis2
+2025-08-25 13:12:06 [INFO] 🔍 MainForm: 기존 DB 정보 - User: gramwonlogis2
+2025-08-25 13:12:06 [INFO] 🔍 MainForm: 기존 DB 정보 - Port: 3306
+2025-08-25 13:12:06 [INFO] 📊 MainForm: 연결 테스트 결과 = True
+2025-08-25 13:12:06 [INFO] 📊 MainForm: 오류 메시지 = 연결 성공
+2025-08-25 13:12:06 [INFO] 🔍 MainForm: 최신 DB 정보 - Server: gramwonlogis2.mycafe24.com
+2025-08-25 13:12:06 [INFO] 🔍 MainForm: 최신 DB 정보 - Database: gramwonlogis2
+2025-08-25 13:12:06 [INFO] 🔍 MainForm: 최신 DB 정보 - User: gramwonlogis2
+2025-08-25 13:12:06 [INFO] 🔍 MainForm: 최신 DB 정보 - Port: 3306
+2025-08-25 13:12:06 [INFO] ✅ MainForm: 연결 성공 처리 완료
+2025-08-25 13:12:06 [INFO] ✅ Program.Main: MainForm 생성 완료
+2025-08-25 13:12:06 [INFO] 🔍 Program.Main: MainForm 실행 시작
+2025-08-25 13:12:27 [INFO] ✅ Program.Main: MainForm 실행 완료

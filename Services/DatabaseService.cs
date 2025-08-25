@@ -8,7 +8,7 @@ using LogisticManager.Services;
 namespace LogisticManager.Services
 {
     /// <summary>
-    /// 데이터베이스 연결 및 쿼리 실행을 담당하는 서비스 클래스
+    /// 데이터베이스 연결 및 쿼리 실행을 담당하는 서비스 클래스 (Singleton 패턴)
     /// 
     /// 주요 기능:
     /// - MySQL 데이터베이스 연결 관리
@@ -28,28 +28,129 @@ namespace LogisticManager.Services
     /// 보안:
     /// - 연결 문자열에 민감한 정보 포함
     /// - 설정 파일 접근 권한 관리 필요
+    /// 
+    /// Singleton 패턴:
+    /// - 프로그램 전체에서 단일 인스턴스 사용
+    /// - 설정 변경 시 ReloadSettings() 메서드로 재설정 가능
     /// </summary>
     public class DatabaseService
     {
         #region 필드 (Private Fields)
 
         /// <summary>
+        /// Singleton 인스턴스
+        /// </summary>
+        private static DatabaseService? _instance;
+        
+        /// <summary>
+        /// 스레드 안전성을 위한 lock 객체
+        /// </summary>
+        private static readonly object _lock = new object();
+
+        /// <summary>
         /// MySQL 데이터베이스 연결 문자열
         /// 서버, 데이터베이스, 사용자, 비밀번호, 포트 정보 포함
         /// </summary>
-        private readonly string _connectionString;
+        private string _connectionString;
         
         /// <summary>
-        /// 컬럼 매핑 설정을 관리하는 서비스
+        /// 컬럼 매핑 설정을 관리하는 서비스 (테이블매핑 기능 제거됨)
         /// Excel 컬럼명과 데이터베이스 컬럼명 간의 매핑 처리
         /// </summary>
-        private readonly MappingService _mappingService;
+        // private readonly MappingService? _mappingService; // 테이블매핑 기능 제거
         
         /// <summary>
         /// 로그 파일 관리를 위한 서비스
         /// 로그 파일 크기 자동 관리 및 클리어 기능
         /// </summary>
 
+
+        #endregion
+
+        #region Singleton 인스턴스 접근자
+
+        /// <summary>
+        /// DatabaseService의 Singleton 인스턴스를 반환합니다.
+        /// </summary>
+        public static DatabaseService Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    lock (_lock)
+                    {
+                        if (_instance == null)
+                        {
+                            _instance = new DatabaseService();
+                        }
+                    }
+                }
+                return _instance;
+            }
+        }
+
+        /// <summary>
+        /// 설정을 다시 로드하고 연결 문자열을 업데이트합니다.
+        /// </summary>
+        public void ReloadSettings()
+        {
+            LogManagerService.LogInfo("🔄 DatabaseService: 설정을 다시 로드합니다.");
+            
+            // settings.json에서 직접 데이터베이스 설정 읽기
+            var (server, database, user, password, port) = LoadDatabaseSettingsFromJson();
+            
+            // null 체크
+            if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(database) || 
+                string.IsNullOrWhiteSpace(user) || string.IsNullOrEmpty(password) || string.IsNullOrWhiteSpace(port))
+            {
+                LogManagerService.LogError("❌ DatabaseService: 설정값이 null입니다.");
+                throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+            }
+            
+            // 설정값 검증
+            var (isValid, validationMessages) = SettingsValidationService.ValidateDatabaseSettings(server, database, user, password, port);
+            if (!isValid)
+            {
+                LogManagerService.LogError("❌ DatabaseService: 필수 설정값 검증 실패:");
+                foreach (var message in validationMessages)
+                {
+                    LogManagerService.LogError($"   {message}");
+                }
+                throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
+            }
+            
+            // 연결 문자열 업데이트
+            _connectionString = string.Format(DatabaseConstants.CONNECTION_STRING_TEMPLATE, server, database, user, password, port);
+            
+            LogManagerService.LogInfo($"✅ DatabaseService: 설정 재로드 완료 - 서버: {server}, 데이터베이스: {database}");
+        }
+
+        /// <summary>
+        /// 설정 파일이 변경되었는지 확인하고 필요시 재로드합니다.
+        /// </summary>
+        public void CheckAndReloadSettingsIfNeeded()
+        {
+            try
+            {
+                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DatabaseConstants.SETTINGS_FILE_NAME);
+                
+                if (File.Exists(settingsPath))
+                {
+                    var currentFileInfo = new FileInfo(settingsPath);
+                    var lastWriteTime = currentFileInfo.LastWriteTime;
+                    
+                    // 파일 변경 시간을 저장할 정적 변수가 필요하므로 간단한 체크만 수행
+                    LogManagerService.LogInfo($"🔍 DatabaseService: 설정 파일 마지막 수정 시간: {lastWriteTime}");
+                    
+                    // 필요시 여기에 파일 변경 감지 로직 추가 가능
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManagerService.LogWarning($"⚠️ DatabaseService: 설정 파일 변경 감지 중 오류: {ex.Message}");
+            }
+        }
 
         #endregion
 
@@ -78,7 +179,7 @@ namespace LogisticManager.Services
         /// </summary>
         public DatabaseService()
         {
-            Console.WriteLine("🔍 DatabaseService: settings.json에서 직접 데이터베이스 설정을 읽어옵니다.");
+            LogManagerService.LogInfo("🔍 DatabaseService: settings.json에서 직접 데이터베이스 설정을 읽어옵니다.");
             
             // settings.json에서 직접 데이터베이스 설정 읽기 (무조건 JSON 파일 우선)
             var (server, database, user, password, port) = LoadDatabaseSettingsFromJson();
@@ -87,26 +188,26 @@ namespace LogisticManager.Services
             if (string.IsNullOrWhiteSpace(server) || string.IsNullOrWhiteSpace(database) || 
                 string.IsNullOrWhiteSpace(user) || string.IsNullOrEmpty(password) || string.IsNullOrWhiteSpace(port))
             {
-                Console.WriteLine("❌ DatabaseService: 설정값이 null입니다.");
+                LogManagerService.LogError("❌ DatabaseService: 설정값이 null입니다.");
                 throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
             }
             
             // 설정값 검증 및 로깅
-            Console.WriteLine($"🔍 DatabaseService: settings.json에서 읽어온 설정값");
-            Console.WriteLine($"   DB_SERVER: '{server}' (길이: {server.Length})");
-            Console.WriteLine($"   DB_NAME: '{database}' (길이: {database.Length})");
-            Console.WriteLine($"   DB_USER: '{user}' (길이: {user.Length})");
-            Console.WriteLine($"   DB_PASSWORD: '{password}' (길이: {password.Length})");
-            Console.WriteLine($"   DB_PORT: '{port}' (길이: {port.Length})");
+            //LogManagerService.LogInfo($"🔍 DatabaseService: settings.json에서 읽어온 설정값");
+            //LogManagerService.LogInfo($"   DB_SERVER: '{server}' (길이: {server.Length})");
+            //LogManagerService.LogInfo($"   DB_NAME: '{database}' (길이: {database.Length})");
+            //LogManagerService.LogInfo($"   DB_USER: '{user}' (길이: {user.Length})");
+            //LogManagerService.LogInfo($"   DB_PASSWORD: '{password}' (길이: {password.Length})");
+            //LogManagerService.LogInfo($"   DB_PORT: '{port}' (길이: {port.Length})");
             
             // 설정값 엄격한 검증 (이제 null이 아님을 보장)
             var (isValid, validationMessages) = SettingsValidationService.ValidateDatabaseSettings(server, database, user, password, port);
             if (!isValid)
             {
-                Console.WriteLine("❌ DatabaseService: 필수 설정값 검증 실패:");
+                LogManagerService.LogError("❌ DatabaseService: 필수 설정값 검증 실패:");
                 foreach (var message in validationMessages)
                 {
-                    Console.WriteLine($"   {message}");
+                    LogManagerService.LogError($"   {message}");
                 }
                 
                 // 필수값이 누락된 경우 프로그램 중단
@@ -114,32 +215,75 @@ namespace LogisticManager.Services
             }
             
             // 최종 설정값 로깅
-            Console.WriteLine($"🔗 DatabaseService: 최종 설정값");
-            Console.WriteLine($"   서버: {server}");
-            Console.WriteLine($"   데이터베이스: {database}");
-            Console.WriteLine($"   사용자: {user}");
-            Console.WriteLine($"   포트: {port}");
+            LogManagerService.LogInfo($"🔗 DatabaseService: 최종 설정값");
+            LogManagerService.LogInfo($"   서버: {server}");
+            LogManagerService.LogInfo($"   데이터베이스: {database}");
+            LogManagerService.LogInfo($"   사용자: {user}");
+            LogManagerService.LogInfo($"   포트: {port}");
             
             // 연결 문자열 생성
             _connectionString = string.Format(DatabaseConstants.CONNECTION_STRING_TEMPLATE, server, database, user, password, port);
             
-            // MappingService 인스턴스 생성
-            _mappingService = new MappingService();
+            // MappingService 인스턴스 생성 (테이블매핑 기능 제거됨)
+            // _mappingService = null; // MappingService 제거
             
             // 연결 문자열 로깅 (보안상 비밀번호는 마스킹)
             var maskedPassword = password.Length > 2 ? password.Substring(0, 2) + "***" : "***";
             var maskedConnectionString = _connectionString.Replace(password, maskedPassword);
-            Console.WriteLine($"🔗 연결 문자열: {maskedConnectionString}");
+            LogManagerService.LogInfo($"🔗 연결 문자열: {maskedConnectionString}");
             
             // 현재 연결 정보 상세 로깅
-            Console.WriteLine($"📊 DatabaseService: 연결 정보 상세");
-            Console.WriteLine($"   서버: {server}");
-            Console.WriteLine($"   데이터베이스: {database}");
-            Console.WriteLine($"   사용자: {user}");
-            Console.WriteLine($"   포트: {port}");
-            Console.WriteLine($"   연결 문자열 길이: {_connectionString.Length}");
+            LogManagerService.LogInfo($"📊 DatabaseService: 연결 정보 상세");
+            LogManagerService.LogInfo($"   서버: {server}");
+            LogManagerService.LogInfo($"   데이터베이스: {database}");
+            LogManagerService.LogInfo($"   사용자: {user}");
+            LogManagerService.LogInfo($"   포트: {port}");
+            LogManagerService.LogInfo($"   연결 문자열 길이: {_connectionString.Length}");
             
-            Console.WriteLine("✅ DatabaseService 초기화 완료");
+            LogManagerService.LogInfo("✅ DatabaseService 초기화 완료");
+        }
+
+        #endregion
+
+        #region 헬퍼 메서드 (Helper Methods)
+
+        /// <summary>
+        /// 프로젝트 루트 디렉토리 경로를 반환합니다.
+        /// </summary>
+        /// <returns>프로젝트 루트 디렉토리 경로</returns>
+        private string GetProjectRootPath()
+        {
+            try
+            {
+                // 현재 실행 파일의 디렉토리에서 상위로 이동하여 프로젝트 루트 찾기
+                var currentDir = AppDomain.CurrentDomain.BaseDirectory;
+                var directory = new DirectoryInfo(currentDir);
+                
+                // bin/Debug/net8.0-windows/win-x64 구조에서 상위로 이동
+                while (directory != null && 
+                       (directory.Name == "win-x64" || 
+                        directory.Name == "net8.0-windows" || 
+                        directory.Name == "Debug" || 
+                        directory.Name == "bin"))
+                {
+                    directory = directory.Parent;
+                }
+                
+                if (directory != null)
+                {
+                    LogManagerService.LogInfo($"🔍 DatabaseService: 프로젝트 루트 경로: {directory.FullName}");
+                    return directory.FullName;
+                }
+                
+                // 상위 디렉토리를 찾을 수 없는 경우 현재 디렉토리 반환
+                LogManagerService.LogWarning($"⚠️ DatabaseService: 프로젝트 루트를 찾을 수 없어 현재 디렉토리 사용: {currentDir}");
+                return currentDir;
+            }
+            catch (Exception ex)
+            {
+                LogManagerService.LogWarning($"⚠️ DatabaseService: 프로젝트 루트 경로 찾기 실패: {ex.Message}");
+                return AppDomain.CurrentDomain.BaseDirectory;
+            }
         }
 
         #endregion
@@ -162,7 +306,31 @@ namespace LogisticManager.Services
         {
             try
             {
-                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DatabaseConstants.SETTINGS_FILE_NAME);
+                // 설정 파일 경로 우선순위: 1) 프로젝트 루트 config/settings.json, 2) 실행 폴더 settings.json
+                var projectRootPath = GetProjectRootPath();
+                var configSettingsPath = Path.Combine(projectRootPath, "config", DatabaseConstants.SETTINGS_FILE_NAME);
+                var executableSettingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DatabaseConstants.SETTINGS_FILE_NAME);
+                
+                string settingsPath;
+                
+                // 프로젝트 루트의 config/settings.json을 우선적으로 사용
+                if (File.Exists(configSettingsPath))
+                {
+                    settingsPath = configSettingsPath;
+                    LogManagerService.LogInfo($"🔍 DatabaseService: 프로젝트 루트 config/settings.json 사용: {settingsPath}");
+                }
+                else if (File.Exists(executableSettingsPath))
+                {
+                    settingsPath = executableSettingsPath;
+                    LogManagerService.LogInfo($"🔍 DatabaseService: 실행 폴더 settings.json 사용: {settingsPath}");
+                }
+                else
+                {
+                    LogManagerService.LogError($"❌ DatabaseService: 설정 파일을 찾을 수 없습니다.");
+                    LogManagerService.LogError($"   프로젝트 루트: {configSettingsPath}");
+                    LogManagerService.LogError($"   실행 폴더: {executableSettingsPath}");
+                    throw new InvalidOperationException(DatabaseConstants.ERROR_SETTINGS_FILE_COMPLETELY_MISSING);
+                }
                 
                 // 설정 파일 경로 검증
                 var (pathValid, pathMessage) = SettingsValidationService.ValidateSettingsFilePath(settingsPath);
@@ -176,49 +344,49 @@ namespace LogisticManager.Services
                 var jsonContent = File.ReadAllText(settingsPath);
                 if (string.IsNullOrEmpty(jsonContent))
                 {
-                    Console.WriteLine("⚠️ settings.json 파일이 비어있음");
-                    Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_READ_FAILED);
+                    LogManagerService.LogWarning("⚠️ settings.json 파일이 비어있음");
+                    LogManagerService.LogError(DatabaseConstants.ERROR_SETTINGS_FILE_READ_FAILED);
                     throw new InvalidOperationException("설정 파일이 비어있습니다.");
                 }
                 
-                Console.WriteLine($"📄 settings.json 파일 내용: {jsonContent}");
+                //LogManagerService.LogInfo($"📄 settings.json 파일 내용: {jsonContent}");
                 
                 var settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(jsonContent);
                 if (settings == null)
                 {
-                    Console.WriteLine("❌ settings.json 파싱 실패");
-                    Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_PARSE_FAILED);
+                    LogManagerService.LogError("❌ settings.json 파싱 실패");
+                    LogManagerService.LogError(DatabaseConstants.ERROR_SETTINGS_FILE_PARSE_FAILED);
                     throw new InvalidOperationException("설정 파일 파싱에 실패했습니다.");
                 }
                 
                 // 설정값 추출 (null 체크 포함)
                 if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_SERVER, out var server) || string.IsNullOrWhiteSpace(server))
                 {
-                    Console.WriteLine("❌ DB_SERVER 설정값이 누락되었습니다.");
+                    LogManagerService.LogError("❌ DB_SERVER 설정값이 누락되었습니다.");
                     throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
                 }
                 
                 if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_NAME, out var database) || string.IsNullOrWhiteSpace(database))
                 {
-                    Console.WriteLine("❌ DB_NAME 설정값이 누락되었습니다.");
+                    LogManagerService.LogError("❌ DB_NAME 설정값이 누락되었습니다.");
                     throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
                 }
                 
                 if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_USER, out var user) || string.IsNullOrWhiteSpace(user))
                 {
-                    Console.WriteLine("❌ DB_USER 설정값이 누락되었습니다.");
+                    LogManagerService.LogError("❌ DB_USER 설정값이 누락되었습니다.");
                     throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
                 }
                 
                 if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_PASSWORD, out var password) || string.IsNullOrEmpty(password))
                 {
-                    Console.WriteLine("❌ DB_PASSWORD 설정값이 누락되었습니다.");
+                    LogManagerService.LogError("❌ DB_PASSWORD 설정값이 누락되었습니다.");
                     throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
                 }
                 
                 if (!settings.TryGetValue(DatabaseConstants.CONFIG_KEY_DB_PORT, out var port) || string.IsNullOrWhiteSpace(port))
                 {
-                    Console.WriteLine("❌ DB_PORT 설정값이 누락되었습니다.");
+                    LogManagerService.LogError("❌ DB_PORT 설정값이 누락되었습니다.");
                     throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
                 }
                 
@@ -226,25 +394,25 @@ namespace LogisticManager.Services
                 var (isValid, validationMessages) = SettingsValidationService.ValidateDatabaseSettings(server, database, user, password, port);
                 if (!isValid)
                 {
-                    Console.WriteLine("⚠️ 설정값 유효성 검증 실패:");
+                    LogManagerService.LogWarning("⚠️ 설정값 유효성 검증 실패:");
                     foreach (var message in validationMessages)
                     {
-                        Console.WriteLine($"   {message}");
+                        LogManagerService.LogWarning($"   {message}");
                     }
                     
                     // 필수값이 누락된 경우 프로그램 중단
-                    Console.WriteLine("❌ 필수 설정값이 누락되었습니다.");
+                    LogManagerService.LogError("❌ 필수 설정값이 누락되었습니다.");
                     throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
                 }
                 
-                Console.WriteLine($"✅ settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.");
-                Console.WriteLine(DatabaseConstants.SUCCESS_SETTINGS_LOADED);
+                LogManagerService.LogInfo($"✅ settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.");
+                LogManagerService.LogInfo(DatabaseConstants.SUCCESS_SETTINGS_LOADED);
                 return (server, database, user, password, port);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ settings.json 읽기 실패: {ex.Message}");
-                Console.WriteLine(DatabaseConstants.ERROR_SETTINGS_FILE_READ_FAILED);
+                LogManagerService.LogError($"❌ settings.json 읽기 실패: {ex.Message}");
+                LogManagerService.LogError(DatabaseConstants.ERROR_SETTINGS_FILE_READ_FAILED);
                 throw new InvalidOperationException($"설정 파일 읽기 실패: {ex.Message}", ex);
             }
         }
@@ -854,50 +1022,14 @@ namespace LogisticManager.Services
         /// <param name="tableName">대상 테이블명</param>
         /// <param name="tableMappingKey">테이블 매핑 키 (기본값: "order_table")</param>
         /// <returns>삽입된 행의 수</returns>
-        public async Task<int> InsertExcelDataAsync(DataTable dataTable, string tableName, string tableMappingKey = "order_table")
+        public Task<int> InsertExcelDataAsync(DataTable dataTable, string tableName, string tableMappingKey = "order_table")
         {
-            try
-            {
-                Console.WriteLine($"🔍 DatabaseService: Excel 데이터 삽입 시작 - {dataTable.Rows.Count}행");
-                
-                // Excel 데이터를 데이터베이스 형식으로 변환
-                var transformedData = _mappingService.TransformExcelData(dataTable, tableMappingKey);
-                Console.WriteLine($"✅ DatabaseService: 데이터 변환 완료 - {transformedData.Count}행");
-                
-                if (transformedData.Count == 0)
-                {
-                    Console.WriteLine("⚠️ DatabaseService: 변환된 데이터가 없습니다.");
-                    return 0;
-                }
-                
-                // 각 행에 대해 INSERT 쿼리 생성 및 실행
-                var insertedRows = 0;
-                foreach (var rowData in transformedData)
-                {
-                    // 데이터 유효성 검사
-                    var (isValid, errors) = _mappingService.ValidateData(rowData, tableMappingKey);
-                    if (!isValid)
-                    {
-                        Console.WriteLine($"⚠️ DatabaseService: 데이터 유효성 검사 실패: {string.Join(", ", errors)}");
-                        continue;
-                    }
-                    
-                    // INSERT 쿼리 생성
-                    var insertQuery = _mappingService.GenerateInsertQuery(tableName, rowData);
-                    
-                    // 쿼리 실행
-                    var affectedRows = await ExecuteNonQueryAsync(insertQuery);
-                    insertedRows += affectedRows;
-                }
-                
-                Console.WriteLine($"✅ DatabaseService: Excel 데이터 삽입 완료 - {insertedRows}행 삽입됨");
-                return insertedRows;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"❌ DatabaseService: Excel 데이터 삽입 실패: {ex.Message}");
-                throw;
-            }
+            Console.WriteLine($"🔍 DatabaseService: Excel 데이터 삽입 시작 - {dataTable.Rows.Count}행");
+            
+            // 테이블매핑 기능이 제거되어 Excel 데이터 삽입을 건너뜀
+            Console.WriteLine("⚠️ DatabaseService: 테이블매핑 기능이 제거되어 Excel 데이터 삽입을 건너뜁니다.");
+            Console.WriteLine("💡 DatabaseService: 프로시저 기반 처리를 사용하세요.");
+            return Task.FromResult(0);
         }
 
         #endregion
@@ -914,8 +1046,8 @@ namespace LogisticManager.Services
         /// </summary>
         public void ReloadMappingConfiguration()
         {
-            _mappingService.ReloadConfiguration();
-            Console.WriteLine("✅ DatabaseService: 매핑 설정 다시 로드 완료");
+            // 테이블매핑 기능이 제거되어 설정 다시 로드를 건너뜀
+            Console.WriteLine("⚠️ DatabaseService: 테이블매핑 기능이 제거되어 설정 다시 로드를 건너뜁니다.");
         }
 
         /// <summary>
@@ -926,9 +1058,11 @@ namespace LogisticManager.Services
         /// - null: 설정이 로드되지 않은 경우
         /// </summary>
         /// <returns>현재 매핑 설정</returns>
-        public MappingConfiguration? GetMappingConfiguration()
+        public object? GetMappingConfiguration()
         {
-            return _mappingService.GetConfiguration();
+            // 테이블매핑 기능이 제거되어 null 반환
+            Console.WriteLine("⚠️ DatabaseService: 테이블매핑 기능이 제거되어 null을 반환합니다.");
+            return null;
         }
 
         #endregion
