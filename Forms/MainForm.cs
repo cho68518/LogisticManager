@@ -4,6 +4,7 @@ using LogisticManager.Processors;
 using LogisticManager.Repositories;
 using System.Drawing.Drawing2D;
 using System.Configuration;
+using System.Reflection; // 버전 정보를 얻기 위해 필요
 
 namespace LogisticManager.Forms
 {
@@ -125,6 +126,12 @@ namespace LogisticManager.Forms
         /// </summary>
         private Button btnKakaoWorkTest = null!;
 
+        /// <summary>
+        /// 상태표시줄 및 버전 라벨
+        /// </summary>
+        private StatusStrip statusStrip = null!;
+        private ToolStripStatusLabel toolStripStatusLabelVersion = null!;
+
         #endregion
 
         #region 생성자 (Constructor)
@@ -197,8 +204,8 @@ namespace LogisticManager.Forms
         /// </summary>
         private void InitializeUI()
         {
-            // 폼 기본 설정
-            this.Text = "송장 처리 시스템";
+            // 폼 기본 설정 (상단 좌측 창 제목에 버전 표시)
+            this.Text = $"송장 처리 시스템 ({GetAppVersionString()})";
             this.Size = new Size(1100, 900); // 폼 크기를 1100으로 조정
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.Sizable; // 크기 조절 가능하도록 변경
@@ -207,7 +214,7 @@ namespace LogisticManager.Forms
             this.MinimumSize = new Size(1000, 700); // 최소 크기도 더 크게 조정
             this.BackColor = Color.FromArgb(240, 244, 248); // 연한 회색 배경
 
-            // 타이틀 라벨 생성 및 설정
+            // 타이틀 라벨 생성 및 설정 (중앙 라벨은 버전 없이 표시)
             lblTitle = new Label
             {
                 Text = "📦 송장 처리 시스템",
@@ -328,6 +335,20 @@ namespace LogisticManager.Forms
                 ScrollBars = RichTextBoxScrollBars.Vertical
             };
 
+            // 상태표시줄(StatusStrip) 및 버전 라벨 생성
+            statusStrip = new StatusStrip
+            {
+                Dock = DockStyle.Bottom
+            };
+            toolStripStatusLabelVersion = new ToolStripStatusLabel
+            {
+                // 초기 텍스트는 빈 값으로 설정 후 아래에서 실제 버전으로 설정
+                Text = string.Empty,
+                Spring = true, // 남는 공간을 채워 가운데 정렬 효과
+                TextAlign = ContentAlignment.MiddleCenter // 텍스트 가운데 정렬
+            };
+            statusStrip.Items.Add(toolStripStatusLabelVersion);
+
             // 모든 컨트롤을 폼에 추가
             this.Controls.AddRange(new Control[]
             {
@@ -344,7 +365,8 @@ namespace LogisticManager.Forms
                 lblStatus,
                 lblDbStatus,
                 progressDisplayControl,
-                txtLog
+                txtLog,
+                statusStrip
             });
 
             // 폼 리사이즈 이벤트 핸들러 추가
@@ -356,6 +378,12 @@ namespace LogisticManager.Forms
             // 초기 로그 메시지 출력
             LogMessage("🎉 송장 처리 시스템이 시작되었습니다.");
             LogMessage("📁 파일을 선택하고 '송장 처리 시작' 버튼을 클릭하세요.");
+
+            // 버전 정보를 상태표시줄 라벨에 표시
+            // - ClickOnce 배포인 경우: ClickOnce 버전
+            // - 일반 실행/디버그: 어셈블리 버전
+            var versionText = GetAppVersionString();
+            toolStripStatusLabelVersion.Text = versionText;
         }
 
         /// <summary>
@@ -953,6 +981,52 @@ namespace LogisticManager.Forms
         #endregion
 
         #region 유틸리티 메서드 (Utility Methods)
+
+        /// <summary>
+        /// 애플리케이션 버전 문자열을 반환
+        /// - ClickOnce 배포 시: Application.ProductVersion 사용 (ClickOnce 버전 노출)
+        /// - 그 외: 어셈블리 버전
+        /// </summary>
+        /// <returns>"vMajor.Minor.Build.Revision" 형식의 버전 문자열</returns>
+        private string GetAppVersionString()
+        {
+            try
+            {
+                // WinForms의 Application.ProductVersion 사용
+                // - ClickOnce 배포 시 Publish Version이 노출됨
+                // - 일반 실행 시 파일 버전/어셈블리 정보에 기반
+                var productVersion = Application.ProductVersion; // 예: 1.2.3.4 또는 1.2.3+buildmeta
+                if (!string.IsNullOrWhiteSpace(productVersion))
+                {
+                    // SemVer의 빌드메타/프리릴리즈(+/ - 이후) 제거
+                    var semverCore = productVersion.Split('+', '-')[0];
+                    if (Version.TryParse(semverCore, out var ver))
+                    {
+                        // 메이저.마이너.빌드까지만 노출 (짧게)
+                        var shortText = $"v{ver.Major}.{ver.Minor}.{ver.Build}";
+                        return shortText;
+                    }
+                    // 파싱 실패 시 문자열을 점 기준으로 3부분까지만 노출 (메타 제거본 우선)
+                    var parts = semverCore.Split('.');
+                    var shortParts = parts.Take(Math.Min(3, parts.Length));
+                    return $"v{string.Join('.', shortParts)}";
+                }
+            }
+            catch
+            {
+                // ClickOnce API 호출 실패 시 어셈블리 버전으로 폴백
+            }
+
+            // 폴백: 어셈블리 버전 사용
+            var asmVer = Assembly.GetExecutingAssembly().GetName().Version;
+            if (asmVer != null)
+            {
+                return $"v{asmVer.Major}.{asmVer.Minor}.{asmVer.Build}"; // 짧게 표시
+            }
+
+            // 추가 안전장치: 버전을 얻지 못한 경우 기본값
+            return "v0.0.0.0";
+        }
 
         /// <summary>
         /// 로그 메시지를 텍스트박스에 출력하는 메서드

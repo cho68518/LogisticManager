@@ -41,6 +41,8 @@
     <PackageReference Include="Microsoft.VisualBasic" Version="10.3.0" />
   </ItemGroup>
 
+  
+
   <ItemGroup>
     <!-- 필요한 설정 파일들만 포함 -->
     <EmbeddedResource Include="App.config">
@@ -50,9 +52,10 @@
 
   <ItemGroup>
     <!-- 설정 파일을 출력 디렉토리로 복사 -->
-    <None Include="config\settings.json">
+    <Content Include="config\run-app.bat" />
+    <Content Include="config\settings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
@@ -76,6 +79,10 @@
     <Compile Remove="**\*Test.cs" />
     <EmbeddedResource Remove="**\*Test.cs" />
     <None Remove="**\*Test.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="config\run-app.bat" />
   </ItemGroup>
 
   <PropertyGroup>

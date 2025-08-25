@@ -17,7 +17,7 @@ namespace LogisticManager.Services
     /// </summary>
     public class SecurityService
     {
-        private static readonly string _encryptionKey = "LogisticManager2024!@#";
+        private static readonly string _encryptionKey = "MySecretKey123!";
         
         /// <summary>
         /// 환경 변수로 설정된 값을 가져오는 메서드 (JSON 파일에서도 로드)
@@ -64,6 +64,39 @@ namespace LogisticManager.Services
             }
         }
         
+        /// <summary>
+        /// 암호화된 문자열을 복호화하는 메서드
+        /// </summary>
+        /// <param name="encryptedText">암호화된 텍스트</param>
+        /// <returns>복호화된 텍스트</returns>
+        public static string DecryptString(string encryptedText)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(encryptedText))
+                    return string.Empty;
+
+                var keyBytes = Encoding.UTF8.GetBytes(_encryptionKey.PadRight(32, '0'));
+                var encryptedBytes = Convert.FromBase64String(encryptedText);
+                
+                using var aes = Aes.Create();
+                aes.Key = keyBytes;
+                aes.Mode = CipherMode.ECB;
+                aes.Padding = PaddingMode.PKCS7;
+                
+                using var decryptor = aes.CreateDecryptor();
+                var decryptedBytes = decryptor.TransformFinalBlock(encryptedBytes, 0, encryptedBytes.Length);
+                
+                return Encoding.UTF8.GetString(decryptedBytes);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ 복호화 실패: {ex.Message}");
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
         /// <summary>
         /// 환경 변수를 설정하는 메서드 (JSON 파일과 환경 변수 모두 저장)
         /// </summary>
@@ -307,37 +340,7 @@ namespace LogisticManager.Services
             }
         }
         
-        /// <summary>
-        /// 암호화된 문자열을 복호화하는 메서드
-        /// </summary>
-        /// <param name="cipherText">복호화할 Base64 문자열</param>
-        /// <returns>복호화된 텍스트</returns>
-        public static string DecryptString(string cipherText)
-        {
-            if (string.IsNullOrEmpty(cipherText))
-                return cipherText;
-            
-            try
-            {
-                var cipherBytes = Convert.FromBase64String(cipherText);
-                
-                using var aes = Aes.Create();
-                aes.Key = Encoding.UTF8.GetBytes(_encryptionKey.PadRight(32).Substring(0, 32));
-                aes.IV = new byte[16];
-                
-                using var decryptor = aes.CreateDecryptor();
-                using var msDecrypt = new MemoryStream(cipherBytes);
-                using var csDecrypt = new CryptoStream(msDecrypt, decryptor, CryptoStreamMode.Read);
-                using var srDecrypt = new StreamReader(csDecrypt);
-                
-                return srDecrypt.ReadToEnd();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"복호화 실패: {ex.Message}");
-                return cipherText;
-            }
-        }
+
         
         /// <summary>
         /// 안전한 연결 문자열을 생성하는 메서드

@@ -192,6 +192,27 @@ namespace LogisticManager.Services
                 throw new InvalidOperationException(DatabaseConstants.ERROR_MISSING_REQUIRED_SETTINGS);
             }
             
+            // 비밀번호 복호화 처리
+            var decryptedPassword = password;
+            if (!string.IsNullOrEmpty(password) && password.Length > 20) // 암호화된 비밀번호로 판단
+            {
+                try
+                {
+                    decryptedPassword = SecurityService.DecryptString(password);
+                    if (string.IsNullOrEmpty(decryptedPassword))
+                    {
+                        LogManagerService.LogError("❌ DatabaseService: 비밀번호 복호화 실패");
+                        throw new InvalidOperationException("비밀번호 복호화에 실패했습니다.");
+                    }
+                    LogManagerService.LogInfo("✅ DatabaseService: 비밀번호 복호화 성공");
+                }
+                catch (Exception ex)
+                {
+                    LogManagerService.LogError($"❌ DatabaseService: 비밀번호 복호화 중 오류 발생: {ex.Message}");
+                    throw new InvalidOperationException("비밀번호 복호화 중 오류가 발생했습니다.", ex);
+                }
+            }
+            
             // 설정값 검증 및 로깅
             //LogManagerService.LogInfo($"🔍 DatabaseService: settings.json에서 읽어온 설정값");
             //LogManagerService.LogInfo($"   DB_SERVER: '{server}' (길이: {server.Length})");
@@ -221,8 +242,8 @@ namespace LogisticManager.Services
             LogManagerService.LogInfo($"   사용자: {user}");
             LogManagerService.LogInfo($"   포트: {port}");
             
-            // 연결 문자열 생성
-            _connectionString = string.Format(DatabaseConstants.CONNECTION_STRING_TEMPLATE, server, database, user, password, port);
+            // 연결 문자열 생성 (복호화된 비밀번호 사용)
+            _connectionString = string.Format(DatabaseConstants.CONNECTION_STRING_TEMPLATE, server, database, user, decryptedPassword, port);
             
             // MappingService 인스턴스 생성 (테이블매핑 기능 제거됨)
             // _mappingService = null; // MappingService 제거
