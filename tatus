@@ -1,0 +1,5 @@
+[33m0896589[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m 프로젝트 리팩토링 및 개선사항 적용 - 데이터베이스 서비스 개선, 프로시저 업데이트, UI 폼 개선, 보안 서비스 강화
+[33m5f80458[m  ProcessTalkDealUnavailable과 ProcessInvoiceManagement 패턴 통일 및 전체 코드 정리
+[33m2ecad32[m feat(kakaowork): block serialization fixed, unified Shipment pattern; BusanCheonggwaPrint header adjusted; Integrated header and blocks updated; step-control/log polish; Excel naming & rn column fixes
+[33m1f7a94b[m  송장출력 시스템 대규모 개선 및 신규 메서드 추가
+[33m74c3955[m  오류 로그 가독성 향상을 위한 줄바꿈 적용

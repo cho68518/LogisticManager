@@ -127,10 +127,10 @@ namespace LogisticManager.Forms
         private Button btnKakaoWorkTest = null!;
 
         /// <summary>
-        /// 상태표시줄 및 버전 라벨
+        /// 상태표시줄 및 날짜/시간 라벨
         /// </summary>
         private StatusStrip statusStrip = null!;
-        private ToolStripStatusLabel toolStripStatusLabelVersion = null!;
+        private ToolStripStatusLabel toolStripStatusLabelDateTime = null!;
 
         #endregion
 
@@ -172,6 +172,17 @@ namespace LogisticManager.Forms
             
             // 진행상황 단계 데이터 로딩
             _ = LoadProgressStepsAsync();
+            
+            // 배치 타이틀 자동 업데이트 타이머 설정 (1분마다)
+            var batchTitleTimer = new System.Windows.Forms.Timer
+            {
+                Interval = 60000, // 1분 = 60,000ms
+                Enabled = true
+            };
+            batchTitleTimer.Tick += (sender, e) => UpdateBatchTitle();
+            
+            // 초기 타이틀 설정
+            UpdateBatchTitle();
 
         }
 
@@ -214,14 +225,14 @@ namespace LogisticManager.Forms
             this.MinimumSize = new Size(1000, 700); // 최소 크기도 더 크게 조정
             this.BackColor = Color.FromArgb(240, 244, 248); // 연한 회색 배경
 
-            // 타이틀 라벨 생성 및 설정 (중앙 라벨은 버전 없이 표시)
+            // 타이틀 라벨 생성 및 설정 (배치구분규칙에 따른 동적 타이틀 표시)
             lblTitle = new Label
             {
-                Text = "📦 송장 처리 시스템",
+                Text = GetBatchTitle("📦 송장 처리 시스템"),
                 Location = new Point(20, 20),
                 Size = new Size(860, 40),
                 Font = new Font("맑은 고딕", 16F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(52, 73, 94),
+                ForeColor = Color.FromArgb(52, 73, 0),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
@@ -270,6 +281,10 @@ namespace LogisticManager.Forms
             // 디버그용 버튼 (임시)
             btnDebugSalesData = CreateModernButton("🐛 디버그: 판매입력", new Point(340, 160), new Size(120, 45), Color.FromArgb(231, 76, 60));
             btnDebugSalesData.Click += BtnDebugSalesData_Click;
+            
+            // 배치구분 테스트 버튼 추가
+            var btnBatchTest = CreateModernButton("⏰ 배치구분 테스트", new Point(470, 160), new Size(120, 45), Color.FromArgb(52, 152, 219));
+            btnBatchTest.Click += BtnBatchTest_Click;
 
             // 진행률 표시바 생성 및 설정 (현재 숨김 처리됨 - 원형 진행률 차트로 대체)
             progressBar = new ProgressBar
@@ -335,19 +350,19 @@ namespace LogisticManager.Forms
                 ScrollBars = RichTextBoxScrollBars.Vertical
             };
 
-            // 상태표시줄(StatusStrip) 및 버전 라벨 생성
+            // 상태표시줄(StatusStrip) 및 날짜/시간 라벨 생성
             statusStrip = new StatusStrip
             {
                 Dock = DockStyle.Bottom
             };
-            toolStripStatusLabelVersion = new ToolStripStatusLabel
+            toolStripStatusLabelDateTime = new ToolStripStatusLabel
             {
-                // 초기 텍스트는 빈 값으로 설정 후 아래에서 실제 버전으로 설정
+                // 초기 텍스트는 빈 값으로 설정 후 아래에서 실제 날짜/시간으로 설정
                 Text = string.Empty,
                 Spring = true, // 남는 공간을 채워 가운데 정렬 효과
                 TextAlign = ContentAlignment.MiddleCenter // 텍스트 가운데 정렬
             };
-            statusStrip.Items.Add(toolStripStatusLabelVersion);
+            statusStrip.Items.Add(toolStripStatusLabelDateTime);
 
             // 모든 컨트롤을 폼에 추가
             this.Controls.AddRange(new Control[]
@@ -379,11 +394,16 @@ namespace LogisticManager.Forms
             LogMessage("🎉 송장 처리 시스템이 시작되었습니다.");
             LogMessage("📁 파일을 선택하고 '송장 처리 시작' 버튼을 클릭하세요.");
 
-            // 버전 정보를 상태표시줄 라벨에 표시
-            // - ClickOnce 배포인 경우: ClickOnce 버전
-            // - 일반 실행/디버그: 어셈블리 버전
-            var versionText = GetAppVersionString();
-            toolStripStatusLabelVersion.Text = versionText;
+            // 현재 날짜/시간을 상태표시줄 라벨에 표시
+            UpdateDateTimeDisplay();
+            
+            // 날짜/시간 자동 업데이트 타이머 설정 (1초마다)
+            var dateTimeTimer = new System.Windows.Forms.Timer
+            {
+                Interval = 1000, // 1초 = 1,000ms
+                Enabled = true
+            };
+            dateTimeTimer.Tick += (sender, e) => UpdateDateTimeDisplay();
         }
 
         /// <summary>
@@ -1447,6 +1467,74 @@ namespace LogisticManager.Forms
 
         #endregion
 
+        #region 배치구분 테스트 (Batch Time Test)
+
+        /// <summary>
+        /// 배치구분 테스트 버튼 클릭 이벤트 핸들러
+        /// </summary>
+        /// <param name="sender">이벤트 발생 객체</param>
+        /// <param name="e">이벤트 인수</param>
+        private void BtnBatchTest_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                LogMessage("⏰ 배치구분 테스트를 시작합니다...");
+                
+                var batchService = BatchTimeService.Instance;
+                
+                // 현재 시간 테스트
+                var currentTime = DateTime.Now;
+                var currentBatchType = batchService.GetCurrentBatchType();
+                var currentTitle = batchService.GetBatchTitle("📦 송장 처리 시스템");
+                
+                LogMessage($"🕐 현재 시간: {currentTime:HH:mm:ss}");
+                LogMessage($"🏷️ 현재 배치구분: {currentBatchType}");
+                LogMessage($"📝 현재 타이틀: {currentTitle}");
+                
+                // 시간대별 테스트
+                var testTimes = new[]
+                {
+                    new TimeSpan(0, 30, 0),   // 00:30
+                    new TimeSpan(2, 15, 0),   // 02:15
+                    new TimeSpan(8, 45, 0),   // 08:45
+                    new TimeSpan(11, 30, 0),  // 11:30
+                    new TimeSpan(14, 20, 0),  // 14:20
+                    new TimeSpan(16, 45, 0),  // 16:45
+                    new TimeSpan(20, 15, 0),  // 20:15
+                    new TimeSpan(7, 30, 0),   // 07:30 (배치 시간 아님)
+                    new TimeSpan(10, 30, 0),  // 10:30 (배치 시간 아님)
+                };
+                
+                LogMessage("=== 시간대별 배치구분 테스트 ===");
+                foreach (var time in testTimes)
+                {
+                    var batchType = batchService.GetBatchTypeAtTime(time);
+                    var title = batchService.GetBatchTitle("📦 송장 처리 시스템");
+                    LogMessage($"{time:hh\\:mm} → {batchType} → {title}");
+                }
+                
+                LogMessage("=== 모든 배치구분 정보 ===");
+                var allBatchTypes = batchService.GetAllBatchTypes();
+                foreach (var batch in allBatchTypes)
+                {
+                    LogMessage($"{batch.Key}: {batch.Value}");
+                }
+                
+                LogMessage("✅ 배치구분 테스트가 완료되었습니다.");
+                
+                // 타이틀 업데이트
+                UpdateBatchTitle();
+                LogMessage($"🔄 타이틀이 업데이트되었습니다: {lblTitle.Text}");
+                
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"⚠️ 배치구분 테스트 중 오류가 발생했습니다: {ex.Message}");
+            }
+        }
+
+        #endregion
+
         #region 폼 이벤트 (Form Events)
 
         /// <summary>
@@ -1615,6 +1703,106 @@ namespace LogisticManager.Forms
             catch (Exception ex)
             {
                 LogMessage($"⚠️ 진행상황 표시 업데이트 중 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 배치구분규칙에 따른 타이틀을 반환하는 메서드
+        /// </summary>
+        /// <param name="baseTitle">기본 타이틀</param>
+        /// <returns>배치구분이 포함된 타이틀</returns>
+        private string GetBatchTitle(string baseTitle)
+        {
+            try
+            {
+                return BatchTimeService.Instance.GetBatchTitle(baseTitle);
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"⚠️ 배치 타이틀 생성 중 오류: {ex.Message}");
+                return baseTitle; // 오류 시 기본 타이틀 반환
+            }
+        }
+        
+        /// <summary>
+        /// 타이틀을 현재 배치구분에 맞게 업데이트하는 메서드
+        /// </summary>
+        private void UpdateBatchTitle()
+        {
+            try
+            {
+                if (lblTitle != null)
+                {
+                    lblTitle.Text = GetBatchTitle("📦 송장 처리 시스템");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"⚠️ 타이틀 업데이트 중 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 상태바에 현재 날짜/시간을 표시하는 메서드
+        /// </summary>
+        private void UpdateDateTimeDisplay()
+        {
+            try
+            {
+                if (toolStripStatusLabelDateTime != null)
+                {
+                    var now = DateTime.Now;
+                    var dayOfWeek = GetKoreanDayOfWeek(now.DayOfWeek);
+                    var timePeriod = GetKoreanTimePeriod(now.Hour);
+                    
+                    var dateTimeText = $"{now:yyyy-MM-dd} ({dayOfWeek}) {timePeriod} {now:HH:mm}";
+                    toolStripStatusLabelDateTime.Text = dateTimeText;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"⚠️ 날짜/시간 표시 업데이트 중 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 요일을 한국어로 변환하는 메서드
+        /// </summary>
+        /// <param name="dayOfWeek">요일</param>
+        /// <returns>한국어 요일</returns>
+        private string GetKoreanDayOfWeek(DayOfWeek dayOfWeek)
+        {
+            return dayOfWeek switch
+            {
+                DayOfWeek.Monday => "월요일",
+                DayOfWeek.Tuesday => "화요일",
+                DayOfWeek.Wednesday => "수요일",
+                DayOfWeek.Thursday => "목요일",
+                DayOfWeek.Friday => "금요일",
+                DayOfWeek.Saturday => "토요일",
+                DayOfWeek.Sunday => "일요일",
+                _ => "알 수 없음"
+            };
+        }
+        
+        /// <summary>
+        /// 시간을 한국어 시간대별로 변환하는 메서드
+        /// </summary>
+        /// <param name="hour">시간 (0-23)</param>
+        /// <returns>한국어 시간대</returns>
+        private string GetKoreanTimePeriod(int hour)
+        {
+            if (hour >= 0 && hour < 12)
+            {
+                return "오전";
+            }
+            else if (hour >= 12 && hour < 18)
+            {
+                return "오후";
+            }
+            else
+            {
+                return "오후"; // 18시 이후도 오후로 표시
             }
         }
         

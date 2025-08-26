@@ -79,8 +79,8 @@ namespace LogisticManager.Repositories
             }
             catch (Exception ex)
             {
-                //LogManagerService.LogError($"공통코드 그룹코드 조회 중 오류 발생: {ex.Message}");
-                //LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
+                LogManagerService.LogError($"공통코드 그룹코드 조회 중 오류 발생: {ex.Message}");
+                LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
                 throw;
             }
         }
@@ -174,8 +174,8 @@ namespace LogisticManager.Repositories
             }
             catch (Exception ex)
             {
-                //LogManagerService.LogError($"공통코드 조회 중 오류 발생 (그룹코드: {groupCode}): {ex.Message}");
-                //LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
+                LogManagerService.LogError($"공통코드 조회 중 오류 발생 (그룹코드: {groupCode}): {ex.Message}");
+                LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
                 throw;
             }
         }
