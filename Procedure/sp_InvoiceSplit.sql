@@ -18,16 +18,19 @@ BEGIN
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         GET DIAGNOSTICS CONDITION 1
-            error_code = MYSQL_ERRNO,
-            error_info = MESSAGE_TEXT;
+            @sqlstate = RETURNED_SQLSTATE,
+            @errno    = MYSQL_ERRNO,
+            @text     = MESSAGE_TEXT;
 
         ROLLBACK;
-        DROP TEMPORARY TABLE IF EXISTS sp_execution_log;
-        DROP TEMPORARY TABLE IF EXISTS temp_gamcheon_codes;
-        DROP TEMPORARY TABLE IF EXISTS temp_address_counts;
-        SELECT '오류가 발생하여 모든 작업이 롤백되었습니다.' AS ErrorMessage,
-               error_code AS MySQLErrorCode,
-               error_info AS MySQLErrorMessage;
+
+        INSERT INTO error_log (procedure_name, error_code, error_message)
+        VALUES ('sp_InvoiceSplit', @errno, @text);
+
+        DROP TEMPORARY TABLE IF EXISTS sp_execution_log, temp_sorted_data;
+        SELECT '오류가 발생하여 모든 작업이 롤백되었습니다.' AS Message;
+
+        SHOW ERRORS;
     END;
 
     CREATE TEMPORARY TABLE sp_execution_log (

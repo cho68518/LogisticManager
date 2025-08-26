@@ -14,10 +14,11 @@ BEGIN
             @errno    = MYSQL_ERRNO,
             @text     = MESSAGE_TEXT;
 
+        ROLLBACK;
+
         INSERT INTO error_log (procedure_name, error_code, error_message)
         VALUES ('sp_GyeonggiProcessF', @errno, @text);
 
-        ROLLBACK;
         DROP TEMPORARY TABLE IF EXISTS sp_execution_log, temp_sorted_data;
         SELECT '오류가 발생하여 모든 작업이 롤백되었습니다.' AS Message;
 
@@ -27,10 +28,6 @@ BEGIN
     CREATE TEMPORARY TABLE sp_execution_log ( StepID INT AUTO_INCREMENT PRIMARY KEY, OperationDescription VARCHAR(255), AffectedRows INT );
     START TRANSACTION;
 
-    /*--TRUNCATE TABLE temp_invoices;
-    --TRUNCATE TABLE temp_additional_invoices;*/
-    TRUNCATE TABLE error_log;	
-		
     /*-- =================================================================================
     -- 임시 작업 테이블 생성
     -- =================================================================================*/

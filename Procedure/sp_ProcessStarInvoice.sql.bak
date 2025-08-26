@@ -21,7 +21,6 @@ BEGIN
 		DECLARE error_info TEXT DEFAULT '';
 		DECLARE error_code INT DEFAULT 0;
 		
-		-- MySQL 오류 정보 수집
 		GET DIAGNOSTICS CONDITION 1
 			error_code = MYSQL_ERRNO,
 			error_info = MESSAGE_TEXT;

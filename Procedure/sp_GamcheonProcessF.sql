@@ -14,10 +14,11 @@ BEGIN
             @errno    = MYSQL_ERRNO,
             @text     = MESSAGE_TEXT;
 
+        ROLLBACK;
+
         INSERT INTO error_log (procedure_name, error_code, error_message)
         VALUES ('sp_GamcheonProcessF', @errno, @text);
 
-        ROLLBACK;
         DROP TEMPORARY TABLE IF EXISTS sp_execution_log, temp_sorted_data;
         SELECT '오류가 발생하여 모든 작업이 롤백되었습니다.' AS Message;
 
@@ -27,8 +28,6 @@ BEGIN
     CREATE TEMPORARY TABLE sp_execution_log ( StepID INT AUTO_INCREMENT PRIMARY KEY, OperationDescription VARCHAR(255), AffectedRows INT );
     START TRANSACTION;
 
-    TRUNCATE TABLE error_log;	
-		
     /*-- =================================================================================
     -- 임시 작업 테이블 생성
     -- =================================================================================*/
@@ -110,7 +109,7 @@ BEGIN
         SELECT 품목코드, SUM(수량) AS total_quantity FROM temp_invoices WHERE 송장구분 = '단일' GROUP BY 품목코드
 		) AS t2 ON t1.품목코드 = t2.품목코드
 		SET t1.품목개수 = t2.total_quantity WHERE t1.송장구분 = '단일';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 단일 데이터 품목개수 합산', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (감천냉동) 단일 데이터 품목개수 합산', ROW_COUNT());
 
     /*--================================================================================
 	-- (감천냉동) 감천냉동추가송장 테이블로 유니크 주소 행 이동

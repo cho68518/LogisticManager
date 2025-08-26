@@ -14,10 +14,11 @@ BEGIN
             @errno    = MYSQL_ERRNO,
             @text     = MESSAGE_TEXT;
 
+        ROLLBACK;
+
         INSERT INTO error_log (procedure_name, error_code, error_message)
         VALUES ('sp_SeoulProcessF', @errno, @text);
 
-        ROLLBACK;
         DROP TEMPORARY TABLE IF EXISTS sp_execution_log, temp_sorted_data;
         SELECT '오류가 발생하여 모든 작업이 롤백되었습니다.' AS Message;
 
@@ -27,10 +28,6 @@ BEGIN
     CREATE TEMPORARY TABLE sp_execution_log ( StepID INT AUTO_INCREMENT PRIMARY KEY, OperationDescription VARCHAR(255), AffectedRows INT );
     START TRANSACTION;
 
-    /*--TRUNCATE TABLE temp_invoices;
-    --TRUNCATE TABLE temp_additional_invoices;*/
-    TRUNCATE TABLE error_log;	
-		
     /*-- =================================================================================
     -- 임시 작업 테이블 생성
     -- =================================================================================*/
@@ -43,7 +40,7 @@ BEGIN
 	CREATE TEMPORARY TABLE temp_additional_invoices LIKE 송장출력_서울냉동;
 	
     /*--================================================================================
-	-- (서울냉동) 서울서울낱개 분류 (데이터 정제 기능 추가)
+	-- (서울냉동) 서울서울낱개 분류
     --================================================================================*/
     INSERT INTO temp_invoices (
 		msg1, msg2, msg3, msg4, msg5, msg6, 수취인명, 전화번호1, 전화번호2, 우편번호, 주소, 옵션명, 수량, 배송메세지, 

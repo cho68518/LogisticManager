@@ -14,10 +14,11 @@ BEGIN
             @errno    = MYSQL_ERRNO,
             @text     = MESSAGE_TEXT;
 
+        ROLLBACK;
+
         INSERT INTO error_log (procedure_name, error_code, error_message)
         VALUES ('sp_GyeonggiGongsanProcessF', @errno, @text);
 
-        ROLLBACK;
         DROP TEMPORARY TABLE IF EXISTS sp_execution_log, temp_sorted_data;
         SELECT '오류가 발생하여 모든 작업이 롤백되었습니다.' AS Message;
 
@@ -27,8 +28,6 @@ BEGIN
     CREATE TEMPORARY TABLE sp_execution_log ( StepID INT AUTO_INCREMENT PRIMARY KEY, OperationDescription VARCHAR(255), AffectedRows INT );
     START TRANSACTION;
 
-    TRUNCATE TABLE error_log;	
-		
     /*-- =================================================================================
     -- 임시 작업 테이블 생성
     -- =================================================================================*/
@@ -55,20 +54,20 @@ BEGIN
         FROM 송장출력_사방넷원본변환 WHERE 송장구분최종 = '공산낱개';
 
 
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[TEMP] temp_invoices 생성 및 공산낱개 데이터 분류', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[TEMP] (경기공산) 생성 및 공산낱개 데이터 분류', ROW_COUNT());
 
     /*--=====================================================================================================
 	-- (경기공산) 택배수량 계산 및 송장구분자 업데이트
 	--             택배수량을 이용하여 1을 나눈 결과를 소수점 세 자리에서 내림하여 송장구분자 컬럼에 업데이트
     --======================================================================================================*/
     UPDATE temp_invoices SET 송장구분자 = FLOOR((1 / IFNULL(NULLIF(CAST(택배수량 AS DECIMAL), 0), 10)) * 1000) / 1000;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 택배수량으로 송장구분자 계산', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (경기공산) 택배수량으로 송장구분자 계산', ROW_COUNT());
 
     /*--================================================================================
 	-- (경기공산) 송장구분자와 수량 곱 업데이트
     --================================================================================*/
     UPDATE temp_invoices SET 송장구분자 = 송장구분자 * 수량;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 송장구분자에 수량 적용', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (경기공산) 송장구분자에 수량 적용', ROW_COUNT());
 
     /*--================================================================================
 	-- (경기공산) 주소 + 수취인명 기반 송장구분자 합산
@@ -78,19 +77,19 @@ BEGIN
 			  FROM temp_invoices GROUP BY 주소, 수취인명
 		 ) AS s ON t.주소 = s.주소 AND t.수취인명 = s.수취인명
 		SET t.택배수량1 = s.구분자합;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 주소/수취인명별 송장구분자 합산', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (경기공산) 주소/수취인명별 송장구분자 합산', ROW_COUNT());
 
     /*--================================================================================
 	-- (경기공산) 택배수량1 올림 처리  ('낱개' 로 남아있는 행이 있음)
     --================================================================================*/
     UPDATE temp_invoices SET 택배수량1 = CEIL(IFNULL(택배수량1, 1));
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 택배수량 올림 처리', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (경기공산) 택배수량 올림 처리', ROW_COUNT());
 
     /*--================================================================================
 	-- (경기공산) 택배수량1에 따른 송장구분 업데이트
     --================================================================================*/
     UPDATE temp_invoices SET 송장구분 = CASE WHEN 택배수량1 > 1 THEN '추가' ELSE '1장' END;
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 송장구분 설정 (추가/1장)', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (경기공산) 송장구분 설정 (추가/1장)', ROW_COUNT());
 
     /*--================================================================================
 	-- (경기공산) 주소 및 수취인명 유일성에 따른 송장구분 업데이트 시작
@@ -100,7 +99,7 @@ BEGIN
 			SELECT 주소, 수취인명 FROM temp_invoices WHERE 송장구분 = '1장' GROUP BY 주소, 수취인명 HAVING COUNT(*) = 1
 		) AS unique_address ON t1.주소 = unique_address.주소 AND t1.수취인명 = unique_address.수취인명
 		SET t1.송장구분 = '단일' WHERE t1.송장구분 = '1장';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 송장구분 설정 (단일)', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (경기공산) 송장구분 설정 (단일)', ROW_COUNT());
 
     /*--================================================================================
 	-- (경기공산) 품목코드별 수량 합산 및 품목개수
@@ -109,7 +108,7 @@ BEGIN
 			SELECT 품목코드, SUM(수량) AS total_quantity FROM temp_invoices WHERE 송장구분 = '단일' GROUP BY 품목코드
 		) AS t2 ON t1.품목코드 = t2.품목코드
 		SET t1.품목개수 = t2.total_quantity WHERE t1.송장구분 = '단일';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_invoices, 단일 데이터 품목개수 합산', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (경기공산) 단일 데이터 품목개수 합산', ROW_COUNT());
 
     /*--================================================================================
 	-- (경기공산) 송장출력_경기공산추가송장 테이블로 유니크 주소 행 이동
@@ -128,7 +127,7 @@ BEGIN
 			FROM temp_invoices WHERE 송장구분 = '추가'
 		) AS subquery WHERE subquery.rn = 1;
 		
-	INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] temp_additional_invoices, 추가송장 기본 데이터 생성', ROW_COUNT());
+	INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] (경기공산) 추가송장 기본 데이터 생성', ROW_COUNT());
 
     /*--================================================================================
 	-- (경기공산) 경기공산추가송장 업데이트
@@ -136,7 +135,7 @@ BEGIN
     --================================================================================*/
     UPDATE temp_additional_invoices
 		SET 수량 = 1, 송장명 = '+++', 옵션명 = '+++', 품목코드 = '0000', 주문번호 = '1234567890';
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_additional_invoices, 추가송장 내용 변경 (+++)', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (경기공산) 추가송장 내용 변경 (+++)', ROW_COUNT());
 
     /*--================================================================================
 	-- (경기공산) 경기공산 추가송장 늘리기
@@ -152,7 +151,7 @@ BEGIN
 			   t.택배수량합산, t.송장구분자, t.송장구분, t.송장구분최종, t.위치, t.위치변환
         FROM temp_additional_invoices AS t JOIN Numbers AS n ON n.n <= (t.택배수량1 - 1) WHERE t.택배수량1 > 1;
 		
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] temp_additional_invoices, 추가송장 늘리기', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[INSERT] (경기공산) 추가송장 늘리기', ROW_COUNT());
     
     /*--================================================================================
 	-- (경기공산) 경기공산 추가송장 순번 매기기
@@ -162,13 +161,13 @@ BEGIN
 			FROM temp_additional_invoices, (SELECT @seq := 0, @current_group := '') AS vars ORDER BY 주소, id
 		) AS s ON t.id = s.id
 		SET t.송장구분자 = CONCAT('[', s.rn, ']');
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_additional_invoices, 추가송장 순번 매기기', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (경기공산) 추가송장 순번 매기기', ROW_COUNT());
 
     /*--================================================================================
 	-- (경기공산) 경기공산추가송장 주소업데이트
     --================================================================================*/
     UPDATE temp_additional_invoices SET 주소 = CONCAT(주소, 송장구분자);
-    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] temp_additional_invoices, 추가송장 주소에 순번 추가', ROW_COUNT());
+    INSERT INTO sp_execution_log (OperationDescription, AffectedRows) VALUES ('[UPDATE] (경기공산) 추가송장 주소에 순번 추가', ROW_COUNT());
 
     /*--================================================================================
 	-- (경기공산) 경기공산 테이블 마지막정리

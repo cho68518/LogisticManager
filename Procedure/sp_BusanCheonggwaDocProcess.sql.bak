@@ -198,7 +198,7 @@ BEGIN
             SELECT 품목코드 FROM 송장출력_부산청과자료_단품 UNION
             SELECT 품목코드 FROM 송장출력_부산청과자료_합포
         ) AS m_code
-    -- 마스터 '품목코드' 목록에 각 테이블의 집계 결과를 LEFT JOIN으로 연결.
+    -- 마스터 '품목코드' 목록에 각 테이블의 집계 결과를 연결.
     LEFT JOIN 
         (
             SELECT 품목코드, REPLACE(MAX(송장명), 'YC_', '') AS 송장명, SUM(수량) AS 총수량
