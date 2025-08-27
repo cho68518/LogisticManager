@@ -101,8 +101,8 @@ namespace LogisticManager.Forms
         /// </summary>
         public SettingsForm()
         {
-            // 공통코드 관련 서비스 초기화
-            _databaseService = new DatabaseService();
+            // 공통코드 관련 서비스 초기화 (Singleton 패턴 사용)
+            _databaseService = DatabaseService.Instance;
             _commonCodeRepository = new CommonCodeRepository(_databaseService);
 
             InitializeComponent();
@@ -147,7 +147,7 @@ namespace LogisticManager.Forms
         private void InitializeComponent()
         {
             // 폼 기본 설정
-            this.Text = "⚙️ 설정";
+            this.Text = "⚙️ 설정/확인";
             this.Size = new System.Drawing.Size(1000, 720);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.Sizable;
@@ -159,7 +159,7 @@ namespace LogisticManager.Forms
             // 타이틀 라벨
             var titleLabel = new Label
             {
-                Text = "🔧 설정",
+                Text = "🔧 설정/확인",
                 Location = new Point(20, 20),
                 Size = new Size(660, 30),
                 Font = new Font("맑은 고딕", 14F, FontStyle.Bold),
@@ -187,15 +187,20 @@ namespace LogisticManager.Forms
             // apiTab.Controls.Add(CreateApiSettingsPanel());
             // tabControl.TabPages.Add(apiTab);
 
-            // 파일 경로 설정 탭
-            var pathTab = new TabPage("📁 파일 경로 설정");
-            pathTab.Controls.Add(CreatePathSettingsPanel());
-            tabControl.TabPages.Add(pathTab);
-
             // 공통코드 관리 탭
             var commonCodeTab = new TabPage("🔧 공통코드 관리");
             commonCodeTab.Controls.Add(CreateCommonCodeManagementPanel());
             tabControl.TabPages.Add(commonCodeTab);
+
+            // 오류확인 탭
+            var errorCheckTab = new TabPage("⚠️ 오류확인");
+            errorCheckTab.Controls.Add(CreateErrorCheckPanel());
+            tabControl.TabPages.Add(errorCheckTab);
+
+            // 파일 경로 설정 탭
+            var pathTab = new TabPage("📁 파일 경로 설정");
+            pathTab.Controls.Add(CreatePathSettingsPanel());
+            tabControl.TabPages.Add(pathTab);
 
             // 하단 버튼 패널 생성
             var buttonPanel = new Panel();
@@ -338,6 +343,315 @@ namespace LogisticManager.Forms
             };
 
             return button;
+        }
+
+        /// <summary>
+        /// 데이터 길이에 따른 컬럼 너비를 자동으로 계산하는 메서드
+        /// </summary>
+        /// <param name="columnName">컬럼명</param>
+        /// <param name="dataTable">데이터 테이블</param>
+        /// <returns>계산된 컬럼 너비</returns>
+        private int CalculateColumnWidth(string columnName, System.Data.DataTable dataTable)
+        {
+            try
+            {
+                // 기본 너비 설정
+                var maxWidth = 300;
+                var minWidth = 60;
+                
+                // 컬럼명 길이 고려
+                var headerWidth = GetColumnDisplayName(columnName).Length * 8;
+                
+                // 데이터 길이 계산
+                var maxDataLength = 0;
+                if (dataTable != null && dataTable.Rows.Count > 0)
+                {
+                    var columnIndex = dataTable.Columns[columnName]?.Ordinal ?? -1;
+                    if (columnIndex >= 0)
+                    {
+                        foreach (System.Data.DataRow row in dataTable.Rows)
+                        {
+                            var cellValue = row[columnIndex]?.ToString() ?? "";
+                            maxDataLength = Math.Max(maxDataLength, cellValue.Length);
+                        }
+                    }
+                }
+                
+                // 데이터 길이에 따른 너비 계산 (한글 고려)
+                var dataWidth = maxDataLength * 10;
+                
+                // 최종 너비 계산
+                var calculatedWidth = Math.Max(headerWidth, dataWidth) + 20; // 여백 추가
+                
+                // 최소/최대 범위 내로 제한
+                return Math.Max(minWidth, Math.Min(maxWidth, calculatedWidth));
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ 컬럼 너비 계산 중 오류: {ex.Message}");
+                return 100; // 기본값 반환
+            }
+        }
+
+        /// <summary>
+        /// 컬럼명을 사용자 친화적인 표시명으로 변환하는 메서드
+        /// </summary>
+        /// <param name="columnName">원본 컬럼명</param>
+        /// <returns>변환된 표시명</returns>
+        private string GetColumnDisplayName(string columnName)
+        {
+            return columnName.ToLower() switch
+            {
+                "id" => "ID",
+                "timestamp" => "시간",
+                "created_at" => "생성시간",
+                "created_date" => "생성일자",
+                "level" => "레벨",
+                "log_level" => "로그레벨",
+                "severity" => "심각도",
+                "message" => "메시지",
+                "log_message" => "로그메시지",
+                "description" => "설명",
+                "details" => "상세정보",
+                "error_code" => "오류코드",
+                "stack_trace" => "스택트레이스",
+                "source" => "소스",
+                "user_id" => "사용자ID",
+                "ip_address" => "IP주소",
+                _ => columnName
+            };
+        }
+
+        /// <summary>
+        /// 오류 로그를 CSV 파일로 내보내는 메서드
+        /// </summary>
+        /// <param name="dataGridView">내보낼 데이터가 있는 그리드</param>
+        private void ExportErrorLogs(DataGridView dataGridView)
+        {
+            try
+            {
+                if (dataGridView.Rows.Count == 0)
+                {
+                    MessageBox.Show("내보낼 데이터가 없습니다.", "내보내기", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                using (var saveFileDialog = new SaveFileDialog())
+                {
+                    saveFileDialog.Filter = "CSV 파일 (*.csv)|*.csv|모든 파일 (*.*)|*.*";
+                    saveFileDialog.FileName = $"오류로그_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    saveFileDialog.Title = "오류 로그 내보내기";
+
+                    if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        var csvContent = new System.Text.StringBuilder();
+
+                        // 헤더 추가
+                        var headers = new List<string>();
+                        foreach (DataGridViewColumn column in dataGridView.Columns)
+                        {
+                            headers.Add(column.HeaderText);
+                        }
+                        csvContent.AppendLine(string.Join(",", headers));
+
+                        // 데이터 추가
+                        foreach (DataGridViewRow row in dataGridView.Rows)
+                        {
+                            if (!row.IsNewRow)
+                            {
+                                var rowData = new List<string>();
+                                foreach (DataGridViewCell cell in row.Cells)
+                                {
+                                    var cellValue = cell.Value?.ToString() ?? "";
+                                    // CSV에서 쉼표와 따옴표 처리
+                                    if (cellValue.Contains(",") || cellValue.Contains("\"") || cellValue.Contains("\n"))
+                                    {
+                                        cellValue = $"\"{cellValue.Replace("\"", "\"\"")}\"";
+                                    }
+                                    rowData.Add(cellValue);
+                                }
+                                csvContent.AppendLine(string.Join(",", rowData));
+                            }
+                        }
+
+                        // 파일 저장
+                        File.WriteAllText(saveFileDialog.FileName, csvContent.ToString(), System.Text.Encoding.UTF8);
+                        MessageBox.Show($"오류 로그가 성공적으로 내보내졌습니다.\n파일: {saveFileDialog.FileName}", "내보내기 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"내보내기 중 오류가 발생했습니다:\n{ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// 오류 로그를 데이터베이스에서 조회하여 그리드에 표시하는 메서드
+        /// </summary>
+        /// <param name="dataGridView">데이터를 표시할 그리드</param>
+        private async Task LoadErrorLogs(DataGridView dataGridView)
+        {
+            try
+            {
+                Console.WriteLine("🔍 LoadErrorLogs 시작");
+                
+                // 그리드 초기화
+                dataGridView.Rows.Clear();
+                dataGridView.Cursor = Cursors.WaitCursor;
+
+                // App.config에서 ErrCheck 테이블명 가져오기
+                var errorTableName = System.Configuration.ConfigurationManager.AppSettings["ErrCheck"];
+                Console.WriteLine($"📋 ErrCheck 설정값: {errorTableName}");
+                
+                if (string.IsNullOrEmpty(errorTableName))
+                {
+                    Console.WriteLine("❌ ErrCheck 설정값이 비어있음");
+                    MessageBox.Show("ErrCheck 설정이 없습니다.", "설정 오류", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // 데이터베이스 연결 확인
+                if (_databaseService == null)
+                {
+                    Console.WriteLine("❌ DatabaseService가 null임");
+                    MessageBox.Show("데이터베이스 서비스가 초기화되지 않았습니다.", "연결 오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                
+                Console.WriteLine($"✅ DatabaseService 상태 확인 완료: {_databaseService.GetType().Name}");
+
+                // 오류 로그 조회 쿼리 실행 (테이블 구조에 맞게 조정)
+                // 먼저 테이블 구조를 확인하는 쿼리 실행
+                var structureQuery = $"DESCRIBE {errorTableName}";
+                Console.WriteLine($"🔍 테이블 구조 확인 쿼리: {structureQuery}");
+                
+                try
+                {
+                    var structureResult = await _databaseService.ExecuteQueryAsync(structureQuery);
+                    Console.WriteLine($"✅ 테이블 구조 조회 완료: {structureResult?.Rows.Count ?? 0}개 컬럼");
+                    
+                    // 테이블 구조 정보를 콘솔에 출력
+                    if (structureResult != null && structureResult.Rows.Count > 0)
+                    {
+                        Console.WriteLine("📋 테이블 컬럼 구조:");
+                        foreach (System.Data.DataRow row in structureResult.Rows)
+                        {
+                            var columnName = row["Field"]?.ToString() ?? "";
+                            var columnType = row["Type"]?.ToString() ?? "";
+                            var isNull = row["Null"]?.ToString() ?? "";
+                            var key = row["Key"]?.ToString() ?? "";
+                            Console.WriteLine($"  - {columnName}: {columnType} (Null: {isNull}, Key: {key})");
+                        }
+                    }
+                    
+                    // 실제 데이터 조회 (log_id 컬럼으로 정렬)
+                    //var query = $"SELECT * FROM {errorTableName} ORDER BY log_id DESC LIMIT 1000";
+                    var query = $"SELECT log_id as ID, procedure_name as 처리명, error_code as Error코드, error_message as Error메시지, log_datetime as 발생시간 FROM {errorTableName} ORDER BY log_id DESC LIMIT 1000";
+                    Console.WriteLine($"🔍 실행할 쿼리: {query}");
+                    
+                    var result = await _databaseService.ExecuteQueryAsync(query);
+                    Console.WriteLine($"✅ 쿼리 실행 완료: {result?.Rows.Count ?? 0}행 조회됨");
+
+                if (result != null && result.Rows.Count > 0)
+                {
+                    // 그리드 컬럼을 동적으로 생성
+                    dataGridView.Columns.Clear();
+                    
+                    // 데이터 테이블의 컬럼을 기반으로 그리드 컬럼 생성
+                    foreach (System.Data.DataColumn column in result.Columns)
+                    {
+                        var gridColumn = new DataGridViewTextBoxColumn
+                        {
+                            Name = column.ColumnName,
+                            HeaderText = GetColumnDisplayName(column.ColumnName),
+                            DataPropertyName = column.ColumnName,
+                            AutoSizeMode = DataGridViewAutoSizeColumnMode.None // 개별 컬럼 자동 크기 조정 비활성화
+                        };
+                        
+                        // 데이터 길이에 따른 컬럼 너비 자동 계산
+                        gridColumn.Width = CalculateColumnWidth(column.ColumnName, result);
+                        
+                        dataGridView.Columns.Add(gridColumn);
+                    }
+                    
+                    // 데이터 행 추가
+                    foreach (System.Data.DataRow row in result.Rows)
+                    {
+                        var gridRow = new object[result.Columns.Count];
+                        for (int i = 0; i < result.Columns.Count; i++)
+                        {
+                            gridRow[i] = row[i]?.ToString() ?? "";
+                        }
+                        dataGridView.Rows.Add(gridRow);
+                    }
+
+                    MessageBox.Show($"총 {result.Rows.Count}개의 오류 로그를 조회했습니다.", "조회 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    MessageBox.Show("조회된 오류 로그가 없습니다.", "조회 결과", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                }
+                catch (Exception structureEx)
+                {
+                    Console.WriteLine($"❌ 테이블 구조 조회 실패: {structureEx.Message}");
+                                         // 테이블 구조 조회에 실패해도 기본 쿼리 시도 (log_id로 정렬)
+                     var query = $"SELECT * FROM {errorTableName} ORDER BY log_id DESC LIMIT 1000";
+                    Console.WriteLine($"🔍 기본 쿼리 실행: {query}");
+                    
+                    var result = await _databaseService.ExecuteQueryAsync(query);
+                    Console.WriteLine($"✅ 기본 쿼리 실행 완료: {result?.Rows.Count ?? 0}행 조회됨");
+                    
+                    if (result != null && result.Rows.Count > 0)
+                    {
+                        // 그리드 컬럼을 동적으로 생성
+                        dataGridView.Columns.Clear();
+                        
+                        // 데이터 테이블의 컬럼을 기반으로 그리드 컬럼 생성
+                        foreach (System.Data.DataColumn column in result.Columns)
+                        {
+                            var gridColumn = new DataGridViewTextBoxColumn
+                            {
+                                Name = column.ColumnName,
+                                HeaderText = GetColumnDisplayName(column.ColumnName),
+                                DataPropertyName = column.ColumnName,
+                                AutoSizeMode = DataGridViewAutoSizeColumnMode.None // 개별 컬럼 자동 크기 조정 비활성화
+                            };
+                            
+                            // 데이터 길이에 따른 컬럼 너비 자동 계산
+                            gridColumn.Width = CalculateColumnWidth(column.ColumnName, result);
+                            
+                            dataGridView.Columns.Add(gridColumn);
+                        }
+                        
+                        // 데이터 행 추가
+                        foreach (System.Data.DataRow row in result.Rows)
+                        {
+                            var gridRow = new object[result.Columns.Count];
+                            for (int i = 0; i < result.Columns.Count; i++)
+                            {
+                                gridRow[i] = row[i]?.ToString() ?? "";
+                            }
+                            dataGridView.Rows.Add(gridRow);
+                        }
+
+                        MessageBox.Show($"총 {result.Rows.Count}개의 오류 로그를 조회했습니다.", "조회 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show("조회된 오류 로그가 없습니다.", "조회 결과", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"오류 로그 조회 중 오류가 발생했습니다:\n{ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                dataGridView.Cursor = Cursors.Default;
+            }
         }
 
         /// <summary>
@@ -633,6 +947,98 @@ namespace LogisticManager.Forms
             infoLabel.ForeColor = Color.FromArgb(127, 140, 141);
             infoLabel.Font = new Font("맑은 고딕", 8F);
             controls.Add(infoLabel);
+
+            panel.Controls.AddRange(controls.ToArray());
+            return panel;
+        }
+
+        /// <summary>
+        /// 오류확인 패널을 생성하는 메서드
+        /// 
+        /// 포함된 기능:
+        /// - 오류 로그 데이터 그리드
+        /// - 조회 버튼
+        /// </summary>
+        /// <returns>오류확인 패널</returns>
+        private Panel CreateErrorCheckPanel()
+        {
+            var panel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.Transparent,
+                Padding = new Padding(20)
+            };
+
+            var controls = new List<Control>();
+
+            // 제목 라벨
+            var titleLabel = CreateLabel("📊 오류 로그 조회", new Point(20, 20));
+            titleLabel.Font = new Font("맑은 고딕", 12F, FontStyle.Bold);
+            titleLabel.ForeColor = Color.FromArgb(52, 73, 94);
+            controls.Add(titleLabel);
+
+            // 설명 라벨
+            //var infoLabel = CreateLabel("App.config의 ErrCheck 설정값에 해당하는 테이블에서 오류 로그를 조회합니다.", new Point(20, 50));
+            //var infoLabel = CreateLabel("App.config의 ErrCheck 설정값에 해당하는 테이블에서 오류 로그를 조회합니다.", new Point(20, 50));
+            //infoLabel.ForeColor = Color.FromArgb(127, 140, 141);
+            //infoLabel.Font = new Font("맑은 고딕", 9F);
+            //controls.Add(infoLabel);
+
+            // 데이터 그리드 생성
+            var dataGridView = new DataGridView
+            {
+                Location = new Point(20, 80),
+                Size = new Size(600, 300), // 높이를 줄여서 버튼 공간 확보
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                ReadOnly = true,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None, // 자동 크기 조정 비활성화
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.Fixed3D,
+                GridColor = Color.FromArgb(220, 220, 220),
+                Font = new Font("맑은 고딕", 9F)  // 폰트 사이즈를 8pt로 변경
+            };
+
+            // 그리드 컬럼 설정
+            dataGridView.Columns.Add("ID", "ID");
+            dataGridView.Columns.Add("Timestamp", "처리명");
+            dataGridView.Columns.Add("Level", "Error코드");
+            dataGridView.Columns.Add("Message", "Error메시지");
+            dataGridView.Columns.Add("Details", "발생시간");
+
+            // 컬럼 너비 조정
+            dataGridView.Columns["ID"].Width = 60;
+            dataGridView.Columns["Timestamp"].Width = 120;
+            dataGridView.Columns["Level"].Width = 80;
+            dataGridView.Columns["Message"].Width = 200;
+            dataGridView.Columns["Details"].Width = 140;
+
+            controls.Add(dataGridView);
+
+            // 버튼 패널 생성
+            var buttonPanel = new Panel
+            {
+                Location = new Point(20, 400), // 그리드 아래로 위치 조정
+                Size = new Size(600, 50), // 높이를 늘려서 버튼들이 잘 보이도록
+                BackColor = Color.Transparent
+            };
+
+            // 조회 버튼
+            var btnRefresh = CreateModernButton("🔄 조회", new Point(20, 10), new Size(100, 35), Color.FromArgb(52, 152, 219));
+            btnRefresh.Click += async (sender, e) => await LoadErrorLogs(dataGridView);
+            buttonPanel.Controls.Add(btnRefresh);
+
+            // 내보내기 버튼
+            var btnExport = CreateModernButton("📤 내보내기", new Point(140, 10), new Size(100, 35), Color.FromArgb(46, 204, 113));
+            btnExport.Click += (sender, e) => ExportErrorLogs(dataGridView);
+            buttonPanel.Controls.Add(btnExport);
+
+            // 지우기 버튼 제거됨
+
+            controls.Add(buttonPanel);
 
             panel.Controls.AddRange(controls.ToArray());
             return panel;

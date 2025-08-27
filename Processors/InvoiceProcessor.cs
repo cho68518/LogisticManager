@@ -171,7 +171,7 @@ namespace LogisticManager.Processors
         /// 파일 목록 추가 콜백 - 드롭박스 업로드 완료 시 파일 목록에 추가
         /// </summary>
         /// <value>파일 목록 추가 콜백</value>
-        private readonly Action<string, long, DateTime>? _fileListCallback;
+        private readonly Action<string, long, DateTime, string?>? _fileListCallback;
 
         #endregion
 
@@ -187,7 +187,7 @@ namespace LogisticManager.Processors
         /// <exception cref="ArgumentNullException">필수 서비스가 null인 경우</exception>
         public InvoiceProcessor(FileService fileService, DatabaseService databaseService, ApiService apiService, 
             IProgress<string>? progress = null, IProgress<int>? progressReporter = null, IProgressStepReporter? stepReporter = null,
-            Action<string, long, DateTime>? fileListCallback = null)
+            Action<string, long, DateTime, string?>? fileListCallback = null)
         {
             // 필수 서비스 의존성 검증
             _fileService = fileService ?? throw new ArgumentNullException(nameof(fileService), 
@@ -5194,7 +5194,7 @@ namespace LogisticManager.Processors
                         var fileSize = fileInfo.Length;
                         var uploadTime = DateTime.Now;
                         
-                        _fileListCallback(fileName, fileSize, uploadTime);
+                        _fileListCallback(fileName, fileSize, uploadTime, dropboxFilePath);
                         LogManagerService.LogInfo($"📋 [{METHOD_NAME}] 파일 목록에 추가됨: {fileName} ({fileSize:N0} bytes)");
                     }
                     catch (Exception ex)
@@ -5407,7 +5407,7 @@ namespace LogisticManager.Processors
 
                 LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 업로드 완료: {dropboxFilePath}");
 
-                // [한글 주석] 업로드 성공 시: 파일목록에 파일명, 크기, 업로드시간 표시
+                // [한글 주석] 업로드 성공 시: 파일목록에 파일명, 크기, 업로드시간, Dropbox 경로 표시
                 if (_fileListCallback != null)
                 {
                     try
@@ -5417,8 +5417,9 @@ namespace LogisticManager.Processors
                         var uploadedFileSize = uploadedFileInfo.Length;
                         var uploadedTime = DateTime.Now;
 
-                        _fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime);
-                        LogManagerService.LogInfo($"📋 [{METHOD_NAME}] 파일 목록에 추가됨: {uploadedFileName} ({uploadedFileSize:N0} bytes)");
+                        // dropboxPath를 포함하여 콜백 호출 (MainForm에서 dropboxPath 매개변수 추가 필요)
+                        _fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime, dropboxFilePath);
+                        LogManagerService.LogInfo($"📋 [{METHOD_NAME}] 파일 목록에 추가됨: {uploadedFileName} ({uploadedFileSize:N0} bytes), Dropbox 경로: {dropboxFilePath}");
                     }
                     catch (Exception ex)
                     {
@@ -5660,7 +5661,7 @@ namespace LogisticManager.Processors
 						var uploadedFileSize = uploadedFileInfo.Length;
 						var uploadedTime = DateTime.Now;
 
-						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime);
+						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime, dropboxFilePath);
 						LogManagerService.LogInfo($"📋 [{METHOD_NAME}] 파일 목록에 추가됨: {uploadedFileName} ({uploadedFileSize:N0} bytes)");
 					}
 					catch (Exception ex)
@@ -5870,7 +5871,7 @@ namespace LogisticManager.Processors
 						var uploadedFileSize = uploadedFileInfo.Length;
 						var uploadedTime = DateTime.Now;
 
-						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime);
+						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime, dropboxFilePath);
 						LogManagerService.LogInfo($"📋 [{METHOD_NAME}] 파일 목록에 추가됨: {uploadedFileName} ({uploadedFileSize:N0} bytes)");
 					}
 					catch (Exception ex)
@@ -6082,7 +6083,7 @@ namespace LogisticManager.Processors
 						var uploadedFileSize = uploadedFileInfo.Length;
 						var uploadedTime = DateTime.Now;
 
-						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime);
+						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime, dropboxFilePath);
 						LogManagerService.LogInfo($"📋 [{METHOD_NAME}] 파일 목록에 추가됨: {uploadedFileName} ({uploadedFileSize:N0} bytes)");
 					}
 					catch (Exception ex)
@@ -6310,7 +6311,7 @@ namespace LogisticManager.Processors
 						var uploadedFileSize = uploadedFileInfo.Length;
 						var uploadedTime = DateTime.Now;
 
-						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime);
+						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime, dropboxFilePath);
 						LogManagerService.LogInfo($"📋 [{METHOD_NAME}] 파일 목록에 추가됨: {uploadedFileName} ({uploadedFileSize:N0} bytes)");
 					}
 					catch (Exception ex)
@@ -6524,7 +6525,7 @@ namespace LogisticManager.Processors
 						var uploadedFileSize = uploadedFileInfo.Length;
 						var uploadedTime = DateTime.Now;
 
-						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime);
+						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime, dropboxFilePath);
 						LogManagerService.LogInfo($"📋 [{METHOD_NAME}] 파일 목록에 추가됨: {uploadedFileName} ({uploadedFileSize:N0} bytes)");
 					}
 					catch (Exception ex)
@@ -6753,7 +6754,7 @@ namespace LogisticManager.Processors
 						var uploadedFileSize = uploadedFileInfo.Length;
 						var uploadedTime = DateTime.Now;
 
-						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime);
+						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime, dropboxFilePath);
 						LogManagerService.LogInfo($"📋 [{METHOD_NAME}] 파일 목록에 추가됨: {uploadedFileName} ({uploadedFileSize:N0} bytes)");
 					}
 					catch (Exception ex)
@@ -6982,7 +6983,7 @@ namespace LogisticManager.Processors
 						var uploadedFileSize = uploadedFileInfo.Length;
 						var uploadedTime = DateTime.Now;
 
-						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime);
+						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime, dropboxFilePath);
 						LogManagerService.LogInfo($"📋 [{METHOD_NAME}] 파일 목록에 추가됨: {uploadedFileName} ({uploadedFileSize:N0} bytes)");
 					}
 					catch (Exception ex)

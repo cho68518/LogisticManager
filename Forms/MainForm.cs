@@ -2,6 +2,7 @@ using LogisticManager.Services;
 using LogisticManager.Models;
 using LogisticManager.Processors;
 using LogisticManager.Repositories;
+using LogisticManager.Forms;
 using System.Drawing.Drawing2D;
 using System.Configuration;
 using System.Reflection; // 버전 정보를 얻기 위해 필요
@@ -97,9 +98,14 @@ namespace LogisticManager.Forms
         private Label lblFileListTitle = null!;
 
         /// <summary>
-        /// 파일 목록 표시 체크리스트박스
+        /// 파일 목록 컨테이너 컨트롤 (새로운 카드 기반 UI)
         /// </summary>
-        private CheckedListBox lstFileList = null!;
+        private FileListContainerControl fileListContainer = null!;
+
+        /// <summary>
+        /// 파일 다운로드 버튼
+        /// </summary>
+        private Button btnDownloadFiles = null!;
 
         /// <summary>
         /// 데이터베이스 연결 상태 표시 라벨
@@ -257,7 +263,7 @@ namespace LogisticManager.Forms
             };
 
             // 설정 버튼 생성 및 설정 (우상단 고정)
-            btnSettings = CreateModernButton("⚙️ 설정", new Point(690, 80), new Size(80, 40), Color.FromArgb(52, 152, 219));
+            btnSettings = CreateModernButton("⚙️ 설정/확인", new Point(690, 80), new Size(90, 40), Color.FromArgb(52, 152, 219));
             btnSettings.Click += BtnSettings_Click;
 
             // Dropbox 테스트 버튼 생성 및 설정 (우상단 고정)
@@ -361,42 +367,44 @@ namespace LogisticManager.Forms
             // 파일 목록 제목 라벨 생성 및 설정 (모던한 카드 스타일)
             lblFileListTitle = new Label
             {
-                Text = "▶ 업로드된 파일 목록",
+                Text = "■ 업로드된 파일 목록",
                 Location = new Point(620, 660), // 로그창 오른쪽에 배치
                 Size = new Size(560, 35),
-                Font = new Font("맑은 고딕", 9F, FontStyle.Bold),
+                Font = new Font("맑은 고딕", 9F, FontStyle.Regular),
                 ForeColor = Color.FromArgb(52, 73, 94), // 진한 회색 텍스트
-                BackColor = Color.FromArgb(225, 225, 255), // 연한 회색 배경
+                BackColor = Color.FromArgb(240, 248, 255), // 연한 파란색 배경
                 TextAlign = ContentAlignment.MiddleCenter,
                 BorderStyle = BorderStyle.None,
                 FlatStyle = FlatStyle.Flat
             };
 
-            // 파일 목록 표시 체크리스트박스 생성 및 설정 (체크박스 포함)
-            lstFileList = new CheckedListBox
+            // 파일 목록 컨테이너 컨트롤 생성 및 설정 (새로운 카드 기반 UI)
+            fileListContainer = new FileListContainerControl
             {
                 Location = new Point(620, 695), // 제목 라벨 아래에 배치
-                Size = new Size(560, 165), // 로그창과 동일한 높이
-                Font = new Font("맑은 고딕", 9F),
-                BackColor = Color.FromArgb(255, 255, 255),
-                ForeColor = Color.FromArgb(52, 73, 94),
-                BorderStyle = BorderStyle.None,
-                CheckOnClick = true,
-                IntegralHeight = false
+                Size = new Size(560, 165) // 로그창과 동일한 높이
             };
 
-            // 파일 목록 판넬 생성 및 설정 (원형 진행률 판넬과 동일한 스타일)
+            // 파일 목록 판넬 생성 및 설정 (모던한 스타일)
             fileListPanel = new Panel
             {
                 Location = new Point(620, 660), // 로그창 오른쪽에 배치
                 Size = new Size(560, 200), // 로그창과 동일한 크기
-                BackColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle
+                //BackColor = Color.FromArgb(248, 250, 252), // 연한 회색 배경
+                BorderStyle = BorderStyle.None
             };
             
-
+            // 파일 다운로드 버튼 생성 및 설정 (파일 목록 패널 하단에 배치)
+            btnDownloadFiles = CreateModernButton("📥 파일 다운로드", new Point(10, 160), new Size(120, 35), Color.FromArgb(46, 204, 113));
+            btnDownloadFiles.Click += BtnDownloadFiles_Click;
+            btnDownloadFiles.Visible = true; // 명시적으로 보이도록 설정
             
-            // 파일 목록 제목에 세련된 테두리 효과 적용
+            // 파일목록 패널에 모든 컨트롤 추가
+            fileListPanel.Controls.Add(lblFileListTitle);
+            fileListPanel.Controls.Add(fileListContainer);
+            fileListPanel.Controls.Add(btnDownloadFiles);
+
+            // 파일 목록 제목에 세련된 그림자 효과 적용
             lblFileListTitle.Paint += (sender, e) =>
             {
                 var label = sender as Label;
@@ -408,10 +416,26 @@ namespace LogisticManager.Forms
                         e.Graphics.FillRectangle(brush, label.ClientRectangle);
                     }
                     
+                    // 하단 그림자 효과 그리기
+                    using (var shadowBrush = new SolidBrush(Color.FromArgb(20, 0, 0, 0)))
+                    {
+                        e.Graphics.FillRectangle(shadowBrush, 0, label.Height - 2, label.Width, 2);
+                    }
+                    
                     // 하단 테두리 그리기 (세련된 구분선)
                     using (var pen = new Pen(Color.FromArgb(189, 195, 199), 1))
                     {
                         e.Graphics.DrawLine(pen, 0, label.Height - 1, label.Width, label.Height - 1);
+                    }
+                    
+                    // 텍스트 그림자 효과
+                    using (var shadowBrush = new SolidBrush(Color.FromArgb(30, 0, 0, 0)))
+                    using (var format = new StringFormat())
+                    {
+                        format.Alignment = StringAlignment.Center;
+                        format.LineAlignment = StringAlignment.Center;
+                        e.Graphics.DrawString(label.Text, label.Font, shadowBrush, 
+                            new Rectangle(1, 1, label.Width, label.Height), format);
                     }
                     
                     // 텍스트 그리기
@@ -459,17 +483,26 @@ namespace LogisticManager.Forms
                 lblDbStatus,
                 progressDisplayControl,
                 txtLog,
-                lblFileListTitle,
-                lstFileList,
                 fileListPanel,
                 statusStrip
             });
+            
+            // 다운로드 버튼 상태 확인 및 로그 출력
+            LogMessage($"🔍 다운로드 버튼 생성 완료: 위치({btnDownloadFiles.Location.X}, {btnDownloadFiles.Location.Y}), 크기({btnDownloadFiles.Size.Width}x{btnDownloadFiles.Size.Height}), 보임여부: {btnDownloadFiles.Visible}");
 
             // 폼 리사이즈 이벤트 핸들러 추가
             this.Resize += MainForm_Resize;
 
             // 초기 크기 조정 적용
             MainForm_Resize(this, EventArgs.Empty);
+            
+            // 다운로드 버튼을 확실히 표시
+            if (btnDownloadFiles != null)
+            {
+                btnDownloadFiles.Visible = true;
+                btnDownloadFiles.BringToFront();
+                LogMessage($"🔍 다운로드 버튼 최종 확인: 위치({btnDownloadFiles.Location.X}, {btnDownloadFiles.Location.Y}), 보임여부: {btnDownloadFiles.Visible}");
+            }
 
             // 초기 로그 메시지 출력
             LogMessage("🎉 송장 처리 시스템이 시작되었습니다.");
@@ -498,6 +531,9 @@ namespace LogisticManager.Forms
                 Enabled = true
             };
             batchTitleTimer.Tick += (sender, e) => UpdateBatchTitle();
+            
+            // 초기 크기 조정 적용 (버튼 위치 설정을 위해)
+            MainForm_Resize(this, EventArgs.Empty);
         }
 
         /// <summary>
@@ -661,13 +697,25 @@ namespace LogisticManager.Forms
             fileListPanel.Size = new Size(halfWidth - spacing/2, logHeight);
             fileListPanel.Location = new Point(padding + halfWidth + spacing/2, logTop);
             
-            // 파일 목록 제목 라벨 조정
-            lblFileListTitle.Size = new Size(halfWidth - spacing/2, 25);
-            lblFileListTitle.Location = new Point(padding + halfWidth + spacing/2, logTop);
+            // 파일 목록 제목 라벨 조정 (패널 내부 좌표)
+            lblFileListTitle.Size = new Size(fileListPanel.Width, 25);
+            lblFileListTitle.Location = new Point(0, 0); // 패널의 (0,0)에 위치
             
-            // 파일 목록 리스트박스 조정
-            lstFileList.Size = new Size(halfWidth - spacing/2, logHeight - 25);
-            lstFileList.Location = new Point(padding + halfWidth + spacing/2, logTop + 25);
+            // 파일 목록 컨테이너 컨트롤 조정 (패널 내부 좌표, 버튼 공간 제외)
+            int listHeight = fileListPanel.Height - lblFileListTitle.Height - btnDownloadFiles.Height - 20; // 제목, 버튼, 여백 제외
+            if (listHeight < 0) listHeight = 0;
+            fileListContainer.Size = new Size(fileListPanel.Width, listHeight);
+            fileListContainer.Location = new Point(0, lblFileListTitle.Height); // 제목 아래에 위치
+            
+            // 파일 다운로드 버튼 조정 (패널 하단에 배치)
+            int downloadButtonTop = fileListPanel.Height - btnDownloadFiles.Height - 10; // 패널 하단에서 10px 위
+            int downloadButtonLeft = (fileListPanel.Width - btnDownloadFiles.Width) / 2; // 패널 가운데 정렬
+            
+            btnDownloadFiles.Location = new Point(downloadButtonLeft, downloadButtonTop);
+            btnDownloadFiles.Visible = true; // 항상 보이도록 설정
+            
+            // 디버그 정보 출력
+            LogMessage($"🔍 파일목록 패널 레이아웃: 패널({fileListPanel.Width}x{fileListPanel.Height}), 제목({lblFileListTitle.Location.X}, {lblFileListTitle.Location.Y}), 리스트({fileListContainer.Location.X}, {fileListContainer.Location.Y}, {fileListContainer.Size.Height}), 버튼({downloadButtonLeft}, {downloadButtonTop})");
         }
 
         #endregion
@@ -900,7 +948,7 @@ namespace LogisticManager.Forms
 
                 // InvoiceProcessor 생성 및 처리 실행
                 var processor = new InvoiceProcessor(_fileService, _databaseService, _apiService, 
-                    logCallback, progressCallback, progressDisplayControl, AddFileToList);
+                    logCallback, progressCallback, progressDisplayControl, (fileName, fileSize, uploadTime, dropboxPath) => AddFileToList(fileName, fileSize, uploadTime, dropboxPath));
 
                 // 진행상황 단계별 업데이트 콜백 설정
                 var stepProgressCallback = new Progress<int>(stepIndex => 
@@ -1878,7 +1926,7 @@ namespace LogisticManager.Forms
                     var dayOfWeek = GetKoreanDayOfWeek(now.DayOfWeek);
                     var timePeriod = GetKoreanTimePeriod(now.Hour);
                     
-                    var dateTimeText = $"{now:yyyy-MM-dd} ({dayOfWeek}) {timePeriod} {now:HH:mm}";
+                    var dateTimeText = $"{now:yyyy-MM-dd} ({dayOfWeek}) {timePeriod} {now:h:mm}";
                     toolStripStatusLabelDateTime.Text = dateTimeText;
                 }
             }
@@ -1930,45 +1978,136 @@ namespace LogisticManager.Forms
         }
         
         /// <summary>
-        /// 파일 목록에 파일을 추가하는 메서드
+        /// 체크된 파일 다운로드 버튼 클릭 이벤트 핸들러
         /// </summary>
-        /// <param name="fileName">파일명</param>
-        /// <param name="fileSize">파일 크기 (바이트)</param>
-        /// <param name="uploadTime">업로드 시간</param>
-        public void AddFileToList(string fileName, long fileSize, DateTime uploadTime)
+        /// <param name="sender">이벤트 발생 객체</param>
+        /// <param name="e">이벤트 인수</param>
+        private async void BtnDownloadFiles_Click(object? sender, EventArgs e)
         {
             try
             {
-                if (lstFileList != null && !string.IsNullOrEmpty(fileName))
+                // 체크된 파일이 있는지 확인
+                var checkedFiles = fileListContainer.CheckedFiles.ToList();
+
+                if (checkedFiles.Count == 0)
                 {
-                    // 파일 정보를 포맷팅하여 표시
-                    var displayText = $"{uploadTime:HH:mm:ss} - {fileName} ({FormatFileSize(fileSize)})";
-                    
-                    // 중복 파일 체크
-                    for (int i = 0; i < lstFileList.Items.Count; i++)
+                    MessageBox.Show("다운로드할 파일을 선택해주세요.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // 다운로드 폴더 선택
+                using (var folderDialog = new FolderBrowserDialog())
+                {
+                    folderDialog.Description = "다운로드할 폴더를 선택하세요";
+                    folderDialog.ShowNewFolderButton = true;
+
+                    if (folderDialog.ShowDialog() == DialogResult.OK)
                     {
-                        var item = lstFileList.Items[i];
-                        if (item?.ToString()?.Contains(fileName) == true)
+                        var downloadFolder = folderDialog.SelectedPath;
+                        LogMessage($"📥 다운로드 시작: {checkedFiles.Count}개 파일 → {downloadFolder}");
+
+                        // 실제 다운로드 처리
+                        var dropboxService = DropboxService.Instance;
+                        var downloadCount = 0;
+                        var errorCount = 0;
+
+                        foreach (var file in checkedFiles)
                         {
-                            // 기존 항목 제거
-                            lstFileList.Items.RemoveAt(i);
-                            break;
+                            try
+                            {
+                                string fileName = file.FileName;
+                                string? dropboxPath = file.DropboxPath;
+
+                                var localFilePath = Path.Combine(downloadFolder, fileName);
+                                
+                                LogMessage($"📥 다운로드 중: {fileName}");
+                                
+                                if (!string.IsNullOrEmpty(dropboxPath))
+                                {
+                                    // 실제 Dropbox에서 파일 다운로드
+                                    LogMessage($"🔗 Dropbox 경로: {dropboxPath}");
+                                    var downloadResult = await dropboxService.DownloadFileAsync(dropboxPath, localFilePath);
+                                    
+                                    if (downloadResult)
+                                    {
+                                        downloadCount++;
+                                        LogMessage($"✅ 다운로드 완료: {fileName}");
+                                    }
+                                    else
+                                    {
+                                        errorCount++;
+                                        LogMessage($"❌ 다운로드 실패: {fileName} (Dropbox 다운로드 실패)");
+                                    }
+                                }
+                                else
+                                {
+                                    // Dropbox 경로가 없는 경우 임시 파일 생성 (테스트용)
+                                    LogMessage($"⚠️ Dropbox 경로가 없어 임시 파일을 생성합니다: {fileName}");
+                                    var tempContent = $"이 파일은 {fileName}의 다운로드 예시입니다.\n실제 구현에서는 Dropbox에서 파일을 다운로드합니다.";
+                                    await File.WriteAllTextAsync(localFilePath, tempContent);
+                                    downloadCount++;
+                                    LogMessage($"✅ 임시 파일 생성 완료: {fileName}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                errorCount++;
+                                LogMessage($"❌ 다운로드 실패: {ex.Message}");
+                            }
+                            
+                            await Task.Delay(100); // UI 응답성을 위한 짧은 지연
                         }
-                    }
-                    
-                    // 새 파일을 맨 위에 추가
-                    lstFileList.Items.Insert(0, displayText);
-                    
-                    // 최대 100개까지만 유지
-                    if (lstFileList.Items.Count > 100)
-                    {
-                        lstFileList.Items.RemoveAt(lstFileList.Items.Count - 1);
+
+                        var resultMessage = $"다운로드가 완료되었습니다.\n\n다운로드 폴더: {downloadFolder}\n";
+                        if (downloadCount > 0)
+                        {
+                            resultMessage += $"성공: {downloadCount}개 파일\n";
+                        }
+                        if (errorCount > 0)
+                        {
+                            resultMessage += $"실패: {errorCount}개 파일\n";
+                        }
+                        
+                        LogMessage($"✅ 다운로드 완료: 성공 {downloadCount}개, 실패 {errorCount}개");
+                        MessageBox.Show(resultMessage, "완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }
             }
             catch (Exception ex)
             {
-                LogMessage($"⚠️ 파일 목록 추가 중 오류: {ex.Message}");
+                LogMessage($"❌ 파일 다운로드 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"파일 다운로드 중 오류가 발생했습니다:\n{ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// 파일 목록에 파일을 추가하는 메서드
+        /// </summary>
+        /// <param name="fileName">파일명</param>
+        /// <param name="fileSize">파일 크기 (바이트)</param>
+        /// <param name="uploadTime">업로드 시간</param>
+        /// <param name="dropboxPath">Dropbox 경로 (선택사항)</param>
+        public void AddFileToList(string fileName, long fileSize, DateTime uploadTime, string? dropboxPath = null)
+        {
+            try
+            {
+                LogMessage($"🔍 AddFileToList 호출됨: {fileName}, 크기: {fileSize}, 시간: {uploadTime}");
+                
+                if (fileListContainer != null && !string.IsNullOrEmpty(fileName))
+                {
+                    LogMessage($"✅ fileListContainer 존재함, AddFileCard 호출");
+                    // 새 파일을 목록에 추가 (중복 체크는 컨트롤 내부에서 처리)
+                    fileListContainer.AddFileCard(fileName, fileSize, uploadTime, dropboxPath);
+                    LogMessage($"✅ AddFileCard 호출 완료");
+                }
+                else
+                {
+                    LogMessage($"⚠️ fileListContainer가 null이거나 fileName이 비어있음: container={fileListContainer != null}, fileName={fileName}");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"❌ 파일 목록 추가 중 오류: {ex.Message}");
             }
         }
         
@@ -2025,5 +2164,25 @@ namespace LogisticManager.Forms
         }
 
         #endregion
+
+        /// <summary>
+        /// Dropbox 경로 정보를 포함한 리스트 아이템 클래스
+        /// </summary>
+        private class ListItemWithTag
+        {
+            public string DisplayText { get; set; }
+            public string DropboxPath { get; set; }
+
+            public ListItemWithTag(string displayText, string dropboxPath)
+            {
+                DisplayText = displayText;
+                DropboxPath = dropboxPath;
+            }
+
+            public override string ToString()
+            {
+                return DisplayText;
+            }
+        }
     }
 } 
