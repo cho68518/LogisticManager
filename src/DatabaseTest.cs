@@ -49,8 +49,8 @@ namespace LogisticManager
                 LogManagerService.LogInfo("🔗 DatabaseTest: 연결 문자열 생성 완료");
                 LogManagerService.LogInfo($"   서버: {server}");
                 LogManagerService.LogInfo($"   데이터베이스: {database}");
-                LogManagerService.LogInfo($"   사용자: {user}");
-                LogManagerService.LogInfo($"   포트: {port}");
+                //LogManagerService.LogInfo($"   사용자: {user}");
+                //LogManagerService.LogInfo($"   포트: {port}");
                 
                 try
                 {
@@ -61,8 +61,8 @@ namespace LogisticManager
                         LogManagerService.LogInfo("🌐 DatabaseTest: 데이터베이스 연결 시도...");
                         LogManagerService.LogInfo($"서버: {server}");
                         LogManagerService.LogInfo($"데이터베이스: {database}");
-                        LogManagerService.LogInfo($"사용자: {user}");
-                        LogManagerService.LogInfo($"포트: {port}");
+                        //LogManagerService.LogInfo($"사용자: {user}");
+                        //LogManagerService.LogInfo($"포트: {port}");
                         
                         connection.Open();
                         LogManagerService.LogInfo("✅ DatabaseTest: 데이터베이스 연결 성공!");
@@ -88,7 +88,8 @@ namespace LogisticManager
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) 
+            
             {
                 LogManagerService.LogError($"❌ DatabaseTest: 일반 오류: {ex.Message}");
             }

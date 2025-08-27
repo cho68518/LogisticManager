@@ -87,6 +87,21 @@ namespace LogisticManager.Forms
         private ProgressDisplayControl progressDisplayControl = null!;
 
         /// <summary>
+        /// 파일 목록 표시 판넬 - 업로드된 파일들의 목록을 표시
+        /// </summary>
+        private Panel fileListPanel = null!;
+
+        /// <summary>
+        /// 파일 목록 제목 라벨
+        /// </summary>
+        private Label lblFileListTitle = null!;
+
+        /// <summary>
+        /// 파일 목록 표시 체크리스트박스
+        /// </summary>
+        private CheckedListBox lstFileList = null!;
+
+        /// <summary>
         /// 데이터베이스 연결 상태 표시 라벨
         /// </summary>
         private Label lblDbStatus = null!;
@@ -172,17 +187,6 @@ namespace LogisticManager.Forms
             
             // 진행상황 단계 데이터 로딩
             _ = LoadProgressStepsAsync();
-            
-            // 배치 타이틀 자동 업데이트 타이머 설정 (1분마다)
-            var batchTitleTimer = new System.Windows.Forms.Timer
-            {
-                Interval = 60000, // 1분 = 60,000ms
-                Enabled = true
-            };
-            batchTitleTimer.Tick += (sender, e) => UpdateBatchTitle();
-            
-            // 초기 타이틀 설정
-            UpdateBatchTitle();
 
         }
 
@@ -285,6 +289,10 @@ namespace LogisticManager.Forms
             // 배치구분 테스트 버튼 추가
             var btnBatchTest = CreateModernButton("⏰ 배치구분 테스트", new Point(470, 160), new Size(120, 45), Color.FromArgb(52, 152, 219));
             btnBatchTest.Click += BtnBatchTest_Click;
+            
+            // 배치 타이틀 수동 업데이트 버튼 추가
+            var btnUpdateTitle = CreateModernButton("🔄 타이틀 업데이트", new Point(600, 160), new Size(120, 45), Color.FromArgb(155, 89, 182));
+            btnUpdateTitle.Click += (sender, e) => UpdateBatchTitle();
 
             // 진행률 표시바 생성 및 설정 (현재 숨김 처리됨 - 원형 진행률 차트로 대체)
             progressBar = new ProgressBar
@@ -337,11 +345,11 @@ namespace LogisticManager.Forms
                 BorderStyle = BorderStyle.FixedSingle
             };
 
-            // 로그 표시 텍스트박스 생성 및 설정 (40% 비율)
+            // 로그 표시 텍스트박스 생성 및 설정 (50% 비율로 조정)
             txtLog = new RichTextBox
             {
                 Location = new Point(20, 660), // 진행상황 컨트롤 아래로 이동 (위치 조정됨)
-                Size = new Size(1160, 200), // 높이 조정 (40% 비율)
+                Size = new Size(580, 200), // 폭을 절반으로 조정 (50% 비율)
                 ReadOnly = true,  // 사용자 입력 방지
                 Font = new Font("맑은 고딕", 9F),
                 BackColor = Color.FromArgb(44, 62, 80),
@@ -349,6 +357,76 @@ namespace LogisticManager.Forms
                 BorderStyle = BorderStyle.None,
                 ScrollBars = RichTextBoxScrollBars.Vertical
             };
+
+            // 파일 목록 제목 라벨 생성 및 설정 (모던한 카드 스타일)
+            lblFileListTitle = new Label
+            {
+                Text = "▶ 업로드된 파일 목록",
+                Location = new Point(620, 660), // 로그창 오른쪽에 배치
+                Size = new Size(560, 35),
+                Font = new Font("맑은 고딕", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(52, 73, 94), // 진한 회색 텍스트
+                BackColor = Color.FromArgb(225, 225, 255), // 연한 회색 배경
+                TextAlign = ContentAlignment.MiddleCenter,
+                BorderStyle = BorderStyle.None,
+                FlatStyle = FlatStyle.Flat
+            };
+
+            // 파일 목록 표시 체크리스트박스 생성 및 설정 (체크박스 포함)
+            lstFileList = new CheckedListBox
+            {
+                Location = new Point(620, 695), // 제목 라벨 아래에 배치
+                Size = new Size(560, 165), // 로그창과 동일한 높이
+                Font = new Font("맑은 고딕", 9F),
+                BackColor = Color.FromArgb(255, 255, 255),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                BorderStyle = BorderStyle.None,
+                CheckOnClick = true,
+                IntegralHeight = false
+            };
+
+            // 파일 목록 판넬 생성 및 설정 (원형 진행률 판넬과 동일한 스타일)
+            fileListPanel = new Panel
+            {
+                Location = new Point(620, 660), // 로그창 오른쪽에 배치
+                Size = new Size(560, 200), // 로그창과 동일한 크기
+                BackColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+            
+
+            
+            // 파일 목록 제목에 세련된 테두리 효과 적용
+            lblFileListTitle.Paint += (sender, e) =>
+            {
+                var label = sender as Label;
+                if (label != null)
+                {
+                    // 배경 그리기
+                    using (var brush = new SolidBrush(label.BackColor))
+                    {
+                        e.Graphics.FillRectangle(brush, label.ClientRectangle);
+                    }
+                    
+                    // 하단 테두리 그리기 (세련된 구분선)
+                    using (var pen = new Pen(Color.FromArgb(189, 195, 199), 1))
+                    {
+                        e.Graphics.DrawLine(pen, 0, label.Height - 1, label.Width, label.Height - 1);
+                    }
+                    
+                    // 텍스트 그리기
+                    using (var textBrush = new SolidBrush(label.ForeColor))
+                    using (var format = new StringFormat())
+                    {
+                        format.Alignment = StringAlignment.Center;
+                        format.LineAlignment = StringAlignment.Center;
+                        e.Graphics.DrawString(label.Text, label.Font, textBrush, label.ClientRectangle, format);
+                    }
+                }
+            };
+            
+            // 파일 목록 리스트박스에 모던한 스타일 적용
+            // CheckedListBox는 기본 렌더링을 사용 (소프트 체크박스, 클릭 즉시 체크)
 
             // 상태표시줄(StatusStrip) 및 날짜/시간 라벨 생성
             statusStrip = new StatusStrip
@@ -381,6 +459,9 @@ namespace LogisticManager.Forms
                 lblDbStatus,
                 progressDisplayControl,
                 txtLog,
+                lblFileListTitle,
+                lstFileList,
+                fileListPanel,
                 statusStrip
             });
 
@@ -393,7 +474,9 @@ namespace LogisticManager.Forms
             // 초기 로그 메시지 출력
             LogMessage("🎉 송장 처리 시스템이 시작되었습니다.");
             LogMessage("📁 파일을 선택하고 '송장 처리 시작' 버튼을 클릭하세요.");
-
+            
+            // 화면 하단 파일목록에 샘플 데이터 주입 로직 제거됨
+            
             // 현재 날짜/시간을 상태표시줄 라벨에 표시
             UpdateDateTimeDisplay();
             
@@ -404,6 +487,17 @@ namespace LogisticManager.Forms
                 Enabled = true
             };
             dateTimeTimer.Tick += (sender, e) => UpdateDateTimeDisplay();
+            
+            // UI 초기화 완료 후 배치 타이틀 설정 및 타이머 시작
+            UpdateBatchTitle();
+            
+            // 배치 타이틀 자동 업데이트 타이머 설정 (1분마다)
+            var batchTitleTimer = new System.Windows.Forms.Timer
+            {
+                Interval = 60000, // 1분 = 60,000ms
+                Enabled = true
+            };
+            batchTitleTimer.Tick += (sender, e) => UpdateBatchTitle();
         }
 
         /// <summary>
@@ -551,10 +645,29 @@ namespace LogisticManager.Forms
             lblDbStatus.Location = new Point(Math.Max(padding, dbStatusLeft), dbStatusTop);
             // AutoSize = true이므로 Size는 자동으로 조정됨
 
-            // 로그 텍스트박스 조정 (진행상황 컨트롤 아래)
+            // 로그 텍스트박스와 파일 목록 판넬을 50:50으로 분할하여 조정
             int logTop = progressDisplayControl.Location.Y + progressDisplayControl.Height + 20;
-            txtLog.Size = new Size(this.ClientSize.Width - (padding * 2), logHeight);
+            
+            // 전체 폼 너비에서 패딩을 제외한 공간을 50:50으로 분할
+            int totalWidth = this.ClientSize.Width - (padding * 2);
+            int halfWidth = totalWidth / 2;
+            int spacing = 10; // 두 컨트롤 사이의 간격
+            
+            // 로그창 (왼쪽 50%)
+            txtLog.Size = new Size(halfWidth - spacing/2, logHeight);
             txtLog.Location = new Point(padding, logTop);
+            
+            // 파일 목록 판넬 (오른쪽 50%)
+            fileListPanel.Size = new Size(halfWidth - spacing/2, logHeight);
+            fileListPanel.Location = new Point(padding + halfWidth + spacing/2, logTop);
+            
+            // 파일 목록 제목 라벨 조정
+            lblFileListTitle.Size = new Size(halfWidth - spacing/2, 25);
+            lblFileListTitle.Location = new Point(padding + halfWidth + spacing/2, logTop);
+            
+            // 파일 목록 리스트박스 조정
+            lstFileList.Size = new Size(halfWidth - spacing/2, logHeight - 25);
+            lstFileList.Location = new Point(padding + halfWidth + spacing/2, logTop + 25);
         }
 
         #endregion
@@ -787,7 +900,7 @@ namespace LogisticManager.Forms
 
                 // InvoiceProcessor 생성 및 처리 실행
                 var processor = new InvoiceProcessor(_fileService, _databaseService, _apiService, 
-                    logCallback, progressCallback, progressDisplayControl);
+                    logCallback, progressCallback, progressDisplayControl, AddFileToList);
 
                 // 진행상황 단계별 업데이트 콜백 설정
                 var stepProgressCallback = new Progress<int>(stepIndex => 
@@ -1291,14 +1404,14 @@ namespace LogisticManager.Forms
                 // 동기적으로 연결 테스트 실행 (UI 스레드에서 직접 실행)
                 try
                 {
-                    LogManagerService.LogInfo("📡 MainForm: DatabaseService Singleton 인스턴스 사용");
+                    //LogManagerService.LogInfo("📡 MainForm: DatabaseService Singleton 인스턴스 사용");
                     
                     // 기존 _databaseService 정보 로그 출력
                     var oldDbInfo = _databaseService.GetConnectionInfo();
                     LogManagerService.LogInfo($"🔍 MainForm: 기존 DB 정보 - Server: {oldDbInfo.Server}");
                     LogManagerService.LogInfo($"🔍 MainForm: 기존 DB 정보 - Database: {oldDbInfo.Database}");
-                    LogManagerService.LogInfo($"🔍 MainForm: 기존 DB 정보 - User: {oldDbInfo.User}");
-                    LogManagerService.LogInfo($"🔍 MainForm: 기존 DB 정보 - Port: {oldDbInfo.Port}");
+                    //LogManagerService.LogInfo($"🔍 MainForm: 기존 DB 정보 - User: {oldDbInfo.User}");
+                    //LogManagerService.LogInfo($"🔍 MainForm: 기존 DB 정보 - Port: {oldDbInfo.Port}");
                     
                     // Singleton 인스턴스에서 연결 테스트 실행
                     var testResult = _databaseService.TestConnectionWithDetailsAsync().GetAwaiter().GetResult();
@@ -1318,8 +1431,8 @@ namespace LogisticManager.Forms
                         // 디버그 로그 추가
                         LogManagerService.LogInfo($"🔍 MainForm: 최신 DB 정보 - Server: {latestDbInfo.Server}");
                         LogManagerService.LogInfo($"🔍 MainForm: 최신 DB 정보 - Database: {latestDbInfo.Database}");
-                        LogManagerService.LogInfo($"🔍 MainForm: 최신 DB 정보 - User: {latestDbInfo.User}");
-                        LogManagerService.LogInfo($"🔍 MainForm: 최신 DB 정보 - Port: {latestDbInfo.Port}");
+                        //LogManagerService.LogInfo($"🔍 MainForm: 최신 DB 정보 - User: {latestDbInfo.User}");
+                        //LogManagerService.LogInfo($"🔍 MainForm: 최신 DB 정보 - Port: {latestDbInfo.Port}");
                         
                         lblDbStatus.Text = dbInfoText;
                         lblDbStatus.ForeColor = Color.FromArgb(46, 204, 113);
@@ -1715,7 +1828,9 @@ namespace LogisticManager.Forms
         {
             try
             {
-                return BatchTimeService.Instance.GetBatchTitle(baseTitle);
+                var batchTitle = BatchTimeService.Instance.GetBatchTitle(baseTitle);
+                LogMessage($"🔍 배치 타이틀 생성: {baseTitle} → {batchTitle}");
+                return batchTitle;
             }
             catch (Exception ex)
             {
@@ -1733,7 +1848,15 @@ namespace LogisticManager.Forms
             {
                 if (lblTitle != null)
                 {
-                    lblTitle.Text = GetBatchTitle("📦 송장 처리 시스템");
+                    var newTitle = GetBatchTitle("📦 송장 처리 시스템");
+                    lblTitle.Text = newTitle;
+                    
+                    // 디버그 로그 추가
+                    LogMessage($"🔄 타이틀 업데이트: {newTitle}");
+                }
+                else
+                {
+                    LogMessage("⚠️ lblTitle이 null입니다. UI 초기화가 완료되지 않았습니다.");
                 }
             }
             catch (Exception ex)
@@ -1805,6 +1928,71 @@ namespace LogisticManager.Forms
                 return "오후"; // 18시 이후도 오후로 표시
             }
         }
+        
+        /// <summary>
+        /// 파일 목록에 파일을 추가하는 메서드
+        /// </summary>
+        /// <param name="fileName">파일명</param>
+        /// <param name="fileSize">파일 크기 (바이트)</param>
+        /// <param name="uploadTime">업로드 시간</param>
+        public void AddFileToList(string fileName, long fileSize, DateTime uploadTime)
+        {
+            try
+            {
+                if (lstFileList != null && !string.IsNullOrEmpty(fileName))
+                {
+                    // 파일 정보를 포맷팅하여 표시
+                    var displayText = $"{uploadTime:HH:mm:ss} - {fileName} ({FormatFileSize(fileSize)})";
+                    
+                    // 중복 파일 체크
+                    for (int i = 0; i < lstFileList.Items.Count; i++)
+                    {
+                        var item = lstFileList.Items[i];
+                        if (item?.ToString()?.Contains(fileName) == true)
+                        {
+                            // 기존 항목 제거
+                            lstFileList.Items.RemoveAt(i);
+                            break;
+                        }
+                    }
+                    
+                    // 새 파일을 맨 위에 추가
+                    lstFileList.Items.Insert(0, displayText);
+                    
+                    // 최대 100개까지만 유지
+                    if (lstFileList.Items.Count > 100)
+                    {
+                        lstFileList.Items.RemoveAt(lstFileList.Items.Count - 1);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"⚠️ 파일 목록 추가 중 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 파일 크기를 읽기 쉬운 형태로 포맷팅하는 메서드
+        /// </summary>
+        /// <param name="bytes">바이트 단위 크기</param>
+        /// <returns>포맷팅된 파일 크기 문자열</returns>
+        private string FormatFileSize(long bytes)
+        {
+            string[] sizes = { "B", "KB", "MB", "GB" };
+            double len = bytes;
+            int order = 0;
+            
+            while (len >= 1024 && order < sizes.Length - 1)
+            {
+                order++;
+                len = len / 1024;
+            }
+            
+            return $"{len:0.##} {sizes[order]}";
+        }
+        
+
         
         /// <summary>
         /// 폼 종료 시 이벤트 핸들러

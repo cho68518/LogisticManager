@@ -239,8 +239,8 @@ namespace LogisticManager.Services
             LogManagerService.LogInfo($"🔗 DatabaseService: 최종 설정값");
             LogManagerService.LogInfo($"   서버: {server}");
             LogManagerService.LogInfo($"   데이터베이스: {database}");
-            LogManagerService.LogInfo($"   사용자: {user}");
-            LogManagerService.LogInfo($"   포트: {port}");
+            //LogManagerService.LogInfo($"   사용자: {user}");
+            //LogManagerService.LogInfo($"   포트: {port}");
             
             // 연결 문자열 생성 (복호화된 비밀번호 사용)
             _connectionString = string.Format(DatabaseConstants.CONNECTION_STRING_TEMPLATE, server, database, user, decryptedPassword, port);
@@ -251,15 +251,15 @@ namespace LogisticManager.Services
             // 연결 문자열 로깅 (보안상 비밀번호는 마스킹)
             var maskedPassword = password.Length > 2 ? password.Substring(0, 2) + "***" : "***";
             var maskedConnectionString = _connectionString.Replace(password, maskedPassword);
-            LogManagerService.LogInfo($"🔗 연결 문자열: {maskedConnectionString}");
+            //LogManagerService.LogInfo($"🔗 연결 문자열: {maskedConnectionString}");
             
             // 현재 연결 정보 상세 로깅
             LogManagerService.LogInfo($"📊 DatabaseService: 연결 정보 상세");
             LogManagerService.LogInfo($"   서버: {server}");
             LogManagerService.LogInfo($"   데이터베이스: {database}");
-            LogManagerService.LogInfo($"   사용자: {user}");
-            LogManagerService.LogInfo($"   포트: {port}");
-            LogManagerService.LogInfo($"   연결 문자열 길이: {_connectionString.Length}");
+            //LogManagerService.LogInfo($"   사용자: {user}");
+            //LogManagerService.LogInfo($"   포트: {port}");
+            //LogManagerService.LogInfo($"   연결 문자열 길이: {_connectionString.Length}");
             
             LogManagerService.LogInfo("✅ DatabaseService 초기화 완료");
         }

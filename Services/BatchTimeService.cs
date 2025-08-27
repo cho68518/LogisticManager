@@ -21,7 +21,7 @@ namespace LogisticManager.Services
         public const string BATCH_2ND = "2차";
         
         /// <summary>
-        /// 3차 배치: 11:00~11:00
+        /// 3차 배치: 11:00~12:00
         /// </summary>
         public const string BATCH_3RD = "3차";
         
@@ -199,7 +199,7 @@ namespace LogisticManager.Services
             {
                 { BATCH_1ST, "01:00~07:00" },
                 { BATCH_2ND, "08:00~10:00" },
-                { BATCH_3RD, "11:00~11:00" },
+                { BATCH_3RD, "11:00~12:00" },
                 { BATCH_4TH, "12:00~13:00" },
                 { BATCH_5TH, "14:00~15:00" },
                 { BATCH_LAST, "16:00~18:00" },
