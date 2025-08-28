@@ -5343,15 +5343,18 @@ namespace LogisticManager.Processors
                 // 2단계: 데이터베이스에서 서울냉동 최종 데이터 조회
                 //var seoulFrozenData = await _databaseCommonService.GetDataFromDatabase(TABLE_NAME);
                 // 주소, 수취인명, 전화번호1 기준으로 중복 제거
+                //var sqlQuery = $@"SELECT *
+                //                   FROM (SELECT *,
+                //                           ROW_NUMBER() OVER (
+                //                               PARTITION BY 주소, 수취인명, 전화번호1 
+                //                               ORDER BY 주소, 수취인명, 전화번호1 ASC
+                //                           ) AS rn
+                //                          FROM {TABLE_NAME}
+                //                    ) AS ranked_rows
+                //                    WHERE rn = 1";
                 var sqlQuery = $@"SELECT *
-                                   FROM (SELECT *,
-                                            ROW_NUMBER() OVER (
-                                                PARTITION BY 주소, 수취인명, 전화번호1 
-                                                ORDER BY 주소, 수취인명, 전화번호1 ASC
-                                            ) AS rn
-                                          FROM {TABLE_NAME}
-                                    ) AS ranked_rows
-                                    WHERE rn = 1";
+                                  FROM {TABLE_NAME}
+                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
 				var seoulFrozenData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
                 if (seoulFrozenData == null || seoulFrozenData.Rows.Count == 0)
@@ -5592,16 +5595,21 @@ namespace LogisticManager.Processors
                 //    "SELECT t1.*, t2.컬럼 FROM 테이블1 t1 JOIN 테이블2 t2 ON t1.id = t2.id"
                 //);
 				//var sqlQuery = $"SELECT DISTINCT `주소`, `수취인명`, `전화번호1`, * FROM `{TABLE_NAME}`";
-                var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,
-                우편번호,주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
-                                   FROM (SELECT *,
-                                            ROW_NUMBER() OVER (
-                                                PARTITION BY 주소, 수취인명, 전화번호1 
-                                                ORDER BY 주소, 수취인명, 전화번호1 ASC
-                                            ) AS rn
-                                          FROM {TABLE_NAME}
-                                    ) AS ranked_rows
-                                    WHERE rn = 1";
+                //var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,
+                //우편번호,주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
+                //                   FROM (SELECT *,
+                //                            ROW_NUMBER() OVER (
+                //                                PARTITION BY 주소, 수취인명, 전화번호1 
+                //                                ORDER BY 주소, 수취인명, 전화번호1 ASC
+                //                            ) AS rn
+                //                          FROM {TABLE_NAME}
+                //                    ) AS ranked_rows
+                //                    WHERE rn = 1";
+
+                var sqlQuery = $@"SELECT *
+                                  FROM {TABLE_NAME}
+                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+
 				var gyeonggiFrozenData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (gyeonggiFrozenData == null || gyeonggiFrozenData.Rows.Count == 0)
@@ -5802,16 +5810,21 @@ namespace LogisticManager.Processors
 
 				// 2단계: 데이터베이스에서 서울공산 최종 데이터 조회 (중복 제거 포함)
 				// 주소, 수취인명, 전화번호1 기준으로 중복 제거
-                var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,우편번호,
-                주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
-                                   FROM (SELECT *,
-                                            ROW_NUMBER() OVER (
-                                                PARTITION BY 주소, 수취인명, 전화번호1 
-                                                ORDER BY 주소, 수취인명, 전화번호1 ASC
-                                            ) AS rn
-                                          FROM {TABLE_NAME}
-                                    ) AS ranked_rows
-                                    WHERE rn = 1";
+                //var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,우편번호,
+                //주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
+                //                  FROM (SELECT *,
+                //                           ROW_NUMBER() OVER (
+                //                               PARTITION BY 주소, 수취인명, 전화번호1 
+                //                               ORDER BY 주소, 수취인명, 전화번호1 ASC
+                //                           ) AS rn
+                //                          FROM {TABLE_NAME}
+                //                    ) AS ranked_rows
+                //                    WHERE rn = 1";
+
+                var sqlQuery = $@"SELECT *
+                                  FROM {TABLE_NAME}
+                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+
 				var seoulGongsanData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (seoulGongsanData == null || seoulGongsanData.Rows.Count == 0)
@@ -6012,16 +6025,21 @@ namespace LogisticManager.Processors
 
 				// 2단계: 데이터베이스에서 경기공산 최종 데이터 조회 (중복 제거 포함)
 				// 주소, 수취인명, 전화번호1 기준으로 중복 제거
-                var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,우편번호,
-                주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
-                                   FROM (SELECT *,
-                                            ROW_NUMBER() OVER (
-                                                PARTITION BY 주소, 수취인명, 전화번호1 
-                                                ORDER BY 주소, 수취인명, 전화번호1 ASC
-                                            ) AS rn
-                                          FROM {TABLE_NAME}
-                                    ) AS ranked_rows
-                                    WHERE rn = 1";
+                //var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,우편번호,
+                //주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
+                //                  FROM (SELECT *,
+                //                           ROW_NUMBER() OVER (
+                //                               PARTITION BY 주소, 수취인명, 전화번호1 
+                //                               ORDER BY 주소, 수취인명, 전화번호1 ASC
+                //                           ) AS rn
+                //                          FROM {TABLE_NAME}
+                //                    ) AS ranked_rows
+                //                    WHERE rn = 1";
+
+                var sqlQuery = $@"SELECT *
+                                  FROM {TABLE_NAME}
+                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+
 				var gyeonggiGongsanData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (gyeonggiGongsanData == null || gyeonggiGongsanData.Rows.Count == 0)
@@ -6240,16 +6258,21 @@ namespace LogisticManager.Processors
 
 				// 2단계: 데이터베이스에서 부산청과 최종 데이터 조회 (중복 제거 포함)
 				// 주소, 수취인명, 전화번호1 기준으로 중복 제거
-                var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,우편번호,
-                주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
-                                   FROM (SELECT *,
-                                            ROW_NUMBER() OVER (
-                                                PARTITION BY 주소, 수취인명, 전화번호1 
-                                                ORDER BY 주소, 수취인명, 전화번호1 ASC
-                                            ) AS rn
-                                          FROM {TABLE_NAME}
-                                    ) AS ranked_rows
-                                    WHERE rn = 1";
+                //var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,우편번호,
+                //주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
+                //                  FROM (SELECT *,
+                //                           ROW_NUMBER() OVER (
+                //                               PARTITION BY 주소, 수취인명, 전화번호1 
+                //                               ORDER BY 주소, 수취인명, 전화번호1 ASC
+                //                           ) AS rn
+                //                          FROM {TABLE_NAME}
+                //                    ) AS ranked_rows
+                //                    WHERE rn = 1";
+
+                var sqlQuery = $@"SELECT *
+                                  FROM {TABLE_NAME}
+                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+
 				var busanCheonggwaData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (busanCheonggwaData == null || busanCheonggwaData.Rows.Count == 0)
@@ -6462,6 +6485,11 @@ namespace LogisticManager.Processors
                                           FROM {TABLE_NAME}
                                     ) AS ranked_rows
                                     WHERE rn = 1";
+
+                //var sqlQuery = $@"SELECT *
+                //                  FROM {TABLE_NAME}
+                //                  ORDER BY 품목코드, 송장명, 총수량 ASC";
+
 				var busanCheonggwaDocData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (busanCheonggwaDocData == null || busanCheonggwaDocData.Rows.Count == 0)
@@ -6681,16 +6709,21 @@ namespace LogisticManager.Processors
 
 				// 2단계: 데이터베이스에서 감천냉동 최종 데이터 조회 (중복 제거 포함)
 				// 주소, 수취인명, 전화번호1 기준으로 중복 제거
-                var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,우편번호,
-                                   주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
-                                   FROM (SELECT *,
-                                            ROW_NUMBER() OVER (
-                                                PARTITION BY 주소, 수취인명, 전화번호1 
-                                                ORDER BY 주소, 수취인명, 전화번호1 ASC
-                                            ) AS rn
-                                          FROM {TABLE_NAME}
-                                    ) AS ranked_rows
-                                    WHERE rn = 1";
+                //var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,우편번호,
+                //주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
+                //                  FROM (SELECT *,
+                //                           ROW_NUMBER() OVER (
+                //                               PARTITION BY 주소, 수취인명, 전화번호1 
+                //                               ORDER BY 주소, 수취인명, 전화번호1 ASC
+                //                           ) AS rn
+                //                          FROM {TABLE_NAME}
+                //                    ) AS ranked_rows
+                //                    WHERE rn = 1";
+
+                var sqlQuery = $@"SELECT *
+                                  FROM {TABLE_NAME}
+                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+
 				var gamcheonFrozenData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (gamcheonFrozenData == null || gamcheonFrozenData.Rows.Count == 0)
@@ -6910,16 +6943,21 @@ namespace LogisticManager.Processors
 
 				// 2단계: 데이터베이스에서 송장출력 최종 데이터 조회 (중복 제거 포함)
 				// 주소, 수취인명, 전화번호1 기준으로 중복 제거
-                var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,우편번호,
-                                   주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
-                                   FROM (SELECT *,
-                                            ROW_NUMBER() OVER (
-                                                PARTITION BY 주소, 수취인명, 전화번호1 
-                                                ORDER BY 주소, 수취인명, 전화번호1 ASC
-                                            ) AS rn
-                                          FROM {TABLE_NAME}
-                                    ) AS ranked_rows
-                                    WHERE rn = 1";
+                //var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,우편번호,
+                //주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
+                //                  FROM (SELECT *,
+                //                           ROW_NUMBER() OVER (
+                //                               PARTITION BY 주소, 수취인명, 전화번호1 
+                //                               ORDER BY 주소, 수취인명, 전화번호1 ASC
+                //                           ) AS rn
+                //                          FROM {TABLE_NAME}
+                //                    ) AS ranked_rows
+                //                    WHERE rn = 1";
+
+                var sqlQuery = $@"SELECT *
+                                  FROM {TABLE_NAME}
+                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+
 				var invoiceFinalData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (invoiceFinalData == null || invoiceFinalData.Rows.Count == 0)
@@ -7122,16 +7160,21 @@ namespace LogisticManager.Processors
 
 				// 2단계: 데이터베이스에서 부산청과 외부출고 최종 데이터 조회 (중복 제거 포함)
 				// 주소, 수취인명, 전화번호1 기준으로 중복 제거
-                var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,우편번호,
-                주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
-                                   FROM (SELECT *,
-                                            ROW_NUMBER() OVER (
-                                                PARTITION BY 주소, 수취인명, 전화번호1 
-                                                ORDER BY 주소, 수취인명, 전화번호1 ASC
-                                            ) AS rn
-                                          FROM {TABLE_NAME}
-                                    ) AS ranked_rows
-                                    WHERE rn = 1";
+                //var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,우편번호,
+                //주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
+                //                  FROM (SELECT *,
+                //                           ROW_NUMBER() OVER (
+                //                               PARTITION BY 주소, 수취인명, 전화번호1 
+                //                               ORDER BY 주소, 수취인명, 전화번호1 ASC
+                //                           ) AS rn
+                //                          FROM {TABLE_NAME}
+                //                    ) AS ranked_rows
+                //                    WHERE rn = 1";
+
+                var sqlQuery = $@"SELECT *
+                                  FROM {TABLE_NAME}
+                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+
 				var busanCheonggwaExtData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (busanCheonggwaExtData == null || busanCheonggwaExtData.Rows.Count == 0)

@@ -225,8 +225,8 @@ namespace LogisticManager.Forms
         /// </summary>
         private void InitializeUI()
         {
-            // 폼 기본 설정 (상단 좌측 창 제목에 버전 표시)
-            this.Text = $"송장 처리 시스템 ({GetAppVersionString()})";
+            // 폼 기본 설정 (상단 좌측 창 제목에 버전과 차수 정보 표시)
+            this.Text = GetBatchTitle($"송장 처리 시스템 ({GetAppVersionString()})");
             this.Size = new Size(1100, 900); // 폼 크기를 1100으로 조정
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.Sizable; // 크기 조절 가능하도록 변경
@@ -1879,13 +1879,17 @@ namespace LogisticManager.Forms
         {
             try
             {
+                //LogMessage($"🔍 GetBatchTitle 호출 시작: baseTitle={baseTitle}");
+                
                 var batchTitle = BatchTimeService.Instance.GetBatchTitle(baseTitle);
                 //LogMessage($"🔍 배치 타이틀 생성: {baseTitle} → {batchTitle}");
+                
                 return batchTitle;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                //LogMessage($"⚠️ 배치 타이틀 생성 중 오류: {ex.Message}");
+                LogMessage($"⚠️ 배치 타이틀 생성 중 오류: {ex.Message}");
+                LogMessage($"⚠️ 스택 트레이스: {ex.StackTrace}");
                 return baseTitle; // 오류 시 기본 타이틀 반환
             }
         }
@@ -1897,13 +1901,23 @@ namespace LogisticManager.Forms
         {
             try
             {
+                //LogMessage("🔄 UpdateBatchTitle 메서드 시작");
+                
                 if (lblTitle != null)
                 {
+                    //LogMessage("✅ lblTitle이 null이 아님, 타이틀 업데이트 시작");
+                    
                     var newTitle = GetBatchTitle("📦 송장 처리 시스템");
+                    //LogMessage($"📝 새 타이틀 생성: {newTitle}");
                     lblTitle.Text = newTitle;
                     
+                    // 폼 타이틀도 함께 업데이트 (차수 정보 포함)
+                    var formTitle = GetBatchTitle($"송장 처리 시스템 ({GetAppVersionString()})");
+                    //LogMessage($"🖼️ 폼 타이틀 업데이트: {formTitle}");
+                    this.Text = formTitle;
+                    
                     // 디버그 로그 추가
-                    //LogMessage($"🔄 타이틀 업데이트: {newTitle}");
+                    //LogMessage($"🔄 타이틀 업데이트 완료: {newTitle}");
                 }
                 else
                 {
@@ -1913,6 +1927,7 @@ namespace LogisticManager.Forms
             catch (Exception ex)
             {
                 LogMessage($"⚠️ 타이틀 업데이트 중 오류: {ex.Message}");
+                LogMessage($"⚠️ 스택 트레이스: {ex.StackTrace}");
             }
         }
         
