@@ -158,7 +158,7 @@ namespace LogisticManager.Forms
                 ReadOnly = true,
                 BackColor = Color.FromArgb(30, 30, 30),
                 ForeColor = Color.FromArgb(0, 255, 0),
-                Font = new Font("Consolas", 9),
+                Font = new Font("Consolas", 10),
                 Size = new Size(760, 300),
                 Location = new Point(20, 180)
             };

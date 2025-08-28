@@ -416,7 +416,8 @@ namespace LogisticManager.Processors
                 // ==================== 2단계: 프로시저에서 이미 데이터 처리 완료 (건너뛰기) ====================
                 
                 finalProgress?.Report("⏭️ [2단계] 프로시저에서 이미 데이터 처리 완료 - 건너뛰기");
-                finalProgress?.Report("✅ 프로시저 sp_Excel_Proc1에서 송장출력_사방넷원본변환 테이블에 데이터 삽입 완료");
+                //finalProgress?.Report("✅ 프로시저 sp_Excel_Proc1에서 송장출력_사방넷원본변환 테이블에 데이터 삽입 완료");
+                finalProgress?.Report("✅ 원본 테이블에 데이터 삽입 완료");
                 
                 // === 2단계 완료 및 성능 통계 보고 ===
                 finalProgressReporter?.Report(10);
@@ -1834,8 +1835,8 @@ namespace LogisticManager.Processors
                 // ==========================================================================
                 // 1. Dropbox에서 엑셀 데이터를 읽어오기
                 // ==========================================================================  
-                _progress?.Report("📥 [1] Dropbox에서 엑셀 파일 다운로드 중...");
-                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 📥 [1] Dropbox에서 엑셀 파일 다운로드 시작");
+                _progress?.Report("📥 Dropbox에서 엑셀 파일 다운로드 중...");
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 📥 Dropbox에서 엑셀 파일 다운로드 시작");
                 
                 // 설정 검증
                 var mergePackingExcelFileName = ConfigurationManager.AppSettings["MergePackingExcelFileName"] ?? string.Empty;
@@ -1932,7 +1933,7 @@ namespace LogisticManager.Processors
                 // ==========================================================================
                 // 3. 후처리 프로시저 실행
                 // ==========================================================================
-                _progress?.Report("🚀 [3] 후처리 프로시저 실행 중...");
+                _progress?.Report("🚀 [3] 후처리 실행 중...");
                 WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 🚀 [3] {PROCEDURE_NAME} 프로시저 호출 시작");
                 
                 var procedureResult = await ExecutePostProcessProcedureAsync(PROCEDURE_NAME);
@@ -1943,12 +1944,12 @@ namespace LogisticManager.Processors
                 {
                     var errorMessage = $"[{METHOD_NAME}] ❌ [3] {PROCEDURE_NAME} 프로시저 실행 실패: {procedureResult}";
                     WriteLogWithFlush(logPath, errorMessage);
-                    _progress?.Report($"❌ [3] 후처리 프로시저 실행 실패: {procedureResult}");
+                    _progress?.Report($"❌ [3] 후처리 실행 실패: {procedureResult}");
                     throw new InvalidOperationException($"프로시저 실행 실패: {procedureResult}");
                 }
                 
                 WriteLogWithFlush(logPath, $"[{METHOD_NAME}] ✅ [3] {PROCEDURE_NAME} 프로시저 실행 완료 - 결과: {procedureResult}");
-                _progress?.Report("✅ [3] 후처리 프로시저 실행 완료");
+                _progress?.Report("✅ [3] 후처리 실행 완료");
                 
                 var endTime = DateTime.Now;
                 var duration = endTime - startTime;
@@ -2374,8 +2375,8 @@ namespace LogisticManager.Processors
                         // ==========================================================================
                         // 1. Dropbox에서 엑셀 데이터를 읽어오기
                         // ========================================================================== 
-                        _progress?.Report("📥 [1] Dropbox에서 엑셀 파일 다운로드 중...");
-                        WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 📥 [1] Dropbox에서 엑셀 파일 다운로드 시작");
+                        _progress?.Report("📥 Dropbox에서 엑셀 파일 다운로드 중...");
+                        WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 📥 Dropbox에서 엑셀 파일 다운로드 시작");
 
                         // 설정 검증
                 var GamcheonExcelFileName = ConfigurationManager.AppSettings["GamcheonExcelFileName"] ?? string.Empty;  
@@ -2472,7 +2473,7 @@ namespace LogisticManager.Processors
                         // ==========================================================================
                         // 3. 후처리 프로시저 실행
                         // ==========================================================================
-                        _progress?.Report("🚀 [3] 후처리 프로시저 실행 중...");
+                        _progress?.Report("🚀 [3] 후처리 실행 중...");
                         WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 🚀 [3] {PROCEDURE_NAME} 프로시저 호출 시작");
                         
                 var procedureResult = await ExecutePostProcessProcedureAsync(PROCEDURE_NAME);
@@ -2483,12 +2484,12 @@ namespace LogisticManager.Processors
                 {
                     var errorMessage = $"[{METHOD_NAME}] ❌ [3] {PROCEDURE_NAME} 프로시저 실행 실패: {procedureResult}";
                     WriteLogWithFlush(logPath, errorMessage);
-                    _progress?.Report($"❌ [3] 후처리 프로시저 실행 실패: {procedureResult}");
+                    _progress?.Report($"❌ [3] 후처리 실행 실패: {procedureResult}");
                     throw new InvalidOperationException($"프로시저 실행 실패: {procedureResult}");
                 }
                 
                 WriteLogWithFlush(logPath, $"[{METHOD_NAME}] ✅ [3] {PROCEDURE_NAME} 프로시저 실행 완료 - 결과: {procedureResult}");
-                _progress?.Report("✅ [3] 후처리 프로시저 실행 완료");
+                _progress?.Report("✅ [3] 후처리 실행 완료");
                 
                 var endTime = DateTime.Now;
                 var duration = endTime - startTime;
@@ -2557,8 +2558,8 @@ namespace LogisticManager.Processors
                 // ==========================================================================
                 // 1. Dropbox에서 엑셀 데이터를 읽어오기
                 // ========================================================================== 
-                _progress?.Report("📥 [1] Dropbox에서 엑셀 파일 다운로드 중...");
-                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 📥 [1] Dropbox에서 엑셀 파일 다운로드 시작");
+                _progress?.Report("📥 Dropbox에서 엑셀 파일 다운로드 중...");
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 📥 Dropbox에서 엑셀 파일 다운로드 시작");
 
                 // 설정 검증
                 var talkDealExcelFileName = ConfigurationManager.AppSettings["TalkDealExcelFileName"] ?? string.Empty;  
@@ -2655,7 +2656,7 @@ namespace LogisticManager.Processors
                 // ==========================================================================
                 // 3. 후처리 프로시저 실행
                 // ==========================================================================
-                _progress?.Report("🚀 [3] 후처리 프로시저 실행 중...");
+                _progress?.Report("🚀 [3] 후처리 실행 중...");
                 WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 🚀 [3] {PROCEDURE_NAME} 프로시저 호출 시작");
                 
                 var procedureResult = await ExecutePostProcessProcedureAsync(PROCEDURE_NAME);
@@ -2666,12 +2667,12 @@ namespace LogisticManager.Processors
                 {
                     var errorMessage = $"[{METHOD_NAME}] ❌ [3] {PROCEDURE_NAME} 프로시저 실행 실패: {procedureResult}";
                     WriteLogWithFlush(logPath, errorMessage);
-                    _progress?.Report($"❌ [3] 후처리 프로시저 실행 실패: {procedureResult}");
+                    _progress?.Report($"❌ [3] 후처리 실행 실패: {procedureResult}");
                     throw new InvalidOperationException($"프로시저 실행 실패: {procedureResult}");
                 }
                 
                 WriteLogWithFlush(logPath, $"[{METHOD_NAME}] ✅ [3] {PROCEDURE_NAME} 프로시저 실행 완료 - 결과: {procedureResult}");
-                _progress?.Report("✅ [3] 후처리 프로시저 실행 완료");
+                _progress?.Report("✅ [3] 후처리 실행 완료");
                 
                 var endTime = DateTime.Now;
                 var duration = endTime - startTime;
@@ -2737,8 +2738,8 @@ namespace LogisticManager.Processors
                 // ==========================================================================
                 // 1. Dropbox에서 엑셀 데이터를 읽어오기
                 // ========================================================================== 
-                _progress?.Report("📥 [1] Dropbox에서 엑셀 파일 다운로드 중...");
-                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 📥 [1] Dropbox에서 엑셀 파일 다운로드 시작");
+                _progress?.Report("📥 Dropbox에서 엑셀 파일 다운로드 중...");
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 📥 Dropbox에서 엑셀 파일 다운로드 시작");
 
                 // 설정 검증
                 var starInvoiceExcelFileName = ConfigurationManager.AppSettings["StarInvoiceExcelFileName"] ?? string.Empty;  
@@ -2835,7 +2836,7 @@ namespace LogisticManager.Processors
                 // ==========================================================================
                 // 3. 후처리 프로시저 실행
                 // ==========================================================================
-                _progress?.Report("🚀 [3] 후처리 프로시저 실행 중...");
+                _progress?.Report("🚀 [3] 후처리 실행 중...");
                 WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 🚀 [3] {PROCEDURE_NAME} 프로시저 호출 시작");
                 
                 var procedureResult = await ExecutePostProcessProcedureAsync(PROCEDURE_NAME);
@@ -2846,12 +2847,12 @@ namespace LogisticManager.Processors
                 {
                     var errorMessage = $"[{METHOD_NAME}] ❌ [3] {PROCEDURE_NAME} 프로시저 실행 실패: {procedureResult}";
                     WriteLogWithFlush(logPath, errorMessage);
-                    _progress?.Report($"❌ [3] 후처리 프로시저 실행 실패: {procedureResult}");
+                    _progress?.Report($"❌ [3] 후처리 실행 실패: {procedureResult}");
                     throw new InvalidOperationException($"프로시저 실행 실패: {procedureResult}");
                 }
                 
                 WriteLogWithFlush(logPath, $"[{METHOD_NAME}] ✅ [3] {PROCEDURE_NAME} 프로시저 실행 완료 - 결과: {procedureResult}");
-                _progress?.Report("✅ [3] 후처리 프로시저 실행 완료");
+                _progress?.Report("✅ [3] 후처리 실행 완료");
                 
                 var endTime = DateTime.Now;
                 var duration = endTime - startTime;
@@ -4959,8 +4960,8 @@ namespace LogisticManager.Processors
                 // ==========================================================================
                 // 1. Dropbox에서 엑셀 데이터를 읽어오기
                 // ==========================================================================  
-                _progress?.Report("📥 [1] Dropbox에서 엑셀 파일 다운로드 중...");
-                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 📥 [1] Dropbox에서 엑셀 파일 다운로드 시작");
+                _progress?.Report("📥 Dropbox에서 엑셀 파일 다운로드 중...");
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 📥 Dropbox에서 엑셀 파일 다운로드 시작");
                 
                 // 설정 검증
                 var dropboxPath = ConfigurationManager.AppSettings[CONFIG_KEY] ?? string.Empty;

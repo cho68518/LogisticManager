@@ -67,7 +67,7 @@ namespace LogisticManager.Forms
             // 컬럼 설정
             _listView.Columns.Add("파일명", 200);
             _listView.Columns.Add("크기", 80);
-            _listView.Columns.Add("업로드 시간", 120);
+            _listView.Columns.Add("업로드 시간", 150); // 실제 시간 표시를 위해 너비 증가
             _listView.Columns.Add("상태", 80);
             
             // 이벤트 핸들러 등록
@@ -289,23 +289,12 @@ namespace LogisticManager.Forms
         }
         
         /// <summary>
-        /// 상대적 시간을 표시합니다
+        /// 실제 업로드 시간을 표시합니다
         /// </summary>
         private string FormatRelativeTime(DateTime time)
         {
-            var now = DateTime.Now;
-            var diff = now - time;
-            
-            if (diff.TotalMinutes < 1)
-                return "방금 전";
-            else if (diff.TotalMinutes < 60)
-                return $"{(int)diff.TotalMinutes}분 전";
-            else if (diff.TotalHours < 24)
-                return $"{(int)diff.TotalHours}시간 전";
-            else if (diff.TotalDays < 7)
-                return $"{(int)diff.TotalDays}일 전";
-            else
-                return time.ToString("MM/dd HH:mm");
+            // 실제 업로드 시간을 한국 시간 형식으로 표시
+            return time.ToString("yyyy-MM-dd HH:mm:ss");
         }
         
         #endregion

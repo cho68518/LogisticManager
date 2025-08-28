@@ -29,7 +29,7 @@ namespace LogisticManager.Repositories
         {
             try
             {
-                LogManagerService.LogInfo("=== GetAllGroupCodesAsync 시작 ===");
+                //LogManagerService.LogInfo("=== GetAllGroupCodesAsync 시작 ===");
                 
                 // 단일 연결을 사용하여 모든 쿼리를 실행
                 using var connection = await _databaseService.GetConnectionAsync();

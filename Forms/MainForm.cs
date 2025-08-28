@@ -488,7 +488,7 @@ namespace LogisticManager.Forms
             });
             
             // 다운로드 버튼 상태 확인 및 로그 출력
-            LogMessage($"🔍 다운로드 버튼 생성 완료: 위치({btnDownloadFiles.Location.X}, {btnDownloadFiles.Location.Y}), 크기({btnDownloadFiles.Size.Width}x{btnDownloadFiles.Size.Height}), 보임여부: {btnDownloadFiles.Visible}");
+            //LogMessage($"🔍 다운로드 버튼 생성 완료: 위치({btnDownloadFiles.Location.X}, {btnDownloadFiles.Location.Y}), 크기({btnDownloadFiles.Size.Width}x{btnDownloadFiles.Size.Height}), 보임여부: {btnDownloadFiles.Visible}");
 
             // 폼 리사이즈 이벤트 핸들러 추가
             this.Resize += MainForm_Resize;
@@ -501,7 +501,7 @@ namespace LogisticManager.Forms
             {
                 btnDownloadFiles.Visible = true;
                 btnDownloadFiles.BringToFront();
-                LogMessage($"🔍 다운로드 버튼 최종 확인: 위치({btnDownloadFiles.Location.X}, {btnDownloadFiles.Location.Y}), 보임여부: {btnDownloadFiles.Visible}");
+                //LogMessage($"🔍 다운로드 버튼 최종 확인: 위치({btnDownloadFiles.Location.X}, {btnDownloadFiles.Location.Y}), 보임여부: {btnDownloadFiles.Visible}");
             }
 
             // 초기 로그 메시지 출력
@@ -715,7 +715,7 @@ namespace LogisticManager.Forms
             btnDownloadFiles.Visible = true; // 항상 보이도록 설정
             
             // 디버그 정보 출력
-            LogMessage($"🔍 파일목록 패널 레이아웃: 패널({fileListPanel.Width}x{fileListPanel.Height}), 제목({lblFileListTitle.Location.X}, {lblFileListTitle.Location.Y}), 리스트({fileListContainer.Location.X}, {fileListContainer.Location.Y}, {fileListContainer.Size.Height}), 버튼({downloadButtonLeft}, {downloadButtonTop})");
+            //LogMessage($"🔍 파일목록 패널 레이아웃: 패널({fileListPanel.Width}x{fileListPanel.Height}), 제목({lblFileListTitle.Location.X}, {lblFileListTitle.Location.Y}), 리스트({fileListContainer.Location.X}, {fileListContainer.Location.Y}, {fileListContainer.Size.Height}), 버튼({downloadButtonLeft}, {downloadButtonTop})");
         }
 
         #endregion
@@ -799,13 +799,13 @@ namespace LogisticManager.Forms
         {
             try
             {
-                LogMessage("☁️ Dropbox 테스트 화면을 엽니다...");
+                //LogMessage("☁️ Dropbox 테스트 화면을 엽니다...");
                 
                 // Dropbox 테스트 폼을 모달로 열기
                 var dropboxTestForm = new DropboxTestForm();
                 dropboxTestForm.ShowDialog(this);
                 
-                LogMessage("✅ Dropbox 테스트 화면이 닫혔습니다.");
+                //LogMessage("✅ Dropbox 테스트 화면이 닫혔습니다.");
             }
             catch (Exception ex)
             {
@@ -828,17 +828,17 @@ namespace LogisticManager.Forms
         {
             try
             {
-                LogMessage("💬 KakaoWork 테스트 화면을 엽니다...");
+                //LogMessage("💬 KakaoWork 테스트 화면을 엽니다...");
                 
                 // KakaoWork 테스트 폼을 모달로 열기
                 var kakaoWorkTestForm = new KakaoWorkTestForm();
                 kakaoWorkTestForm.ShowDialog(this);
                 
-                LogMessage("✅ KakaoWork 테스트 화면이 닫혔습니다.");
+                //LogMessage("✅ KakaoWork 테스트 화면이 닫혔습니다.");
             }
             catch (Exception ex)
             {
-                LogMessage($"❌ KakaoWork 테스트 화면 열기 중 오류 발생: {ex.Message}");
+                //LogMessage($"❌ KakaoWork 테스트 화면 열기 중 오류 발생: {ex.Message}");
                 MessageBox.Show($"KakaoWork 테스트 화면을 열 수 없습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -884,14 +884,14 @@ namespace LogisticManager.Forms
                     lblFilePath.Text = $"📄 선택된 파일: {fileName}";
                     btnStartProcess.Enabled = true;
                     
-                    LogMessage($"📁 새 파일이 선택되었습니다: {fileName}");
-                    LogMessage($"📊 파일 크기: {new FileInfo(_selectedFilePath).Length / 1024} KB");
-                    LogMessage($"⏰ 선택 시각: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                    //LogMessage($"📁 새 파일이 선택되었습니다: {fileName}");
+                    //LogMessage($"📊 파일 크기: {new FileInfo(_selectedFilePath).Length / 1024} KB");
+                    //LogMessage($"⏰ 선택 시각: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 }
             }
             catch (Exception ex)
             {
-                LogMessage($"❌ 파일 선택 중 오류 발생: {ex.Message}");
+                //LogMessage($"❌ 파일 선택 중 오류 발생: {ex.Message}");
                 MessageBox.Show($"파일을 선택할 수 없습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -919,6 +919,9 @@ namespace LogisticManager.Forms
 
             try
             {
+                // 송장처리 시작 시 파일목록 클리어
+                fileListContainer.ClearAllCards();
+                
                 // 통합 시간 관리자 시작 (송장처리 시작 버튼 클릭 시점)
                 ProcessingTimeManager.Instance.StartProcessing();
                 
@@ -1877,12 +1880,12 @@ namespace LogisticManager.Forms
             try
             {
                 var batchTitle = BatchTimeService.Instance.GetBatchTitle(baseTitle);
-                LogMessage($"🔍 배치 타이틀 생성: {baseTitle} → {batchTitle}");
+                //LogMessage($"🔍 배치 타이틀 생성: {baseTitle} → {batchTitle}");
                 return batchTitle;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                LogMessage($"⚠️ 배치 타이틀 생성 중 오류: {ex.Message}");
+                //LogMessage($"⚠️ 배치 타이틀 생성 중 오류: {ex.Message}");
                 return baseTitle; // 오류 시 기본 타이틀 반환
             }
         }
@@ -1900,7 +1903,7 @@ namespace LogisticManager.Forms
                     lblTitle.Text = newTitle;
                     
                     // 디버그 로그 추가
-                    LogMessage($"🔄 타이틀 업데이트: {newTitle}");
+                    //LogMessage($"🔄 타이틀 업데이트: {newTitle}");
                 }
                 else
                 {
@@ -2091,14 +2094,14 @@ namespace LogisticManager.Forms
         {
             try
             {
-                LogMessage($"🔍 AddFileToList 호출됨: {fileName}, 크기: {fileSize}, 시간: {uploadTime}");
+                //LogMessage($"🔍 AddFileToList 호출됨: {fileName}, 크기: {fileSize}, 시간: {uploadTime}");
                 
                 if (fileListContainer != null && !string.IsNullOrEmpty(fileName))
                 {
-                    LogMessage($"✅ fileListContainer 존재함, AddFileCard 호출");
+                    //LogMessage($"✅ fileListContainer 존재함, AddFileCard 호출");
                     // 새 파일을 목록에 추가 (중복 체크는 컨트롤 내부에서 처리)
                     fileListContainer.AddFileCard(fileName, fileSize, uploadTime, dropboxPath);
-                    LogMessage($"✅ AddFileCard 호출 완료");
+                    //LogMessage($"✅ AddFileCard 호출 완료");
                 }
                 else
                 {

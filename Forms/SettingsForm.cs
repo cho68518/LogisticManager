@@ -176,6 +176,13 @@ namespace LogisticManager.Forms
             tabControl.Font = new Font("맑은 고딕", 9F);
             tabControl.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             tabControl.Margin = new Padding(20, 60, 20, 70);
+            
+            // 탭 커스텀 그리기 설정
+            tabControl.DrawMode = TabDrawMode.OwnerDrawFixed;
+            tabControl.DrawItem += TabControl_DrawItem;
+            
+            // 탭 높이 원래 상태
+            tabControl.ItemSize = new Size(0, 23); // 기본 높이로 복원
 
             // 데이터베이스 설정 탭 (숨김 처리)
             // var dbTab = new TabPage("🗄️ 데이터베이스 설정");
@@ -188,17 +195,17 @@ namespace LogisticManager.Forms
             // tabControl.TabPages.Add(apiTab);
 
             // 공통코드 관리 탭
-            var commonCodeTab = new TabPage("🔧 공통코드 관리");
+            var commonCodeTab = new TabPage("공통코드 관리");
             commonCodeTab.Controls.Add(CreateCommonCodeManagementPanel());
             tabControl.TabPages.Add(commonCodeTab);
 
             // 오류확인 탭
-            var errorCheckTab = new TabPage("⚠️ 오류확인");
+            var errorCheckTab = new TabPage("오류확인");
             errorCheckTab.Controls.Add(CreateErrorCheckPanel());
             tabControl.TabPages.Add(errorCheckTab);
 
             // 파일 경로 설정 탭
-            var pathTab = new TabPage("📁 파일 경로 설정");
+            var pathTab = new TabPage("파일 경로 설정");
             pathTab.Controls.Add(CreatePathSettingsPanel());
             tabControl.TabPages.Add(pathTab);
 
@@ -242,8 +249,12 @@ namespace LogisticManager.Forms
                 }
             }
 
-            // 탭 변경 시 레이아웃 갱신
-            tabControl.SelectedIndexChanged += (s, e) => UpdateBottomButtonsLayout();
+            // 탭 변경 시 레이아웃 갱신 및 탭 새로고침
+            tabControl.SelectedIndexChanged += (s, e) => 
+            {
+                UpdateBottomButtonsLayout();
+                tabControl.Invalidate(); // 탭 그리기 새로고침
+            };
 
             // 버튼 패널 리사이즈 시 레이아웃 갱신
             buttonPanel.Resize += (s, e) => UpdateBottomButtonsLayout();
@@ -281,6 +292,81 @@ namespace LogisticManager.Forms
                 buttonPanel
             });
         }
+
+
+
+        /// <summary>
+        /// 탭 컨트롤의 커스텀 그리기 이벤트 핸들러
+        /// </summary>
+        /// <param name="sender">이벤트 발생 객체</param>
+        /// <param name="e">그리기 이벤트 인수</param>
+        private void TabControl_DrawItem(object? sender, DrawItemEventArgs e)
+        {
+            try
+            {
+                var tabControl = sender as TabControl;
+                if (tabControl == null) return;
+
+                var tabPage = tabControl.TabPages[e.Index];
+                var tabRect = tabControl.GetTabRect(e.Index);
+                
+                // 선택된 탭인지 확인
+                bool isSelected = e.Index == tabControl.SelectedIndex;
+                
+                // 배경색 설정
+                Color backgroundColor;
+                Color textColor;
+                
+                if (isSelected)
+                {
+                    // 선택된 탭: 밝은 파란색 배경, 흰색 텍스트
+                    backgroundColor = Color.FromArgb(52, 152, 219);
+                    textColor = Color.White;
+                }
+                else
+                {
+                    // 선택되지 않은 탭: 연한 회색 배경, 어두운 텍스트
+                    backgroundColor = Color.FromArgb(240, 240, 240);
+                    textColor = Color.FromArgb(52, 73, 94);
+                }
+                
+                // 배경 그리기
+                using (var brush = new SolidBrush(backgroundColor))
+                {
+                    e.Graphics.FillRectangle(brush, tabRect);
+                }
+                
+                // 테두리 그리기
+                using (var pen = new Pen(Color.FromArgb(200, 200, 200)))
+                {
+                    e.Graphics.DrawRectangle(pen, tabRect);
+                }
+                
+                // 텍스트 그리기 (원래 상태)
+                var textRect = new Rectangle(
+                    tabRect.X + 2, 
+                    tabRect.Y + 1, 
+                    tabRect.Width - 4, 
+                    tabRect.Height - 2
+                );
+                
+                using (var brush = new SolidBrush(textColor))
+                {
+                    var stringFormat = new StringFormat
+                    {
+                        Alignment = StringAlignment.Center,
+                        LineAlignment = StringAlignment.Center
+                    };
+                    
+                    e.Graphics.DrawString(tabPage.Text, tabPage.Font, brush, textRect, stringFormat);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ 탭 그리기 중 오류: {ex.Message}");
+            }
+        }
+
 
         /// <summary>
         /// 모던한 스타일의 버튼을 생성하는 메서드
@@ -2368,34 +2454,34 @@ namespace LogisticManager.Forms
         {
             try
             {
-                LogManagerService.LogInfo("=== LoadGroupCodesAsync 시작 ===");
-                LogManagerService.LogInfo("TreeView 노드 초기화");
+                //LogManagerService.LogInfo("=== LoadGroupCodesAsync 시작 ===");
+                //LogManagerService.LogInfo("TreeView 노드 초기화");
                 treeViewGroupCodes.Nodes.Clear();
                 
-                LogManagerService.LogInfo("데이터베이스에서 그룹코드 목록 조회 시작");
+                //LogManagerService.LogInfo("데이터베이스에서 그룹코드 목록 조회 시작");
                 var groupCodes = await _commonCodeRepository.GetAllGroupCodesAsync();
-                LogManagerService.LogInfo($"조회된 그룹코드 개수: {groupCodes.Count}");
+                //LogManagerService.LogInfo($"조회된 그룹코드 개수: {groupCodes.Count}");
 
                 foreach (var groupCode in groupCodes)
                 {
-                    LogManagerService.LogInfo($"TreeView에 그룹코드 '{groupCode}' 노드 추가");
+                    //LogManagerService.LogInfo($"TreeView에 그룹코드 '{groupCode}' 노드 추가");
                     var node = new TreeNode(groupCode) { Tag = groupCode };
                     treeViewGroupCodes.Nodes.Add(node);
-                    LogManagerService.LogInfo($"노드 추가 완료 - Text: '{node.Text}', Tag: '{node.Tag}'");
+                    //LogManagerService.LogInfo($"노드 추가 완료 - Text: '{node.Text}', Tag: '{node.Tag}'");
                 }
 
-                LogManagerService.LogInfo($"TreeView 총 노드 수: {treeViewGroupCodes.Nodes.Count}");
+                //LogManagerService.LogInfo($"TreeView 총 노드 수: {treeViewGroupCodes.Nodes.Count}");
 
                 if (groupCodes.Count > 0)
                 {
                     var firstNode = treeViewGroupCodes.Nodes[0];
-                    LogManagerService.LogInfo($"첫 번째 노드 '{firstNode.Text}' 선택");
+                    //LogManagerService.LogInfo($"첫 번째 노드 '{firstNode.Text}' 선택");
                     treeViewGroupCodes.SelectedNode = firstNode;
                     UpdateTreeNodeSelection(firstNode);
                     
                     if (firstNode.Tag is string firstGroupCode)
                     {
-                        LogManagerService.LogInfo($"첫 번째 그룹코드 '{firstGroupCode}'의 공통코드 로드 시작");
+                        //LogManagerService.LogInfo($"첫 번째 그룹코드 '{firstGroupCode}'의 공통코드 로드 시작");
                         _selectedGroupCode = firstGroupCode;
                         await LoadCommonCodesAsync(firstGroupCode, dataGridViewCodes);
                     }
@@ -2406,18 +2492,18 @@ namespace LogisticManager.Forms
                 }
                 else
                 {
-                    LogManagerService.LogWarning("조회된 그룹코드가 없음, DataGridView 초기화");
+                    //LogManagerService.LogWarning("조회된 그룹코드가 없음, DataGridView 초기화");
                     ConfigureDataGridView(dataGridViewCodes);
                     dataGridViewCodes.Rows.Clear();
                     // 버튼 상태는 나중에 설정
                 }
                 
-                LogManagerService.LogInfo("=== LoadGroupCodesAsync 완료 ===");
+                //LogManagerService.LogInfo("=== LoadGroupCodesAsync 완료 ===");
             }
             catch (Exception ex)
             {
-                LogManagerService.LogError($"그룹코드 로드 중 오류: {ex.Message}");
-                LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
+                //LogManagerService.LogError($"그룹코드 로드 중 오류: {ex.Message}");
+                //LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
                 MessageBox.Show($"그룹코드 로드 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 
                 ConfigureDataGridView(dataGridViewCodes);
@@ -2433,37 +2519,37 @@ namespace LogisticManager.Forms
         {
             try
             {
-                LogManagerService.LogInfo($"=== LoadCommonCodesAsync 시작 - 그룹코드: '{groupCode}' ===");
+                //LogManagerService.LogInfo($"=== LoadCommonCodesAsync 시작 - 그룹코드: '{groupCode}' ===");
                 
                 if (string.IsNullOrEmpty(groupCode))
                 {
-                    LogManagerService.LogWarning("그룹코드가 비어있음, DataGridView 초기화");
+                    //LogManagerService.LogWarning("그룹코드가 비어있음, DataGridView 초기화");
                     ConfigureDataGridView(dataGridViewCodes);
                     dataGridViewCodes.Rows.Clear();
                     return;
                 }
 
-                LogManagerService.LogInfo($"데이터베이스에서 그룹코드 '{groupCode}'의 공통코드 조회 시작");
+                //LogManagerService.LogInfo($"데이터베이스에서 그룹코드 '{groupCode}'의 공통코드 조회 시작");
                 var commonCodes = await _commonCodeRepository.GetCommonCodesByGroupAsync(groupCode);
-                LogManagerService.LogInfo($"조회된 공통코드 개수: {commonCodes.Count}");
+                //LogManagerService.LogInfo($"조회된 공통코드 개수: {commonCodes.Count}");
                 
                 _originalData = commonCodes.Select(c => c.Clone()).ToList();
-                LogManagerService.LogInfo("원본 데이터 백업 완료");
+                //LogManagerService.LogInfo("원본 데이터 백업 완료");
                 
-                LogManagerService.LogInfo("DataGridView 구성 시작");
+                //LogManagerService.LogInfo("DataGridView 구성 시작");
                 ConfigureDataGridView(dataGridViewCodes);
-                LogManagerService.LogInfo("DataGridView 구성 완료");
+                //LogManagerService.LogInfo("DataGridView 구성 완료");
                 
-                LogManagerService.LogInfo("DataGridView에 데이터 채우기 시작");
+                //LogManagerService.LogInfo("DataGridView에 데이터 채우기 시작");
                 PopulateDataGridView(commonCodes, dataGridViewCodes);
-                LogManagerService.LogInfo($"DataGridView에 {dataGridViewCodes.Rows.Count}개 행 추가 완료");
+                //LogManagerService.LogInfo($"DataGridView에 {dataGridViewCodes.Rows.Count}개 행 추가 완료");
                 
-                LogManagerService.LogInfo($"=== LoadCommonCodesAsync 완료 - 그룹코드: '{groupCode}' ===");
+                //LogManagerService.LogInfo($"=== LoadCommonCodesAsync 완료 - 그룹코드: '{groupCode}' ===");
             }
             catch (Exception ex)
             {
-                LogManagerService.LogError($"공통코드 로드 중 오류 (그룹코드: {groupCode}): {ex.Message}");
-                LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
+                //LogManagerService.LogError($"공통코드 로드 중 오류 (그룹코드: {groupCode}): {ex.Message}");
+                //LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
                 MessageBox.Show($"공통코드 로드 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 
                 ConfigureDataGridView(dataGridViewCodes);
@@ -2581,7 +2667,7 @@ namespace LogisticManager.Forms
                 LogManagerService.LogError($"DataGridView 데이터 채우기 중 오류: {ex.Message}");
                 throw;
             }
-        }
+        }   
 
         /// <summary>
         /// 버튼 상태를 설정하는 메서드
@@ -2653,34 +2739,34 @@ namespace LogisticManager.Forms
         {
             try
             {
-                LogManagerService.LogInfo("=== TreeView AfterSelect 이벤트 시작 ===");
-                LogManagerService.LogInfo($"선택된 노드: {e.Node?.Text ?? "null"}");
-                LogManagerService.LogInfo($"노드 Tag: {e.Node?.Tag ?? "null"}");
+                //LogManagerService.LogInfo("=== TreeView AfterSelect 이벤트 시작 ===");
+                //LogManagerService.LogInfo($"선택된 노드: {e.Node?.Text ?? "null"}");
+                //LogManagerService.LogInfo($"노드 Tag: {e.Node?.Tag ?? "null"}");
                 
                 UpdateTreeNodeSelection(e.Node);
 
                 if (e.Node?.Tag is string groupCode && !string.IsNullOrEmpty(groupCode))
                 {
-                    LogManagerService.LogInfo($"그룹코드 '{groupCode}' 선택됨");
+                    //LogManagerService.LogInfo($"그룹코드 '{groupCode}' 선택됨");
                     _selectedGroupCode = groupCode;
                     
                     if (e.Node.TreeView != null)
                     {
-                        LogManagerService.LogInfo("TreeView가 존재함, 공통코드 관리 패널 찾기 시작");
+                        //LogManagerService.LogInfo("TreeView가 존재함, 공통코드 관리 패널 찾기 시작");
                         var commonCodePanel = FindCommonCodeManagementPanel(e.Node.TreeView);
-                        LogManagerService.LogInfo($"공통코드 관리 패널 찾기 결과: {(commonCodePanel != null ? "성공" : "실패")}");
+                        //LogManagerService.LogInfo($"공통코드 관리 패널 찾기 결과: {(commonCodePanel != null ? "성공" : "실패")}");
                         
                         if (commonCodePanel != null)
                         {
-                            LogManagerService.LogInfo("DataGridView 찾기 시작");
+                            //LogManagerService.LogInfo("DataGridView 찾기 시작");
                             var dataGridView = FindDataGridViewInParent(commonCodePanel);
-                            LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
+                            //LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
                             
                             if (dataGridView != null)
                             {
-                                LogManagerService.LogInfo($"그룹코드 '{groupCode}'의 상세코드 로드 시작");
+                                //LogManagerService.LogInfo($"그룹코드 '{groupCode}'의 상세코드 로드 시작");
                                 await LoadCommonCodesAsync(groupCode, dataGridView);
-                                LogManagerService.LogInfo($"그룹코드 '{groupCode}'의 상세코드 로드 완료");
+                                //LogManagerService.LogInfo($"그룹코드 '{groupCode}'의 상세코드 로드 완료");
                             }
                             else
                             {
@@ -2702,12 +2788,12 @@ namespace LogisticManager.Forms
                     LogManagerService.LogWarning($"유효하지 않은 그룹코드: Node={e.Node?.Text}, Tag={e.Node?.Tag}");
                 }
                 
-                LogManagerService.LogInfo("=== TreeView AfterSelect 이벤트 완료 ===");
+                //LogManagerService.LogInfo("=== TreeView AfterSelect 이벤트 완료 ===");
             }
             catch (Exception ex)
             {
-                LogManagerService.LogError($"TreeView 선택 이벤트 처리 중 오류: {ex.Message}");
-                LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
+                //LogManagerService.LogError($"TreeView 선택 이벤트 처리 중 오류: {ex.Message}");
+                //LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
                 MessageBox.Show($"그룹코드 선택 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -2719,28 +2805,28 @@ namespace LogisticManager.Forms
         {
             try
             {
-                LogManagerService.LogInfo("=== TreeView DoubleClick 이벤트 시작 ===");
+                //LogManagerService.LogInfo("=== TreeView DoubleClick 이벤트 시작 ===");
                 
                 if (sender is TreeView treeView && treeView.SelectedNode?.Tag is string groupCode && !string.IsNullOrEmpty(groupCode))
                 {
-                    LogManagerService.LogInfo($"더블클릭된 그룹코드: '{groupCode}'");
+                    //LogManagerService.LogInfo($"더블클릭된 그룹코드: '{groupCode}'");
                     _selectedGroupCode = groupCode;
                     
-                    LogManagerService.LogInfo("공통코드 관리 패널 찾기 시작");
+                    //LogManagerService.LogInfo("공통코드 관리 패널 찾기 시작");
                     var commonCodePanel = FindCommonCodeManagementPanel(treeView);
-                    LogManagerService.LogInfo($"공통코드 관리 패널 찾기 결과: {(commonCodePanel != null ? "성공" : "실패")}");
+                    //LogManagerService.LogInfo($"공통코드 관리 패널 찾기 결과: {(commonCodePanel != null ? "성공" : "실패")}");
                     
                     if (commonCodePanel != null)
                     {
-                        LogManagerService.LogInfo("DataGridView 찾기 시작");
+                        //LogManagerService.LogInfo("DataGridView 찾기 시작");
                         var dataGridView = FindDataGridViewInParent(commonCodePanel);
-                        LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
+                        //LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
                         
                         if (dataGridView != null)
                         {
-                            LogManagerService.LogInfo($"그룹코드 '{groupCode}'의 상세코드 로드 시작");
+                            //LogManagerService.LogInfo($"그룹코드 '{groupCode}'의 상세코드 로드 시작");
                             await LoadCommonCodesAsync(groupCode, dataGridView);
-                            LogManagerService.LogInfo($"그룹코드 '{groupCode}'의 상세코드 로드 완료");
+                            //LogManagerService.LogInfo($"그룹코드 '{groupCode}'의 상세코드 로드 완료");
                         }
                         else
                         {
@@ -2757,12 +2843,12 @@ namespace LogisticManager.Forms
                     LogManagerService.LogWarning("더블클릭된 노드가 유효하지 않음");
                 }
                 
-                LogManagerService.LogInfo("=== TreeView DoubleClick 이벤트 완료 ===");
+                //LogManagerService.LogInfo("=== TreeView DoubleClick 이벤트 완료 ===");
             }
             catch (Exception ex)
             {
-                LogManagerService.LogError($"TreeView 더블클릭 이벤트 처리 중 오류: {ex.Message}");
-                LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
+                //LogManagerService.LogError($"TreeView 더블클릭 이벤트 처리 중 오류: {ex.Message}");
+                //LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
                 MessageBox.Show($"그룹코드 더블클릭 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -2832,7 +2918,7 @@ namespace LogisticManager.Forms
                     
                     if (success)
                     {
-                        LogManagerService.LogInfo($"새 그룹코드 '{groupCode}' 추가 성공, TreeView 새로고침 시작");
+                        //LogManagerService.LogInfo($"새 그룹코드 '{groupCode}' 추가 성공, TreeView 새로고침 시작");
                         
                         // 전체 공통코드 관리 패널을 찾아서 TreeView와 DataGridView를 가져옴
                         if (sender is Button btn)
@@ -2843,8 +2929,8 @@ namespace LogisticManager.Forms
                                 var treeView = FindTreeViewInParent(commonCodePanel);
                                 var dataGridView = FindDataGridViewInParent(commonCodePanel);
                                 
-                                LogManagerService.LogInfo($"TreeView 찾기 결과: {(treeView != null ? "성공" : "실패")}");
-                                LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
+                                //LogManagerService.LogInfo($"TreeView 찾기 결과: {(treeView != null ? "성공" : "실패")}");
+                                //LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
                                 
                                 if (treeView != null && dataGridView != null)
                                 {
@@ -2923,8 +3009,8 @@ namespace LogisticManager.Forms
         {
             try
             {
-                LogManagerService.LogInfo("=== 코드 추가 버튼 클릭 이벤트 시작 ===");
-                LogManagerService.LogInfo($"선택된 그룹코드: '{_selectedGroupCode}'");
+                //LogManagerService.LogInfo("=== 코드 추가 버튼 클릭 이벤트 시작 ===");
+                //LogManagerService.LogInfo($"선택된 그룹코드: '{_selectedGroupCode}'");
                 
                 if (string.IsNullOrEmpty(_selectedGroupCode))
                 {
@@ -2935,20 +3021,20 @@ namespace LogisticManager.Forms
 
                 if (sender is Button btn && btn.Parent is Panel panel)
                 {
-                    LogManagerService.LogInfo($"버튼 정보 - Name: {btn.Name}, Parent: {panel.GetType().Name}");
+                    //LogManagerService.LogInfo($"버튼 정보 - Name: {btn.Name}, Parent: {panel.GetType().Name}");
                     
                     // 공통코드 관리 패널에서 DataGridView 찾기
                     var commonCodePanel = FindCommonCodeManagementPanel(btn);
-                    LogManagerService.LogInfo($"공통코드 관리 패널 찾기 결과: {(commonCodePanel != null ? "성공" : "실패")}");
+                    //LogManagerService.LogInfo($"공통코드 관리 패널 찾기 결과: {(commonCodePanel != null ? "성공" : "실패")}");
                     
                     if (commonCodePanel != null)
                     {
                         var dataGridView = FindDataGridViewInParent(commonCodePanel);
-                        LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
+                        //LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
                         
                         if (dataGridView != null)
                         {
-                            LogManagerService.LogInfo("새 공통코드 객체 생성 시작");
+                            //LogManagerService.LogInfo("새 공통코드 객체 생성 시작");
                             var newCode = new CommonCode(_selectedGroupCode)
                             {
                                 Code = $"NEW_{DateTime.Now:yyyyMMddHHmmss}",
@@ -2956,12 +3042,12 @@ namespace LogisticManager.Forms
                                 SortOrder = _originalData.Count + 1,
                                 CreatedBy = Environment.UserName
                             };
-                            LogManagerService.LogInfo($"새 코드 생성: {newCode.GroupCode}.{newCode.Code}");
+                            //LogManagerService.LogInfo($"새 코드 생성: {newCode.GroupCode}.{newCode.Code}");
 
-                            LogManagerService.LogInfo("DataGridView에 새 행 추가 시작");
+                            //LogManagerService.LogInfo("DataGridView에 새 행 추가 시작");
                             var rowIndex = dataGridView.Rows.Add();
                             var row = dataGridView.Rows[rowIndex];
-                            LogManagerService.LogInfo($"새 행 추가됨 - 인덱스: {rowIndex}");
+                            //LogManagerService.LogInfo($"새 행 추가됨 - 인덱스: {rowIndex}");
 
                             // 셀 값 설정
                             LogManagerService.LogInfo("셀 값 설정 시작");
@@ -2973,25 +3059,25 @@ namespace LogisticManager.Forms
                             row.Cells["IsUsed"].Value = newCode.IsUsed;
                             row.Cells["Attribute1"].Value = newCode.Attribute1 ?? string.Empty;
                             row.Cells["Attribute2"].Value = newCode.Attribute2 ?? string.Empty;
-                            LogManagerService.LogInfo("모든 셀 값 설정 완료");
+                            //LogManagerService.LogInfo("모든 셀 값 설정 완료");
 
                             row.Tag = newCode;
                             _isDataModified = true;
-                            LogManagerService.LogInfo("행 태그 설정 및 데이터 수정 플래그 설정 완료");
+                            //LogManagerService.LogInfo("행 태그 설정 및 데이터 수정 플래그 설정 완료");
                             
-                            LogManagerService.LogInfo("버튼 상태 업데이트 시작");
+                            //LogManagerService.LogInfo("버튼 상태 업데이트 시작");
                             var btnSave = FindButtonInParent(commonCodePanel, "btnSave");
                             var btnDelete = FindButtonInParent(commonCodePanel, "btnDelete");
-                            LogManagerService.LogInfo($"저장 버튼 찾기: {(btnSave != null ? "성공" : "실패")}");
-                            LogManagerService.LogInfo($"삭제 버튼 찾기: {(btnDelete != null ? "성공" : "실패")}");
+                            //LogManagerService.LogInfo($"저장 버튼 찾기: {(btnSave != null ? "성공" : "실패")}");
+                            //LogManagerService.LogInfo($"삭제 버튼 찾기: {(btnDelete != null ? "성공" : "실패")}");
                             
                             if (btnSave != null && btnDelete != null)
                             {
                                 SetButtonStates(true, btn, btnSave, btnDelete);
-                                LogManagerService.LogInfo("버튼 상태 업데이트 완료");
+                                //LogManagerService.LogInfo("버튼 상태 업데이트 완료");
                             }
                             
-                            LogManagerService.LogInfo($"현재 DataGridView 총 행 수: {dataGridView.Rows.Count}");
+                            //LogManagerService.LogInfo($"현재 DataGridView 총 행 수: {dataGridView.Rows.Count}");
                         }
                         else
                         {
@@ -3011,12 +3097,12 @@ namespace LogisticManager.Forms
                     MessageBox.Show("버튼 정보가 올바르지 않습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
                 
-                LogManagerService.LogInfo("=== 코드 추가 버튼 클릭 이벤트 완료 ===");
+                //LogManagerService.LogInfo("=== 코드 추가 버튼 클릭 이벤트 완료 ===");
             }
             catch (Exception ex)
             {
-                LogManagerService.LogError($"코드 추가 중 오류: {ex.Message}");
-                LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
+                //LogManagerService.LogError($"코드 추가 중 오류: {ex.Message}");
+                //LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
                 MessageBox.Show($"코드 추가 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -3028,29 +3114,29 @@ namespace LogisticManager.Forms
         {
             try
             {
-                LogManagerService.LogInfo("=== 저장 버튼 클릭 이벤트 시작 ===");
-                LogManagerService.LogInfo($"데이터 수정 상태: {_isDataModified}");
+                //LogManagerService.LogInfo("=== 저장 버튼 클릭 이벤트 시작 ===");
+                //LogManagerService.LogInfo($"데이터 수정 상태: {_isDataModified}");
                 
                 if (sender is Button btn && btn.Parent is Panel panel)
                 {
-                    LogManagerService.LogInfo($"버튼 정보 - Name: {btn.Name}, Parent: {panel.GetType().Name}");
+                    //LogManagerService.LogInfo($"버튼 정보 - Name: {btn.Name}, Parent: {panel.GetType().Name}");
                     
                     // 공통코드 관리 패널에서 DataGridView 찾기
                     var commonCodePanel = FindCommonCodeManagementPanel(btn);
-                    LogManagerService.LogInfo($"공통코드 관리 패널 찾기 결과: {(commonCodePanel != null ? "성공" : "실패")}");
+                    // LogManagerService.LogInfo($"공통코드 관리 패널 찾기 결과: {(commonCodePanel != null ? "성공" : "실패")}");
                     
                     if (commonCodePanel != null)
                     {
                         var dataGridView = FindDataGridViewInParent(commonCodePanel);
-                        LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
+                        //LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
                         
                         if (dataGridView != null)
                         {
-                            LogManagerService.LogInfo($"DataGridView 총 행 수: {dataGridView.Rows.Count}");
+                            //LogManagerService.LogInfo($"DataGridView 총 행 수: {dataGridView.Rows.Count}");
                             
-                            LogManagerService.LogInfo("DataGridView에서 공통코드 데이터 추출 시작");
+                            //LogManagerService.LogInfo("DataGridView에서 공통코드 데이터 추출 시작");
                             var commonCodes = GetCommonCodesFromDataGridView(dataGridView);
-                            LogManagerService.LogInfo($"추출된 공통코드 개수: {commonCodes.Count}");
+                            //LogManagerService.LogInfo($"추출된 공통코드 개수: {commonCodes.Count}");
                             
                             if (commonCodes.Count == 0)
                             {
@@ -3059,21 +3145,21 @@ namespace LogisticManager.Forms
                                 return;
                             }
 
-                            LogManagerService.LogInfo("데이터베이스에 공통코드 저장 시작");
+                            //LogManagerService.LogInfo("데이터베이스에 공통코드 저장 시작");
                             var result = await _commonCodeRepository.SaveCommonCodesAsync(commonCodes);
-                            LogManagerService.LogInfo($"저장 결과: {(result ? "성공" : "실패")}");
+                            //LogManagerService.LogInfo($"저장 결과: {(result ? "성공" : "실패")}");
                             
                             if (result)
                             {
                                 MessageBox.Show("공통코드가 성공적으로 저장되었습니다.", "성공", MessageBoxButtons.OK, MessageBoxIcon.Information);
                                 _isDataModified = false;
-                                LogManagerService.LogInfo("데이터 수정 플래그 초기화");
+                                //LogManagerService.LogInfo("데이터 수정 플래그 초기화");
                                 
                                 if (!string.IsNullOrEmpty(_selectedGroupCode))
                                 {
-                                    LogManagerService.LogInfo($"선택된 그룹코드 '{_selectedGroupCode}' 데이터 새로고침 시작");
+                                    //LogManagerService.LogInfo($"선택된 그룹코드 '{_selectedGroupCode}' 데이터 새로고침 시작");
                                     await LoadCommonCodesAsync(_selectedGroupCode, dataGridView);
-                                    LogManagerService.LogInfo("데이터 새로고침 완료");
+                                    //LogManagerService.LogInfo("데이터 새로고침 완료");
                                 }
                             }
                             else
@@ -3100,12 +3186,12 @@ namespace LogisticManager.Forms
                     MessageBox.Show("버튼 정보가 올바르지 않습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
                 
-                LogManagerService.LogInfo("=== 저장 버튼 클릭 이벤트 완료 ===");
+                //LogManagerService.LogInfo("=== 저장 버튼 클릭 이벤트 완료 ===");
             }
             catch (Exception ex)
             {
-                LogManagerService.LogError($"공통코드 저장 중 오류: {ex.Message}");
-                LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
+                //LogManagerService.LogError($"공통코드 저장 중 오류: {ex.Message}");
+                //LogManagerService.LogError($"스택 트레이스: {ex.StackTrace}");
                 MessageBox.Show($"저장 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -3117,24 +3203,24 @@ namespace LogisticManager.Forms
         {
             try
             {
-                LogManagerService.LogInfo("=== 삭제 버튼 클릭 이벤트 시작 ===");
+                //LogManagerService.LogInfo("=== 삭제 버튼 클릭 이벤트 시작 ===");
                 
                 if (sender is Button btn && btn.Parent is Panel panel)
                 {
-                    LogManagerService.LogInfo($"버튼 정보 - Name: {btn.Name}, Parent: {panel.GetType().Name}");
+                    //LogManagerService.LogInfo($"버튼 정보 - Name: {btn.Name}, Parent: {panel.GetType().Name}");
                     
                     // 공통코드 관리 패널에서 DataGridView 찾기
                     var commonCodePanel = FindCommonCodeManagementPanel(btn);
-                    LogManagerService.LogInfo($"공통코드 관리 패널 찾기 결과: {(commonCodePanel != null ? "성공" : "실패")}");
+                    //LogManagerService.LogInfo($"공통코드 관리 패널 찾기 결과: {(commonCodePanel != null ? "성공" : "실패")}");
                     
                     if (commonCodePanel != null)
                     {
                         var dataGridView = FindDataGridViewInParent(commonCodePanel);
-                        LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
+                        //LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
                         
                         if (dataGridView?.SelectedRows.Count > 0)
                         {
-                            LogManagerService.LogInfo($"선택된 행 개수: {dataGridView.SelectedRows.Count}");
+                            //LogManagerService.LogInfo($"선택된 행 개수: {dataGridView.SelectedRows.Count}");
                             
                             var result = MessageBox.Show(
                                 "정말로 선택된 공통코드를 삭제하시겠습니까?", 
@@ -3144,13 +3230,13 @@ namespace LogisticManager.Forms
 
                             if (result == DialogResult.Yes)
                             {
-                                LogManagerService.LogInfo("사용자가 삭제를 확인함");
+                                //LogManagerService.LogInfo("사용자가 삭제를 확인함");
                                 
                                 var selectedRow = dataGridView.SelectedRows[0];
                                 var groupCode = selectedRow.Cells["GroupCode"].Value?.ToString() ?? string.Empty;
                                 var code = selectedRow.Cells["Code"].Value?.ToString() ?? string.Empty;
                                 
-                                LogManagerService.LogInfo($"삭제할 공통코드: {groupCode}.{code}");
+                                //LogManagerService.LogInfo($"삭제할 공통코드: {groupCode}.{code}");
 
                                 if (string.IsNullOrEmpty(groupCode) || string.IsNullOrEmpty(code))
                                 {
@@ -3159,9 +3245,9 @@ namespace LogisticManager.Forms
                                     return;
                                 }
 
-                                LogManagerService.LogInfo("데이터베이스에서 공통코드 삭제 시작");
+                                //LogManagerService.LogInfo("데이터베이스에서 공통코드 삭제 시작");
                                 var deleteResult = await _commonCodeRepository.DeleteCommonCodeAsync(groupCode, code);
-                                LogManagerService.LogInfo($"삭제 결과: {(deleteResult ? "성공" : "실패")}");
+                                //LogManagerService.LogInfo($"삭제 결과: {(deleteResult ? "성공" : "실패")}");
                                 
                                 if (deleteResult)
                                 {
@@ -3169,9 +3255,9 @@ namespace LogisticManager.Forms
                                     
                                     if (!string.IsNullOrEmpty(_selectedGroupCode))
                                     {
-                                        LogManagerService.LogInfo($"선택된 그룹코드 '{_selectedGroupCode}' 데이터 새로고침 시작");
+                                        //LogManagerService.LogInfo($"선택된 그룹코드 '{_selectedGroupCode}' 데이터 새로고침 시작");
                                         await LoadCommonCodesAsync(_selectedGroupCode, dataGridView);
-                                        LogManagerService.LogInfo("데이터 새로고침 완료");
+                                        //LogManagerService.LogInfo("데이터 새로고침 완료");
                                     }
                                 }
                                 else
@@ -3263,7 +3349,7 @@ namespace LogisticManager.Forms
         {
             try
             {
-                LogManagerService.LogInfo("=== 그룹코드 삭제 시작 ===");
+                //LogManagerService.LogInfo("=== 그룹코드 삭제 시작 ===");
                 
                 if (node?.Tag is not string groupCode || string.IsNullOrEmpty(groupCode))
                 {
@@ -3272,7 +3358,7 @@ namespace LogisticManager.Forms
                     return;
                 }
 
-                LogManagerService.LogInfo($"삭제할 그룹코드: '{groupCode}'");
+                //LogManagerService.LogInfo($"삭제할 그룹코드: '{groupCode}'");
 
                 var result = MessageBox.Show(
                     $"정말로 그룹코드 '{groupCode}'와 관련된 모든 공통코드를 삭제하시겠습니까?\n\n" +
@@ -3283,9 +3369,9 @@ namespace LogisticManager.Forms
 
                 if (result == DialogResult.Yes)
                 {
-                    LogManagerService.LogInfo("사용자가 삭제를 확인함, 데이터베이스에서 삭제 시작");
+                    //LogManagerService.LogInfo("사용자가 삭제를 확인함, 데이터베이스에서 삭제 시작");
                     var deleteResult = await _commonCodeRepository.DeleteGroupCodeAsync(groupCode);
-                    LogManagerService.LogInfo($"데이터베이스 삭제 결과: {(deleteResult ? "성공" : "실패")}");
+                    //LogManagerService.LogInfo($"데이터베이스 삭제 결과: {(deleteResult ? "성공" : "실패")}");
                     
                     if (deleteResult)
                     {
@@ -3293,22 +3379,22 @@ namespace LogisticManager.Forms
                         
                         if (node.TreeView != null)
                         {
-                            LogManagerService.LogInfo("TreeView에서 노드 제거 및 새로고침 시작");
+                            //LogManagerService.LogInfo("TreeView에서 노드 제거 및 새로고침 시작");
                             
                             // 공통코드 관리 패널 찾기
                             var commonCodePanel = FindCommonCodeManagementPanel(node.TreeView);
-                            LogManagerService.LogInfo($"공통코드 관리 패널 찾기 결과: {(commonCodePanel != null ? "성공" : "실패")}");
+                            //LogManagerService.LogInfo($"공통코드 관리 패널 찾기 결과: {(commonCodePanel != null ? "성공" : "실패")}");
                             
                             if (commonCodePanel != null)
                             {
                                 var dataGridView = FindDataGridViewInParent(commonCodePanel);
-                                LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
+                                //LogManagerService.LogInfo($"DataGridView 찾기 결과: {(dataGridView != null ? "성공" : "실패")}");
                                 
                                 if (dataGridView != null)
                                 {
-                                    LogManagerService.LogInfo("TreeView 전체 새로고침 시작");
+                                    //LogManagerService.LogInfo("TreeView 전체 새로고침 시작");
                                     await LoadGroupCodesAsync(node.TreeView, dataGridView);
-                                    LogManagerService.LogInfo("TreeView 새로고침 완료");
+                                    //LogManagerService.LogInfo("TreeView 새로고침 완료");
                                 }
                                 else
                                 {
@@ -3449,27 +3535,27 @@ namespace LogisticManager.Forms
         /// </summary>
         private DataGridView? FindDataGridViewInParent(Control control)
         {
-            LogManagerService.LogInfo($"FindDataGridViewInParent 시작 - 컨트롤 타입: {control.GetType().Name}");
+            //LogManagerService.LogInfo($"FindDataGridViewInParent 시작 - 컨트롤 타입: {control.GetType().Name}");
             
             if (control is DataGridView dataGridView) 
             {
-                LogManagerService.LogInfo($"DataGridView 발견! Name: {dataGridView.Name}");
+                //LogManagerService.LogInfo($"DataGridView 발견! Name: {dataGridView.Name}");
                 return dataGridView;
             }
             
-            LogManagerService.LogInfo($"자식 컨트롤 개수: {control.Controls.Count}");
+            //LogManagerService.LogInfo($"자식 컨트롤 개수: {control.Controls.Count}");
             foreach (Control child in control.Controls)
             {
-                LogManagerService.LogInfo($"자식 컨트롤 검사 - 타입: {child.GetType().Name}, Name: {child.Name}");
+                //LogManagerService.LogInfo($"자식 컨트롤 검사 - 타입: {child.GetType().Name}, Name: {child.Name}");
                 var result = FindDataGridViewInParent(child);
                 if (result != null) 
                 {
-                    LogManagerService.LogInfo("DataGridView 찾기 성공!");
+                    //LogManagerService.LogInfo("DataGridView 찾기 성공!");
                     return result;
                 }
             }
             
-            LogManagerService.LogWarning("DataGridView를 찾지 못함");
+            //LogManagerService.LogWarning("DataGridView를 찾지 못함");
             return null;
         }
 
