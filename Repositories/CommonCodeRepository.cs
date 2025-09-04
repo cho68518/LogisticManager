@@ -303,7 +303,7 @@ namespace LogisticManager.Repositories
         {
             try
             {
-                LogManagerService.LogInfo($"공통코드 삭제 처리 시작: {groupCode}.{code}");
+                //LogManagerService.LogInfo($"공통코드 삭제 처리 시작: {groupCode}.{code}");
 
                 // 단일 연결을 사용하여 삭제 처리
                 using var connection = await _databaseService.GetConnectionAsync();
@@ -316,7 +316,7 @@ namespace LogisticManager.Repositories
                 existsCommand.Parameters.Add(new MySqlConnector.MySqlParameter("@Code", code));
                 
                 var existsCount = Convert.ToInt32(await existsCommand.ExecuteScalarAsync());
-                LogManagerService.LogInfo($"삭제 대상 공통코드 존재 확인: {existsCount}개");
+                //LogManagerService.LogInfo($"삭제 대상 공통코드 존재 확인: {existsCount}개");
                 
                 if (existsCount == 0)
                 {
@@ -335,7 +335,7 @@ namespace LogisticManager.Repositories
 
                 var result = await deleteCommand.ExecuteNonQueryAsync();
                 
-                LogManagerService.LogInfo($"공통코드 삭제 완료: {groupCode}.{code}, 영향받은 행: {result}개");
+                //LogManagerService.LogInfo($"공통코드 삭제 완료: {groupCode}.{code}, 영향받은 행: {result}개");
                 return result > 0;
             }
             catch (MySqlConnector.MySqlException mysqlEx)
@@ -382,7 +382,7 @@ namespace LogisticManager.Repositories
                         if (isExisting)
                         {
                             // 기존 코드 수정
-                            LogManagerService.LogInfo($"기존 공통코드 수정: {commonCode.GroupCode}.{commonCode.Code}");
+                            //LogManagerService.LogInfo($"기존 공통코드 수정: {commonCode.GroupCode}.{commonCode.Code}");
                             
                             var updateQuery = @"
                                 UPDATE CommonCode SET 
@@ -413,7 +413,7 @@ namespace LogisticManager.Repositories
                         else
                         {
                             // 새 코드 추가
-                            LogManagerService.LogInfo($"새 공통코드 추가: {commonCode.GroupCode}.{commonCode.Code}");
+                            //LogManagerService.LogInfo($"새 공통코드 추가: {commonCode.GroupCode}.{commonCode.Code}");
                             
                             var insertQuery = @"
                                 INSERT INTO CommonCode (
@@ -441,7 +441,7 @@ namespace LogisticManager.Repositories
                     }
 
                     await transaction.CommitAsync();
-                    LogManagerService.LogInfo($"공통코드 일괄 저장 완료: {commonCodes.Count}개 처리됨");
+                    //LogManagerService.LogInfo($"공통코드 일괄 저장 완료: {commonCodes.Count}개 처리됨");
                     return true;
                 }
                 catch (MySqlConnector.MySqlException mysqlEx)

@@ -27,6 +27,11 @@ namespace LogisticManager.Models
         GyeonggiFrozen,
         
         /// <summary>
+        /// 프랩원냉동 알림
+        /// </summary>
+        FrapwonFrozen,
+        
+        /// <summary>
         /// 서울공산 알림
         /// </summary>
         SeoulGongsan,

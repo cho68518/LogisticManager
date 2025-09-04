@@ -1599,8 +1599,26 @@ namespace LogisticManager.Forms
             {
                 Console.WriteLine("🔄 설정 로드 시작...");
                 
-                // JSON 파일에서 직접 로드
-                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                // Application.StartupPath를 사용하여 settings.json 파일 찾기
+                var startupPath = Application.StartupPath;
+                var configSettingsPath = Path.Combine(startupPath, "config", "settings.json");
+                var rootSettingsPath = Path.Combine(startupPath, "settings.json");
+                
+                string settingsPath;
+                
+                // config/settings.json을 우선적으로 사용, 없으면 루트의 settings.json 사용
+                if (File.Exists(configSettingsPath))
+                {
+                    settingsPath = configSettingsPath;
+                }
+                else if (File.Exists(rootSettingsPath))
+                {
+                    settingsPath = rootSettingsPath;
+                }
+                else
+                {
+                    throw new FileNotFoundException("settings.json 파일을 찾을 수 없습니다.");
+                }
                 var settings = new Dictionary<string, string>();
                 
                 if (File.Exists(settingsPath))
@@ -1841,8 +1859,26 @@ namespace LogisticManager.Forms
                     return;
                 }
 
-                // JSON 파일에 직접 저장
-                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                // Application.StartupPath를 사용하여 settings.json 파일 찾기
+                var startupPath = Application.StartupPath;
+                var configSettingsPath = Path.Combine(startupPath, "config", "settings.json");
+                var rootSettingsPath = Path.Combine(startupPath, "settings.json");
+                
+                string settingsPath;
+                
+                // config/settings.json을 우선적으로 사용, 없으면 루트의 settings.json 사용
+                if (File.Exists(configSettingsPath))
+                {
+                    settingsPath = configSettingsPath;
+                }
+                else if (File.Exists(rootSettingsPath))
+                {
+                    settingsPath = rootSettingsPath;
+                }
+                else
+                {
+                    throw new FileNotFoundException("settings.json 파일을 찾을 수 없습니다.");
+                }
                 var settings = new Dictionary<string, string>();
 
                 // 기존 설정 로드
@@ -2045,8 +2081,26 @@ namespace LogisticManager.Forms
                 // 임시 설정에 저장
                 _tempSettings[settingKey] = value;
                 
-                // settings.json 파일에 저장
-                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                // Application.StartupPath를 사용하여 settings.json 파일 찾기
+                var startupPath = Application.StartupPath;
+                var configSettingsPath = Path.Combine(startupPath, "config", "settings.json");
+                var rootSettingsPath = Path.Combine(startupPath, "settings.json");
+                
+                string settingsPath;
+                
+                // config/settings.json을 우선적으로 사용, 없으면 루트의 settings.json 사용
+                if (File.Exists(configSettingsPath))
+                {
+                    settingsPath = configSettingsPath;
+                }
+                else if (File.Exists(rootSettingsPath))
+                {
+                    settingsPath = rootSettingsPath;
+                }
+                else
+                {
+                    throw new FileNotFoundException("settings.json 파일을 찾을 수 없습니다.");
+                }
                 var settings = new Dictionary<string, string>();
                 
                 if (File.Exists(settingsPath))
@@ -2332,7 +2386,26 @@ namespace LogisticManager.Forms
         {
             try
             {
-                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+                // Application.StartupPath를 사용하여 settings.json 파일 찾기
+                var startupPath = Application.StartupPath;
+                var configSettingsPath = Path.Combine(startupPath, "config", "settings.json");
+                var rootSettingsPath = Path.Combine(startupPath, "settings.json");
+                
+                string settingsPath;
+                
+                // config/settings.json을 우선적으로 사용, 없으면 루트의 settings.json 사용
+                if (File.Exists(configSettingsPath))
+                {
+                    settingsPath = configSettingsPath;
+                }
+                else if (File.Exists(rootSettingsPath))
+                {
+                    settingsPath = rootSettingsPath;
+                }
+                else
+                {
+                    throw new FileNotFoundException("settings.json 파일을 찾을 수 없습니다.");
+                }
                 
                 if (File.Exists(settingsPath))
                 {
@@ -2889,7 +2962,9 @@ namespace LogisticManager.Forms
                 {
                     await DeleteGroupCodeAsync(node);
                 });
-                
+                // [한글 주석] 요구사항: 삭제 기능은 제거하지 않고 메뉴만 숨김 처리
+                deleteMenuItem.Visible = false;
+
                 contextMenu.Items.Add(deleteMenuItem);
                 contextMenu.Show(node.TreeView, location);
             }
@@ -3132,6 +3207,12 @@ namespace LogisticManager.Forms
                         
                         if (dataGridView != null)
                         {
+                            // 비밀번호 확인
+                            if (!ValidatePassword())
+                            {
+                                return;
+                            }
+                            
                             //LogManagerService.LogInfo($"DataGridView 총 행 수: {dataGridView.Rows.Count}");
                             
                             //LogManagerService.LogInfo("DataGridView에서 공통코드 데이터 추출 시작");
@@ -3220,6 +3301,12 @@ namespace LogisticManager.Forms
                         
                         if (dataGridView?.SelectedRows.Count > 0)
                         {
+                            // 비밀번호 확인
+                            if (!ValidatePassword())
+                            {
+                                return;
+                            }
+                            
                             //LogManagerService.LogInfo($"선택된 행 개수: {dataGridView.SelectedRows.Count}");
                             
                             var result = MessageBox.Show(
@@ -3289,7 +3376,7 @@ namespace LogisticManager.Forms
                     MessageBox.Show("버튼 정보가 올바르지 않습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
                 
-                LogManagerService.LogInfo("=== 삭제 버튼 클릭 이벤트 완료 ===");
+                //LogManagerService.LogInfo("=== 삭제 버튼 클릭 이벤트 완료 ===");
             }
             catch (Exception ex)
             {
@@ -3593,5 +3680,85 @@ namespace LogisticManager.Forms
         }
 
         #endregion
+
+        /// <summary>
+        /// 비밀번호 확인 메서드
+        /// </summary>
+        /// <returns>비밀번호가 올바르면 true, 그렇지 않으면 false</returns>
+        private bool ValidatePassword()
+        {
+            const string correctPassword = "gram0904";
+            
+            // 커스텀 비밀번호 입력 다이얼로그 생성
+            var passwordForm = new Form
+            {
+                Width = 300,
+                Height = 150,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                Text = "비밀번호 확인"
+            };
+
+            var label = new Label
+            {
+                Text = "관리자 비밀번호를 입력하세요:",
+                Left = 20,
+                Top = 20,
+                Width = 260
+            };
+
+            var textBox = new TextBox
+            {
+                Left = 20,
+                Top = 45,
+                Width = 260,
+                PasswordChar = '*',
+                UseSystemPasswordChar = true
+            };
+
+            var okButton = new Button
+            {
+                Text = "확인",
+                Left = 100,
+                Top = 75,
+                Width = 80,
+                DialogResult = DialogResult.OK
+            };
+
+            var cancelButton = new Button
+            {
+                Text = "취소",
+                Left = 190,
+                Top = 75,
+                Width = 80,
+                DialogResult = DialogResult.Cancel
+            };
+
+            passwordForm.Controls.AddRange(new Control[] { label, textBox, okButton, cancelButton });
+            passwordForm.AcceptButton = okButton;
+            passwordForm.CancelButton = cancelButton;
+
+            // 텍스트박스에 포커스 설정
+            passwordForm.Load += (s, e) => textBox.Focus();
+
+            var result = passwordForm.ShowDialog();
+            var inputPassword = textBox.Text;
+
+            if (result != DialogResult.OK || string.IsNullOrEmpty(inputPassword))
+            {
+                MessageBox.Show("비밀번호를 입력해주세요.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            if (inputPassword != correctPassword)
+            {
+                MessageBox.Show("비밀번호가 올바르지 않습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+
+            return true;
+        }
     }
 } 

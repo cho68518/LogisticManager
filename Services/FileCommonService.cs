@@ -205,7 +205,7 @@ namespace LogisticManager.Services
                 {
                     File.Delete(filePath);
                     var logPrefix = string.IsNullOrEmpty(methodName) ? "" : $"[{methodName}] ";
-                    Console.WriteLine($"🗑️ {logPrefix}임시 파일 정리 완료: {filePath}");
+                    //Console.WriteLine($"🗑️ {logPrefix}임시 파일 정리 완료: {filePath}");
                     return true;
                 }
                 return true; // 파일이 없어도 성공으로 처리

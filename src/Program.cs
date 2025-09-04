@@ -1,6 +1,7 @@
 using LogisticManager.Forms;
 using LogisticManager.Services;
 using System.Text;
+// Squirrel.Windows 패키지 제거됨
 
 namespace LogisticManager
 {

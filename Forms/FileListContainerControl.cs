@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using System.IO;
+using System.Diagnostics;
+using System.Threading.Tasks;
+using LogisticManager.Services;
 
 namespace LogisticManager.Forms
 {
@@ -15,6 +19,7 @@ namespace LogisticManager.Forms
         
         private readonly ListView _listView;
         private readonly List<FileInfo> _fileInfos = new();
+        private readonly DropboxService _dropboxService;
         
         // 색상 상수
         private readonly Color _backgroundColor = Color.White;
@@ -49,6 +54,9 @@ namespace LogisticManager.Forms
             this.BackColor = _backgroundColor;
             this.BorderStyle = BorderStyle.FixedSingle;
             
+            // DropboxService 초기화
+            _dropboxService = DropboxService.Instance;
+            
             // ListView 생성 및 설정
             _listView = new ListView
             {
@@ -72,6 +80,7 @@ namespace LogisticManager.Forms
             
             // 이벤트 핸들러 등록
             _listView.ItemChecked += ListView_ItemChecked;
+            _listView.DoubleClick += ListView_DoubleClick; // 더블클릭 이벤트 추가
             
             // 컨트롤 추가
             this.Controls.Add(_listView);
@@ -235,9 +244,109 @@ namespace LogisticManager.Forms
             }
         }
         
+        /// <summary>
+        /// 파일 더블클릭 시 바로 열기
+        /// </summary>
+        private async void ListView_DoubleClick(object? sender, EventArgs e)
+        {
+            if (_listView.SelectedItems.Count == 0) return;
+            
+            var selectedItem = _listView.SelectedItems[0];
+            if (selectedItem.Tag is FileInfo fileInfo)
+            {
+                await OpenFileDirectly(fileInfo);
+            }
+        }
+        
         #endregion
 
         #region 비공개 메서드 (Private Methods)
+        
+        /// <summary>
+        /// 파일을 바로 열기 (다운로드 후 시스템 기본 프로그램으로 열기)
+        /// </summary>
+        private async Task OpenFileDirectly(FileInfo fileInfo)
+        {
+            try
+            {
+                // 상태 업데이트
+                UpdateFileStatus(fileInfo.FileName, "다운로드 중...");
+                
+                // 임시 디렉토리 생성
+                var tempDir = Path.Combine(Path.GetTempPath(), "LogisticManager");
+                Directory.CreateDirectory(tempDir);
+                
+                // 임시 파일 경로 생성
+                var tempFilePath = Path.Combine(tempDir, fileInfo.FileName);
+                
+                // 기존 임시 파일이 있으면 삭제
+                if (File.Exists(tempFilePath))
+                {
+                    File.Delete(tempFilePath);
+                }
+                
+                // Dropbox에서 파일 다운로드
+                if (!string.IsNullOrEmpty(fileInfo.DropboxPath))
+                {
+                    var downloadSuccess = await _dropboxService.DownloadFileAsync(fileInfo.DropboxPath, tempFilePath);
+                    
+                    if (downloadSuccess && File.Exists(tempFilePath))
+                    {
+                        // 상태 업데이트
+                        UpdateFileStatus(fileInfo.FileName, "열기 중...");
+                        
+                        // 시스템 기본 프로그램으로 파일 열기
+                        var process = new Process();
+                        process.StartInfo.FileName = tempFilePath;
+                        process.StartInfo.UseShellExecute = true;
+                        
+                        if (process.Start())
+                        {
+                            UpdateFileStatus(fileInfo.FileName, "완료");
+                            
+                            // 파일 열기 성공 이벤트 발생
+                            OnFileOpened(fileInfo, tempFilePath);
+                        }
+                        else
+                        {
+                            UpdateFileStatus(fileInfo.FileName, "열기 실패");
+                            MessageBox.Show($"파일을 열 수 없습니다: {fileInfo.FileName}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                    else
+                    {
+                        UpdateFileStatus(fileInfo.FileName, "다운로드 실패");
+                        MessageBox.Show($"파일 다운로드에 실패했습니다: {fileInfo.FileName}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+                else
+                {
+                    UpdateFileStatus(fileInfo.FileName, "경로 없음");
+                    MessageBox.Show($"파일 경로 정보가 없습니다: {fileInfo.FileName}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                UpdateFileStatus(fileInfo.FileName, "오류");
+                MessageBox.Show($"파일 열기 중 오류가 발생했습니다:\n{ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                System.Diagnostics.Debug.WriteLine($"파일 열기 오류: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// 파일 상태 업데이트
+        /// </summary>
+        private void UpdateFileStatus(string fileName, string status)
+        {
+            foreach (ListViewItem item in _listView.Items)
+            {
+                if (item.Text == fileName)
+                {
+                    item.SubItems[3].Text = status; // 상태 컬럼 업데이트
+                    break;
+                }
+            }
+        }
         
         /// <summary>
         /// 빈 상태를 표시합니다
@@ -258,7 +367,7 @@ namespace LogisticManager.Forms
             // 빈 상태 라벨 생성
             var emptyLabel = new Label
             {
-                Text = "📁 업로드된 파일이 없습니다.\n파일을 처리하면 여기에 표시됩니다.",
+                Text = "📁 업로드된 파일이 없습니다.\n파일을 처리하면 여기에 표시됩니다.\n\n💡 파일을 더블클릭하면 바로 열 수 있습니다.",
                 Font = new Font("맑은 고딕", 9),
                 ForeColor = Color.FromArgb(127, 140, 141),
                 TextAlign = ContentAlignment.MiddleCenter,
@@ -306,9 +415,19 @@ namespace LogisticManager.Forms
         /// </summary>
         public event EventHandler? CardCheckedChanged;
         
+        /// <summary>
+        /// 파일이 열렸을 때 발생하는 이벤트
+        /// </summary>
+        public event EventHandler<FileOpenedEventArgs>? FileOpened;
+        
         protected virtual void OnCardCheckedChanged()
         {
             CardCheckedChanged?.Invoke(this, EventArgs.Empty);
+        }
+        
+        protected virtual void OnFileOpened(FileInfo fileInfo, string localFilePath)
+        {
+            FileOpened?.Invoke(this, new FileOpenedEventArgs(fileInfo, localFilePath));
         }
         
         #endregion
@@ -325,6 +444,21 @@ namespace LogisticManager.Forms
             public DateTime UploadTime { get; set; }
             public string? DropboxPath { get; set; }
             public bool IsChecked { get; set; }
+        }
+        
+        /// <summary>
+        /// 파일 열기 이벤트 인수
+        /// </summary>
+        public class FileOpenedEventArgs : EventArgs
+        {
+            public FileInfo FileInfo { get; }
+            public string LocalFilePath { get; }
+            
+            public FileOpenedEventArgs(FileInfo fileInfo, string localFilePath)
+            {
+                FileInfo = fileInfo;
+                LocalFilePath = localFilePath;
+            }
         }
         
         #endregion

@@ -272,26 +272,27 @@ namespace LogisticManager.Processors
         /// 📋 주요 기능:
         /// - Excel 파일에서 주문 데이터 로드 및 검증
         /// - 데이터베이스 초기화 및 대용량 데이터 적재
-        /// - 단계별 송장 처리 (4-1 ~ 4-22)
+        /// - 단계별 송장 처리 (4-1 ~ 4-24)
         /// - 진행률 보고 및 오류 처리
         /// 
         /// 🎯 매개변수:
         /// - filePath: 처리할 Excel 파일 경로
         /// - progress: 진행 상황 텍스트 보고용 콜백
         /// - progressReporter: 진행률 퍼센트 보고용 콜백
-        /// - maxStep: 최대 처리 단계 (기본값: 22, 전체 처리)
+        /// - maxStep: 최대 처리 단계 (기본값: 24, 전체 처리)
         /// 
         /// 📊 처리 단계:
         /// - 4-1 ~ 4-6: 기본 데이터 처리
         /// - 4-7 ~ 4-14: 지역별 처리 (서울, 경기, 부산)
-        /// - 4-15 ~ 4-22: 최종 처리 및 파일 생성
+        /// - 4-15 ~ 4-20: 지역별 최종 파일 생성
+        /// - 4-21 ~ 4-24: 감천냉동 처리 및 최종 통합 처리
         /// </summary>
         /// <param name="filePath">Excel 파일 경로</param>
         /// <param name="progress">진행 상황 텍스트 콜백</param>
         /// <param name="progressReporter">진행률 퍼센트 콜백</param>
-        /// <param name="maxStep">최대 처리 단계 (1~22, 기본값: 22)</param>
+        /// <param name="maxStep">최대 처리 단계 (1~24, 기본값: 24)</param>
         /// <returns>처리 성공 여부</returns>
-        public async Task<bool> ProcessAsync(string filePath, IProgress<string>? progress = null, IProgress<int>? progressReporter = null, int maxStep = 22)
+        public async Task<bool> ProcessAsync(string filePath, IProgress<string>? progress = null, IProgress<int>? progressReporter = null, int maxStep = 24)
         {
             // 입력 파일 경로 검증
             if (string.IsNullOrEmpty(filePath))
@@ -301,9 +302,9 @@ namespace LogisticManager.Processors
             if (!File.Exists(filePath))
                 throw new FileNotFoundException($"Excel 파일을 찾을 수 없습니다: {filePath}");
 
-            // maxStep 매개변수 검증 (1~22 범위)
-            if (maxStep < 1 || maxStep > 22)
-                throw new ArgumentException("maxStep은 1에서 22 사이의 값이어야 합니다.", nameof(maxStep));
+                    // maxStep 매개변수 검증 (1~24 범위)
+        if (maxStep < 1 || maxStep > 24)
+            throw new ArgumentException("maxStep은 1에서 24 사이의 값이어야 합니다.", nameof(maxStep));
 
             try
             {
@@ -325,8 +326,8 @@ namespace LogisticManager.Processors
                 finalProgress?.Report("🚀 [물류 시스템] 송장 처리를 시작합니다...");
                 finalProgress?.Report("📋 처리 대상 파일: " + Path.GetFileName(filePath));
                 finalProgress?.Report("⏰ 처리 시작 시각: " + workflowStartTime.ToString("yyyy-MM-dd HH:mm:ss"));
-                // 🎯 처리 단계 제한 정보 표시 (22단계 전체 처리 시에는 표시하지 않음)
-                if (maxStep < 22)
+                // 🎯 처리 단계 제한 정보 표시 (24단계 전체 처리 시에는 표시하지 않음)
+                if (maxStep < 24)
                 {
                     finalProgress?.Report($"🎯 처리 단계 제한: 4-1 ~ 4-{maxStep} (총 {maxStep}단계)");
                 }
@@ -394,7 +395,7 @@ namespace LogisticManager.Processors
 
                 
                 // === 1단계 완료 및 데이터 통계 보고 ===
-                finalProgressReporter?.Report(5);
+                finalProgressReporter?.Report(4); // 4-1단계 완료 (4%)
                 finalProgress?.Report($"✅ [1단계 완료] 총 {originalData.Rows.Count:N0}건의 주문 데이터 로드 성공");
                 finalProgress?.Report("");
 
@@ -420,7 +421,7 @@ namespace LogisticManager.Processors
                 finalProgress?.Report("✅ 원본 테이블에 데이터 삽입 완료");
                 
                 // === 2단계 완료 및 성능 통계 보고 ===
-                finalProgressReporter?.Report(10);
+                finalProgressReporter?.Report(8); // 4-2단계 완료 (8%)
                 finalProgress?.Report("✅ [2단계 완료] 프로시저를 통한 데이터 처리 완료");
                 finalProgress?.Report("📈 다음 단계: 1차 데이터 정제 및 비즈니스 규칙 적용 준비 완료");
 
@@ -428,7 +429,7 @@ namespace LogisticManager.Processors
                 // 3단계: 1차 데이터 정제 및 비즈니스 규칙 적용
                 finalProgress?.Report("🔧 [3단계] 비즈니스 규칙 적용");
                 await ProcessFirstStageDataOptimized(finalProgress);
-                finalProgressReporter?.Report(20);
+                finalProgressReporter?.Report(12); // 4-3단계 완료 (12%)
                 finalProgress?.Report("✅ [3단계] 비즈니스 규칙 적용 완료");
                 finalProgress?.Report("");
 
@@ -436,15 +437,16 @@ namespace LogisticManager.Processors
                  
                 finalProgress?.Report("⭐ [4단계]  특수 처리 시작");
                 
-                //----------------------------------------------------------------------------------------------
-                // 송장출력 메세지 생성
-                // [4-1] 송장출력 메세지 처리 단계 - 오류 발생 시 프로세스 중단 및 메인창 로그(finalProgress)로 오류 메시지 전달
+                //=======================================================================
+                #region [4-1] 송장메세지
+                #endregion
+                //=======================================================================
                 try
                 {
                     finalProgress?.Report("❄️ [4-1] 송장출력 메세지 처리");
                     _stepReporter?.ReportStepProgress(0); // 4-1 단계 (0부터 시작하므로 0)
                     LogManagerService.LogInfo("🔍 ProcessInvoiceMessageData 메서드 호출 시작...");
-                    finalProgressReporter?.Report(5);
+                    finalProgressReporter?.Report(4); // 4-1단계 완료 (4%)
                     await ProcessInvoiceMessageData(); // 📝 4-1 송장출력 메세지 데이터 처리
                     LogManagerService.LogInfo("✅ ProcessInvoiceMessageData 메서드 호출 완료");
                     finalProgress?.Report("✅ [4-1] 송장출력 메세지 처리 완료");
@@ -472,17 +474,17 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                //----------------------------------------------------------------------------------------------
-                //합포장 처리 프로시져 호출
-                // 🎁 합포장 최적화 프로시저 호출 (ProcessMergePacking)
-                // 한글 주석: 합포장 최적화 처리 단계에서 오류 발생 시 프로세스 중단 및 메인창 로그(finalProgress)로 오류 메시지 전달
+                //=======================================================================
+                #region [4-2] 합포장
+                #endregion
+                //=======================================================================
                 try
                 {
                     finalProgress?.Report("❄️ [4-2] 합포장 최적화 처리");
                     _stepReporter?.ReportStepProgress(1); // 4-2 단계 (0부터 시작하므로 1)
                     LogManagerService.LogInfo("🔍 ProcessMergePacking 메서드 호출 시작...");
                     await ProcessMergePacking(); // 📝 4-2 합포장 최적화 프로시저 호출
-                    finalProgressReporter?.Report(9);
+                    finalProgressReporter?.Report(8); // 4-2단계 완료 (8%)
                     LogManagerService.LogInfo("✅ ProcessMergePacking 메서드 호출 완료");
                     finalProgress?.Report("✅ [4-2] 합포장 최적화 처리 완료");
                     _stepReporter?.ReportStepCompleted(1); // 4-2 단계 완료
@@ -509,17 +511,17 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                //----------------------------------------------------------------------------------------------                
-                // 송장분리처리 루틴 추가
-                // 감천 특별출고 처리 루틴
-                // [4-3] 감천 특별출고 처리 단계 - 오류 발생 시 프로세스 중단 및 메인창 로그(finalProgress)로 오류 메시지 전달
+                //=======================================================================
+                #region [4-3] 감천특별출고
+                #endregion
+                //======================================================================= 
                 try
                 {
                     finalProgress?.Report("❄️ [4-3] 감천 특별출고 처리");
                     _stepReporter?.ReportStepProgress(2); // 4-3 단계 (0부터 시작하므로 2)
                     LogManagerService.LogInfo("🔍 ProcessInvoiceSplit1 메서드 호출 시작...");
                     await ProcessInvoiceSplit1();
-                    finalProgressReporter?.Report(14);
+                    finalProgressReporter?.Report(12); // 4-3단계 완료 (12%)
                     LogManagerService.LogInfo("✅ ProcessInvoiceSplit1 메서드 호출 완료");       
                     finalProgress?.Report("✅ [4-3] 감천 특별출고 완료");
                     _stepReporter?.ReportStepCompleted(2); // 4-3 단계 완료
@@ -546,16 +548,10 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                //----------------------------------------------------------------------------------------------
-                // 판매입력_이카운트자료 (테이블 -> 엑셀 생성)
-                // - 윈도우: Win + . (마침표) 키를 누르면 이모지 선택창이 나옵니다.
-                // - macOS: Control + Command + Space 키를 누르면 이모지 선택창이 나옵니다.
-                // - 또는 https://emojipedia.org/ 사이트에서 원하는 이모지를 복사해서 사용할 수 있습니다.
-                // - C# 문자열에 직접 유니코드 이모지를 넣어도 되고, \uXXXX 형식의 유니코드 이스케이프를 사용할 수도 있습니다.
-                // 예시: finalProgress?.Report("✅ 처리 완료!"); // 이모지는 위 방법으로 복사해서 붙여넣기
-                // [4-4] 판매입력_이카운트자료 생성 및 업로드 처리 단계
-                // [4-4] 판매입력_이카운트자료 생성 및 업로드 처리 단계
-                // 한글 주석: 이 단계에서 오류 발생 시 프로세스를 중단하고, 오류 메시지를 메인창 로그(finalProgress)로 전달해야 함
+                //=======================================================================
+                #region [4-4] 이카운트자료
+                #endregion
+                //=======================================================================
                 try
                 {
                     // 한글 주석: [4-4] 판매입력_이카운트자료 생성 및 업로드 처리 단계 시작
@@ -563,7 +559,7 @@ namespace LogisticManager.Processors
                     _stepReporter?.ReportStepProgress(3); // 4-4 단계 (0부터 시작하므로 3)
                     LogManagerService.LogInfo("🔍 ProcessSalesInputData 메서드 호출 시작...");
                     LogManagerService.LogInfo($"🔍 ProcessSalesInputData 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                    finalProgressReporter?.Report(18);
+                    finalProgressReporter?.Report(16); // 4-4단계 완료 (16%)
                     LogManagerService.LogInfo("🔍 ProcessSalesInputData 메서드 실행 중...");
                     finalProgress?.Report("✅ [4-4] 판매입력_이카운트자료 생성 및 업로드 처리 완료");
                     _stepReporter?.ReportStepCompleted(3); // 4-4 단계 완료
@@ -595,16 +591,17 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                //----------------------------------------------------------------------------------------------
-                // 톡딜불가 처리
-                // [4-5] 톡딜불가 처리 단계 - 예외 발생 시 프로세스 중단 및 메인창 로그에 오류 메시지 표시 (finalProgress 사용)
+                //=======================================================================
+                #region [4-5] 톡딜불가
+                #endregion
+                //=======================================================================
                 try
                 {
                     finalProgress?.Report("❄️ [4-5] 톡딜불가 처리");
                     _stepReporter?.ReportStepProgress(4); // 4-5 단계 (0부터 시작하므로 4)
                     LogManagerService.LogInfo("🔍 ProcessTalkDealUnavailable 메서드 호출 시작...");
                     await ProcessTalkDealUnavailable(); // 📝 4-5 톡딜불가 처리
-                    finalProgressReporter?.Report(23);
+                    finalProgressReporter?.Report(20); // 4-5단계 완료 (20%)
                     LogManagerService.LogInfo("✅ ProcessTalkDealUnavailable 메서드 호출 완료");
                     finalProgress?.Report("✅ [4-5] 톡딜불가 처리 완료");
                     _stepReporter?.ReportStepCompleted(4); // 4-5 단계 완료
@@ -630,46 +627,17 @@ namespace LogisticManager.Processors
                                 throw;
                 }
 
-                //----------------------------------------------------------------------------------------------
-                // 송장출력관리 처리  
-                #region 송장출력관리 처리
-                // 배송메세지에서 별표지우기 
-                // 별표 품목코드 데이터입력 
-                // 별표1 = '★★★' (별표 배송메세지 데이터입력)
-                // 별표 수취인 데이터입력
-                // 별표 제주도
-                // 별표 고객 공통 마킹
-                // 박스상품 명칭변경
-                // 택배 박스 낱개 나누기
-                // 카카오 행사 송장 코드 (구현 하지 않음)
-                // 송장 출고지별로 구분
-                // 냉동 렉 위치 입력
-                // 냉동 공산 제품 중 작은 품목 합포장처리
-                // 빈 위치 업데이트
-                // 이름 주소 전화번호 합치기
-                // 냉동창고 공산품 송장분리입력
-                // 공통박스 분류작업
-                // 박스 공통늘리기
-                // 박스주문 순번 매기기1 (송장구분자에 순번 업데이트)
-                // 박스주문 주소업데이트
-                // 박스주소 순번 매기기2 (주소 업데이트, 주소에 순번 업데이트)
-                // 박스주문 수량1로변경
-                // 박스주문 유일자설정 (위치변환)
-                // 공통박스 수량 처리 (품목코드별로 수량을 합산하여 출력개수에 업데이트)
-                // 개별작업1	(송장구분최종 업데이트)
-	            //    : 서울낱개 중 서울 주소 + 쇼핑몰 조건
-	            //    : 서울박스 중 서울 주소 + 쇼핑몰 조건
-                // 개별작업2	(송장구분최종 업데이트)
-	            //   : 서울박스 중 서울 주소 → 서울박스
-                // [4-6] 송장출력관리 처리 단계 - 예외 발생 시 프로세스 중단 및 메인창 로그에 오류 메시지 표시 (finalProgress 사용)
+                //=======================================================================
+                #region [4-6] 송장처리
                 #endregion
+                //=======================================================================
                 try
                 {
                     finalProgress?.Report("❄️ [4-6] 송장출력관리 처리");
                     _stepReporter?.ReportStepProgress(5); // 4-6 단계 (0부터 시작하므로 5)
                     LogManagerService.LogInfo("🔍 ProcessInvoiceManagement 메서드 호출 시작...");
                     await ProcessInvoiceManagement(); // 📝 4-6 송장출력관리 처리
-                    finalProgressReporter?.Report(27);
+                    finalProgressReporter?.Report(24); // 4-6단계 완료 (24%)
                     LogManagerService.LogInfo("✅ ProcessInvoiceManagement 메서드 호출 완료");
                     finalProgress?.Report("✅ [4-6] 송장출력관리 처리 완료");
                     _stepReporter?.ReportStepCompleted(5); // 4-6 단계 완료
@@ -696,39 +664,17 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                // ==================== [서울냉동 처리] ========================================================
-                #region 서울냉동 처리
-                // 서울냉동처리
-                // (서울냉동) 서울서울낱개 분류
-                // (서울냉동) 택배수량 계산 및 송장구분자 업데이트
-                // (서울냉동) 송장구분자와 수량 곱 업데이트
-                // (서울냉동) 주소 + 수취인명 기반 송장구분자 합산
-                // (서울냉동) 택배수량1 올림 처리
-                // (서울냉동) 택배수량1에 따른 송장구분 업데이트
-                // (서울냉동) 주소 및 수취인명 유일성에 따른 송장구분 업데이트 시작
-                // (서울냉동) 서울냉동1장 분류
-                // (서울냉동) 서울냉동 단일 분류
-                // (서울냉동) 품목코드별 수량 합산 및 품목개수
-                // (서울냉동) 서울냉동 추가 분류
-                // (서울냉동) 서울냉동추가송장 테이블로 유니크 주소 행 이동
-                // (서울냉동) 서울냉동추가송장 업데이트
-                // (서울냉동) 서울냉동 추가송장 늘리기
-                // (서울냉동) 서울냉동추가송장 순번 매기기
-                // (서울냉동) 서울냉동추가송장 주소업데이트
-                // (서울냉동) 서울냉동추가 합치기
-                // (서울냉동) 서울냉동 테이블 마지막정리
-                // (서울냉동) 별표 행 이동 및 삭제
-                // (서울냉동) 별표1 기준으로 정렬하여 행 이동
-                // (서울냉동) 송장출력_서울냉동에서 송장출력_서울냉동_최종으로 데이터 이동
-                // (서울냉동) 송장출력_서울냉동_최종 테이블 업데이트(택배비용, 박스크기, 출력개수 업데이트) 
+                //=======================================================================
+                #region [4-7] 서울냉동
                 #endregion
+                //=======================================================================
                 try
                 {
                     finalProgress?.Report("❄️ [4-7] 서울냉동 처리");
                     _stepReporter?.ReportStepProgress(6); // 4-7 단계 (0부터 시작하므로 6)
                     LogManagerService.LogInfo("🔍 ProcessSeoulFrozenManagement 메서드 호출 시작...");
                     await ProcessSeoulFrozenManagement(); // 📝 4-7 서울냉동 처리
-                    finalProgressReporter?.Report(32);
+                    finalProgressReporter?.Report(28); // 4-7단계 완료 (28%)
                     LogManagerService.LogInfo("✅ ProcessSeoulFrozenManagement 메서드 호출 완료");
                     finalProgress?.Report("✅ [4-7] 서울냉동 처리 완료");
                     _stepReporter?.ReportStepCompleted(6); // 4-7 단계 완료
@@ -752,13 +698,15 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                //----------------------------------------------------------------------------------------------
-                // 서울냉동 최종파일 생성(업로드, 카카오워크)
+                //=======================================================================
+                #region [4-8] 서울냉동최종
+                #endregion
+                //=======================================================================
                 finalProgress?.Report("💾 [4-8] 서울냉동 최종파일 생성 및 업로드 처리");
                 _stepReporter?.ReportStepProgress(7); // 4-8 단계 (0부터 시작하므로 7)
                 LogManagerService.LogInfo("🔍 ProcessSeoulFrozenFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessSeoulFrozenFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                                    finalProgressReporter?.Report(36);
+                                    finalProgressReporter?.Report(32); // 4-8단계 완료 (32%)
                 LogManagerService.LogInfo("🔍 ProcessSeoulFrozenFinalFile 메서드 실행 중...");
                 finalProgress?.Report("✅ [4-8] 서울냉동 최종파일 생성 및 업로드 처리 완료");
                 _stepReporter?.ReportStepCompleted(7); // 4-8 단계 완료
@@ -790,38 +738,17 @@ namespace LogisticManager.Processors
                 }
 
 
-                // ==================== [경기냉동 처리] ========================================================
-                #region 경기냉동 처리
-                // (경기냉동) 경기냉동낱개 분류
-                // (경기냉동) 택배수량 계산 및 송장구분자 업데이트
-                // (경기냉동) 송장구분자와 수량 곱 업데이트
-                // (경기냉동) 주소 + 수취인명 기반 송장구분자 합산
-                // (경기냉동) 택배수량1 올림 처리
-                // (경기냉동) 택배수량1에 따른 송장구분 업데이트
-                // (경기냉동) 주소 및 수취인명 유일성에 따른 송장구분 업데이트 시작
-                // (경기냉동) 경기냉동1장 분류
-                // (경기냉동) 경기냉동 단일 분류
-                // (경기냉동) 품목코드별 수량 합산 및 품목개수
-                // (경기냉동) 경기냉동 추가 분류
-                // (경기냉동) 경기냉동추가송장 테이블로 유니크 주소 행 이동
-                // (경기냉동) 경기냉동추가송장 업데이트
-                // (경기냉동) 경기냉동 추가송장 늘리기
-                // (경기냉동) 경기냉동추가송장 순번 매기기
-                // (경기냉동) 경기냉동추가송장 주소업데이트
-                // (경기냉동) 경기냉동추가 합치기
-                // (경기냉동) 경기냉동 테이블 마지막정리
-                // (경기냉동) 별표 행 이동 및 삭제
-                // (경기냉동) 별표1 기준으로 정렬하여 행 이동
-                // (경기냉동) 송장출력_경기냉동에서 송장출력_경기냉동_최종으로 데이터 이동
-                // (경기냉동) 송장출력_경기냉동_최종 테이블 업데이트(택배비용, 박스크기, 출력개수 업데이트)     
+                //=======================================================================
+                #region [4-9] 경기냉동
                 #endregion
+                //=======================================================================
                 try
                 {
                     finalProgress?.Report("❄️ [4-9] 경기냉동 처리");           
                     _stepReporter?.ReportStepProgress(8); // 4-9 단계 (0부터 시작하므로 8)
                     LogManagerService.LogInfo("🔍 ProcessGyeonggiFrozenManagement 메서드 호출 시작...");
                     await ProcessGyeonggiFrozenManagement();
-                    finalProgressReporter?.Report(41);
+                    finalProgressReporter?.Report(36); // 4-9단계 완료 (36%)
                     LogManagerService.LogInfo("🔍 ProcessGyeonggiFrozenManagement 메서드 호출 완료...");
                     finalProgress?.Report("✅ [4-9] 경기냉동 처리 완료");
                     _stepReporter?.ReportStepCompleted(8); // 4-9 단계 완료
@@ -844,13 +771,15 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                //----------------------------------------------------------------------------------------------
-                // 경기냉동 최종파일 생성(업로드, 카카오워크)
+                //=======================================================================
+                #region [4-10] 경기냉동최종
+                #endregion
+                //=======================================================================
                 finalProgress?.Report("💾 [4-10] 경기냉동 최종파일 생성 및 업로드 처리");
                 _stepReporter?.ReportStepProgress(9); // 4-10 단계 (0부터 시작하므로 9)
                 LogManagerService.LogInfo("🔍 ProcessGyeonggiFrozenFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessGyeonggiFrozenFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(45);
+                finalProgressReporter?.Report(40); // 4-10단계 완료 (40%)
                 LogManagerService.LogInfo("🔍 ProcessGyeonggiFrozenFinalFile 메서드 실행 중...");
                 finalProgress?.Report("✅ [4-10] 경기냉동 최종파일 생성 및 업로드 처리 완료");
                 _stepReporter?.ReportStepCompleted(9); // 4-10 단계 완료
@@ -880,47 +809,96 @@ namespace LogisticManager.Processors
                 }
 
 
-                // ===================  = [서울공산 처리] ========================================================
-                #region 서울공산 처리
-                // (서울공산) 서울공산낱개 분류 
-                // (서울공산) 택배수량 계산 및 송장구분자 업데이트
-                // (서울공산) 송장구분자와 수량 곱 업데이트
-                // (서울공산) 주소 + 수취인명 기반 송장구분자 합산
-                // (서울공산) 택배수량1 올림 처리
-                // (서울공산) 택배수량1에 따른 송장구분 업데이트
-                // (서울공산) 주소 및 수취인명 유일성에 따른 송장구분 업데이트 시작
-                // (서울공산) 서울공산1장 분류
-                // (서울공산) 서울공산 단일 분류
-                // (서울공산) 품목코드별 수량 합산 및 품목개수
-                // (서울공산) 서울공산 추가 분류
-                // (서울공산) 서울공산추가송장 테이블로 유니크 주소 행 이동
-                // (서울공산) 서울공산추가송장 업데이트
-                // (서울공산) 서울공산 추가송장 늘리기
-                // (서울공산) 서울공산추가송장 순번 매기기
-                // (서울공산) 서울공산추가송장 주소업데이트
-                // (서울공산) 서울공산추가 합치기
-                // (서울공산) 서울공산 테이블 마지막정리
-                // (서울공산) 별표 행 이동 및 삭제
-                // (서울공산) 별표1 기준으로 정렬하여 행 이동
-                // (서울공산) 송장출력_서울공산에서 송장출력_서울공산_최종으로 데이터 이동
-                // (서울공산) 송장출력_서울공산_최종 테이블 업데이트(택배비용, 박스크기, 출력개수 업데이트)     
+                //=======================================================================
+                #region [4-11] 프랩원냉동
                 #endregion
+                //=======================================================================
                 try
                 {
-                    finalProgress?.Report("❄️ [4-11] 서울공산 처리");           
+                    finalProgress?.Report("❄️ [4-11] 프랩원냉동 처리");           
                     _stepReporter?.ReportStepProgress(10); // 4-11 단계 (0부터 시작하므로 10)
-                    LogManagerService.LogInfo("🔍 ProcessSeoulGongsanManagement 메서드 호출 시작...");
-                    await ProcessSeoulGongsanManagement();
-                    finalProgressReporter?.Report(50);
-                    LogManagerService.LogInfo("🔍 ProcessSeoulGongsanManagement 메서드 호출 완료...");
-                    finalProgress?.Report("✅ [4-11] 서울공산 처리 완료");
+                    LogManagerService.LogInfo("🔍 ProcessFrapwonFrozenManagement 메서드 호출 시작...");
+                    await ProcessFrapwonFrozenManagement();
+                    finalProgressReporter?.Report(44); // 4-11단계 완료 (44%)
+                    LogManagerService.LogInfo("🔍 ProcessFrapwonFrozenManagement 메서드 호출 완료...");
+                    finalProgress?.Report("✅ [4-11] 프랩원냉동 처리 완료");
                     _stepReporter?.ReportStepCompleted(10); // 4-11 단계 완료
                     finalProgress?.Report("");
 
-                    // maxStep 체크: 4-11까지만 처리하는 경우 종료
+                    // maxStep 체크: 4-9까지만 처리하는 경우 종료
                     if (maxStep <= 11)
                     {
                         finalProgress?.Report($"🛑 [제한] 4-11단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 프랩원냉동 처리까지 완료되었습니다.");
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogManagerService.LogError($"❌ ProcessFrapwonFrozenManagement 실행 중 오류 발생: {ex.Message}");
+                    LogManagerService.LogError($"❌ ProcessFrapwonFrozenManagement 오류 상세: {ex.StackTrace}");
+                    finalProgress?.Report($"❌ [프랩원냉동 처리 오류] {ex.Message}");
+
+                    throw;
+                }
+
+                //=======================================================================
+                #region [4-12] 프랩원냉동최종
+                #endregion
+                //=======================================================================
+                finalProgress?.Report("💾 [4-12] 프랩원 냉동 최종파일 생성 및 업로드 처리");
+                _stepReporter?.ReportStepProgress(11); // 4-12 단계 (0부터 시작하므로 11)
+                LogManagerService.LogInfo("🔍 ProcessFrapwonFrozenFinalFile 메서드 호출 시작...");
+                LogManagerService.LogInfo($"🔍 ProcessFrapwonFrozenFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                finalProgressReporter?.Report(48); // 4-12단계 완료 (48%)
+                LogManagerService.LogInfo("🔍 ProcessFrapwonFrozenFinalFile 메서드 실행 중...");
+                finalProgress?.Report("✅ [4-12] 프랩원냉동 최종파일 생성 및 업로드 처리 완료");
+                _stepReporter?.ReportStepCompleted(11); // 4-12 단계 완료
+                finalProgress?.Report("");
+
+                try
+                {
+                    var salesDataResult = await ProcessFrapwonFrozenFinalFile(); 
+                    LogManagerService.LogInfo($"✅ ProcessFrapwonFrozenFinalFile 메서드 호출 완료 - 결과: {salesDataResult}");
+                    LogManagerService.LogInfo($"✅ ProcessFrapwonFrozenFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+                    // maxStep 체크: 4-10까지만 처리하는 경우 종료
+                    if (maxStep <= 12)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-12단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 프랩원냉동 처리 및 최종파일 생성까지 완료되었습니다.");
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogManagerService.LogError($"❌ ProcessFrapwonFrozenFinalFile 실행 중 오류 발생: {ex.Message}");
+                    LogManagerService.LogError($"❌ ProcessFrapwonFrozenFinalFile 오류 상세: {ex.StackTrace}");
+                    finalProgress?.Report($"❌ [프랩원냉동 최종파일 생성 오류] {ex.Message}");
+
+                    throw;
+                }
+
+                //=======================================================================
+                #region [4-13] 서울공산
+                #endregion
+                //=======================================================================
+                try
+                {
+                    finalProgress?.Report("❄️ [4-13] 서울공산 처리");           
+                    _stepReporter?.ReportStepProgress(12); // 4-13 단계 (0부터 시작하므로 12)
+                    LogManagerService.LogInfo("🔍 ProcessSeoulGongsanManagement 메서드 호출 시작...");
+                    await ProcessSeoulGongsanManagement();
+                    finalProgressReporter?.Report(52); // 4-13단계 완료 (52%)
+                    LogManagerService.LogInfo("🔍 ProcessSeoulGongsanManagement 메서드 호출 완료...");
+                    finalProgress?.Report("✅ [4-13] 서울공산 처리 완료");
+                    _stepReporter?.ReportStepCompleted(12); // 4-13 단계 완료
+                    finalProgress?.Report("");
+
+                    // maxStep 체크: 4-11까지만 처리하는 경우 종료
+                    if (maxStep <= 13)
+                    {
+                        finalProgress?.Report($"🛑 [제한] 4-13단계까지만 처리 완료 (maxStep: {maxStep})");
                         finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산 처리까지 완료되었습니다.");
                         return true;
                     }
@@ -934,16 +912,18 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                //----------------------------------------------------------------------------------------------
-                // 서울공산 최종파일 생성(업로드, 카카오워크)
-                finalProgress?.Report("💾 [4-12] 서울공산 최종파일 생성 및 업로드 처리");
-                _stepReporter?.ReportStepProgress(11); // 4-12 단계 (0부터 시작하므로 11)
+                //=======================================================================
+                #region [4-14] 서울공산최종
+                #endregion
+                //=======================================================================
+                finalProgress?.Report("💾 [4-14] 서울공산 최종파일 생성 및 업로드 처리");
+                _stepReporter?.ReportStepProgress(13); // 4-14 단계 (0부터 시작하므로 13)
                 LogManagerService.LogInfo("🔍 ProcessSeoulGongsanFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessSeoulGongsanFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(54);
+                finalProgressReporter?.Report(52); // 4-13단계 완료 (52%)
                 LogManagerService.LogInfo("🔍 ProcessSeoulGongsanFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-12] 서울공산 최종파일 생성 및 업로드 처리 완료");
-                _stepReporter?.ReportStepCompleted(11); // 4-12 단계 완료
+                finalProgress?.Report("✅ [4-14] 서울공산 최종파일 생성 및 업로드 처리 완료");
+                _stepReporter?.ReportStepCompleted(13); // 4-14 단계 완료
                 finalProgress?.Report("");
 
                 try
@@ -953,9 +933,9 @@ namespace LogisticManager.Processors
                     LogManagerService.LogInfo($"✅ ProcessSeoulGongsanFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
                     // maxStep 체크: 4-12까지만 처리하는 경우 종료
-                    if (maxStep <= 12)
+                    if (maxStep <= 14)
                     {
-                        finalProgress?.Report($"🛑 [제한] 4-12단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report($"🛑 [제한] 4-14단계까지만 처리 완료 (maxStep: {maxStep})");
                         finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산 처리 및 최종파일 생성까지 완료되었습니다.");
                         return true;
                     }
@@ -969,26 +949,26 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                // ===================  = [경기 공산 처리] ========================================================
-                #region 경기공산 처리
-  
+                //=======================================================================
+                #region [4-15] 경기공산
                 #endregion
+                //=======================================================================
                 try
                 {
-                    finalProgress?.Report("❄️ [4-13] 경기공산 처리");           
-                    _stepReporter?.ReportStepProgress(12); // 4-13 단계 (0부터 시작하므로 12)
+                    finalProgress?.Report("❄️ [4-15] 경기공산 처리");           
+                    _stepReporter?.ReportStepProgress(14); // 4-15 단계 (0부터 시작하므로 14)
                     LogManagerService.LogInfo("🔍 ProcessGyeonggiGongsanManagement 메서드 호출 시작...");
                     await ProcessGyeonggiGongsanManagement();
-                    finalProgressReporter?.Report(59);
+                    finalProgressReporter?.Report(56); // 4-14단계 완료 (56%)
                     LogManagerService.LogInfo("🔍 ProcessGyeonggiGongsanManagement 메서드 호출 완료...");
-                    finalProgress?.Report("✅ [4-13] 경기공산 처리 완료");
-                    _stepReporter?.ReportStepCompleted(12); // 4-13 단계 완료
+                    finalProgress?.Report("✅ [4-15] 경기공산 처리 완료");
+                    _stepReporter?.ReportStepCompleted(14); // 4-15 단계 완료
                     finalProgress?.Report("");
 
                     // maxStep 체크: 4-13까지만 처리하는 경우 종료
-                    if (maxStep <= 13)
+                    if (maxStep <= 15)
                     {
-                        finalProgress?.Report($"🛑 [제한] 4-13단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report($"🛑 [제한] 4-15단계까지만 처리 완료 (maxStep: {maxStep})");
                         finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산 처리까지 완료되었습니다.");
                         return true;
                     }
@@ -1002,16 +982,18 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                //----------------------------------------------------------------------------------------------
-                // 경기공산 최종파일 생성(업로드, 카카오워크)
-                finalProgress?.Report("💾 [4-14] 경기공산 최종파일 생성 및 업로드 처리");
-                _stepReporter?.ReportStepProgress(13); // 4-14 단계 (0부터 시작하므로 13)
+                //=======================================================================
+                #region [4-16] 경기공산최종
+                #endregion
+                //=======================================================================
+                finalProgress?.Report("💾 [4-16] 경기공산 최종파일 생성 및 업로드 처리");
+                _stepReporter?.ReportStepProgress(15); // 4-16 단계 (0부터 시작하므로 15)
                 LogManagerService.LogInfo("🔍 ProcessGyeonggiGongsanFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessGyeonggiGongsanFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(63);
+                finalProgressReporter?.Report(60); // 4-15단계 완료 (60%)
                 LogManagerService.LogInfo("🔍 ProcessGyeonggiGongsanFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-14] 경기공산 최종파일 생성 및 업로드 처리 완료");
-                _stepReporter?.ReportStepCompleted(13); // 4-14 단계 완료
+                finalProgress?.Report("✅ [4-16] 경기공산 최종파일 생성 및 업로드 처리 완료");
+                _stepReporter?.ReportStepCompleted(15); // 4-16 단계 완료
                 finalProgress?.Report("");
 
                 try
@@ -1021,10 +1003,10 @@ namespace LogisticManager.Processors
                     LogManagerService.LogInfo($"✅ ProcessGyeonggiGongsanFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
                     // maxStep 체크: 4-14까지만 처리하는 경우 종료
-                    if (maxStep <= 14)
+                    if (maxStep <= 16)
                     {
-                        finalProgress?.Report($"🛑 [제한] 4-14단계까지만 처리 완료 (maxStep: {maxStep})");
-                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산 처리 및 최종파일 생성까지 완료되었습니다.");
+                        finalProgress?.Report($"🛑 [제한] 4-16단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 프랩원냉동, 서울공산, 경기공산 처리 및 최종파일 생성까지 완료되었습니다.");
                         return true;
                     }
                 }
@@ -1037,48 +1019,27 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                // ===================  = [부산청과 처리] ========================================================
-                #region 부산청과 처리
-                // (부산청과) 부산청과낱개 분류 
-                // (부산청과) 택배수량 계산 및 송장구분자 업데이트
-                // (부산청과) 송장구분자와 수량 곱 업데이트
-                // (부산청과) 주소 + 수취인명 기반 송장구분자 합산
-                // (부산청과) 택배수량1 올림 처리
-                // (부산청과) 택배수량1에 따른 송장구분 업데이트
-                // (부산청과) 주소 및 수취인명 유일성에 따른 송장구분 업데이트 시작
-                // (부산청과) 부산청과1장 분류
-                // (부산청과) 부산청과 단일 분류
-                // (부산청과) 품목코드별 수량 합산 및 품목개수
-                // (부산청과) 부산청과 추가 분류
-                // (부산청과) 부산청과추가송장 테이블로 유니크 주소 행 이동
-                // (부산청과) 부산청과추가송장 업데이트
-                // (부산청과) 부산청과 추가송장 늘리기
-                // (부산청과) 부산청과추가송장 순
-                // (부산청과) 부산청과추가송장 주소업데이트
-                // (부산청과) 부산청과추가 합치기
-                // (부산청과) 부산청과 테이블 마지막정리
-                // (부산청과) 별표 행 이동 및 삭제
-                // (부산청과) 별표1 기준으로 정렬하여 행 이동
-                // (부산청과) 송장출력_부산청과에서 송장출력_부산청과_최종으로 데이터 이동
-                // (부산청과) 송장출력_부산청과_최종 테이블 업데이트(택배비용, 박스크기, 출력개수 업데이트)     
+                //=======================================================================
+                #region [4-17] 부산청과
                 #endregion
+                //=======================================================================
                 try
                 {
-                    finalProgress?.Report("❄️ [4-15] 부산청과 처리");           
-                    _stepReporter?.ReportStepProgress(14); // 4-15 단계 (0부터 시작하므로 14)
+                    finalProgress?.Report("❄️ [4-17] 부산청과 처리");           
+                    _stepReporter?.ReportStepProgress(16); // 4-17 단계 (0부터 시작하므로 16)
                     LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaManagement 메서드 호출 시작...");
                     await ProcessBusanCheonggwaManagement();
-                    finalProgressReporter?.Report(68);
+                    finalProgressReporter?.Report(64); // 4-16단계 완료 (64%)
                     LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaManagement 메서드 호출 완료...");
-                    finalProgress?.Report("✅ [4-15] 부산청과 처리 완료");
-                    _stepReporter?.ReportStepCompleted(14); // 4-15 단계 완료
+                    finalProgress?.Report("✅ [4-17] 부산청과 처리 완료");
+                    _stepReporter?.ReportStepCompleted(15); // 4-16 단계 완료
                     finalProgress?.Report("");
 
                     // maxStep 체크: 4-15까지만 처리하는 경우 종료
-                    if (maxStep <= 15)
+                    if (maxStep <= 17)
                     {
-                        finalProgress?.Report($"🛑 [제한] 4-15단계까지만 처리 완료 (maxStep: {maxStep})");
-                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리까지 완료되었습니다.");
+                        finalProgress?.Report($"🛑 [제한] 4-17단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 프랩원냉동, 서울공산, 경기공산, 부산청과 처리까지 완료되었습니다.");
                         return true;
                     }
                 }
@@ -1116,17 +1077,18 @@ namespace LogisticManager.Processors
                 //    throw;
                 //}
 
-                // ===================  = [부산청과 최종파일 생성] ========================================================
-                // 부산청과 최종파일 생성(업로드, 카카오워크)
-                // 부산청과 운송장
-                finalProgress?.Report("💾 [4-16] 부산청과 최종파일 생성 및 업로드 처리");
-                _stepReporter?.ReportStepProgress(15); // 4-16 단계 (0부터 시작하므로 15)
+                //=======================================================================
+                #region [4-18] 부산청과최종
+                #endregion
+                //=======================================================================
+                finalProgress?.Report("💾 [4-18] 부산청과 최종파일 생성 및 업로드 처리");
+                _stepReporter?.ReportStepProgress(17); // 4-18 단계 (0부터 시작하므로 17)
                 LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessBusanCheonggwaFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(72);
+                finalProgressReporter?.Report(68); // 4-17단계 완료 (68%)
                 LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-16] 부산청과 최종파일 생성 및 업로드 처리 완료");
-                _stepReporter?.ReportStepCompleted(15); // 4-16 단계 완료
+                finalProgress?.Report("✅ [4-18] 부산청과 최종파일 생성 및 업로드 처리 완료");
+                _stepReporter?.ReportStepCompleted(16); // 4-17 단계 완료
                 finalProgress?.Report("");
 
                 try
@@ -1136,10 +1098,10 @@ namespace LogisticManager.Processors
                     LogManagerService.LogInfo($"✅ ProcessBusanCheonggwaFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
                     // maxStep 체크: 4-16까지만 처리하는 경우 종료
-                    if (maxStep <= 16)
+                    if (maxStep <= 18)
                     {
-                        finalProgress?.Report($"🛑 [제한] 4-16단계까지만 처리 완료 (maxStep: {maxStep})");
-                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성까지 완료되었습니다.");
+                        finalProgress?.Report($"🛑 [제한] 4-18단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 프랩원냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성까지 완료되었습니다.");
                         return true;
                     }
                 }
@@ -1178,24 +1140,27 @@ namespace LogisticManager.Processors
                 //    throw;
                 //}
 
-                // ===================  = [부산청과자료 처리] ========================================================
+                //=======================================================================
+                #region [4-19] 부산청과자료
+                #endregion
+                //=======================================================================
                 try
                 {
-                    finalProgress?.Report("❄️ [4-17] 부산청과자료 처리");           
-                    _stepReporter?.ReportStepProgress(16); // 4-17 단계 (0부터 시작하므로 16)
+                    finalProgress?.Report("❄️ [4-19] 부산청과자료 처리");           
+                    _stepReporter?.ReportStepProgress(18); // 4-19 단계 (0부터 시작하므로 18)
                     LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaDoc 메서드 호출 시작...");
                     await ProcessBusanCheonggwaDoc();
-                    finalProgressReporter?.Report(77);
+                    finalProgressReporter?.Report(72); // 4-18단계 완료 (72%)
                     LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaDoc 메서드 호출 완료...");
-                    finalProgress?.Report("✅ [4-17] 부산청과자료 처리 완료");
-                    _stepReporter?.ReportStepCompleted(16); // 4-17 단계 완료
+                    finalProgress?.Report("✅ [4-19] 부산청과자료 처리 완료");
+                    _stepReporter?.ReportStepCompleted(17); // 4-18 단계 완료
                     finalProgress?.Report("");
 
                     // maxStep 체크: 4-17까지만 처리하는 경우 종료
-                    if (maxStep <= 17)
+                    if (maxStep <= 19)
                     {
-                        finalProgress?.Report($"🛑 [제한] 4-17단계까지만 처리 완료 (maxStep: {maxStep})");
-                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리까지 완료되었습니다.");
+                        finalProgress?.Report($"🛑 [제한] 4-19단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 프랩원냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리까지 완료되었습니다.");
                         return true;
                     }
                 }
@@ -1208,17 +1173,18 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                // ===================  = [부산청과자료 최종파일 생성] ========================================================
-                // 부산청과자료 최종파일 생성(업로드, 카카오워크)
-                // 부산청과 A4자료
-                finalProgress?.Report("💾 [4-18] 부산청과 A4자료 최종파일 생성 및 업로드 처리");
-                _stepReporter?.ReportStepProgress(17); // 4-18 단계 (0부터 시작하므로 17)
+                //=======================================================================
+                #region [4-20] 부산청과자료최종
+                #endregion
+                //=======================================================================
+                finalProgress?.Report("💾 [4-20] 부산청과 A4자료 최종파일 생성 및 업로드 처리");
+                _stepReporter?.ReportStepProgress(19); // 4-20 단계 (0부터 시작하므로 19)
                 LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaDocFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessBusanCheonggwaDocFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(81);
+                finalProgressReporter?.Report(76); // 4-19단계 완료 (76%)
                 LogManagerService.LogInfo("🔍 ProcessBusanCheonggwaDocFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-18] 부산청과 A4자료 최종파일 생성 및 업로드 처리 완료");
-                _stepReporter?.ReportStepCompleted(17); // 4-18 단계 완료
+                finalProgress?.Report("✅ [4-20] 부산청과 A4자료 최종파일 생성 및 업로드 처리 완료");
+                _stepReporter?.ReportStepCompleted(18); // 4-19 단계 완료
                 finalProgress?.Report("");
 
                 try
@@ -1228,10 +1194,10 @@ namespace LogisticManager.Processors
                     LogManagerService.LogInfo($"✅ ProcessBusanCheonggwaDocFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
                     // maxStep 체크: 4-18까지만 처리하는 경우 종료
-                    if (maxStep <= 18)
+                    if (maxStep <= 20)
                     {
-                        finalProgress?.Report($"🛑 [제한] 4-18단계까지만 처리 완료 (maxStep: {maxStep})");
-                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리 및 A4자료 최종파일 생성까지 완료되었습니다.");
+                        finalProgress?.Report($"🛑 [제한] 4-20단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 프랩원냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리 및 A4자료 최종파일 생성까지 완료되었습니다.");
                         return true;
                     }
                 }
@@ -1244,24 +1210,27 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                // ===================  [감천냉동 처리] ========================================================
+                //=======================================================================
+                #region [4-21] 감천냉동
+                #endregion
+                //=======================================================================
                 try
                 {
-                    finalProgress?.Report("❄️ [4-19] 감천냉동 처리");           
-                    _stepReporter?.ReportStepProgress(18); // 4-19 단계 (0부터 시작하므로 18)
+                    finalProgress?.Report("❄️ [4-21] 감천냉동 처리");           
+                    _stepReporter?.ReportStepProgress(20); // 4-21 단계 (0부터 시작하므로 20)
                     LogManagerService.LogInfo("🔍 ProcessGamcheonFrozenManagement 메서드 호출 시작...");
                     await ProcessGamcheonFrozenManagement();
-                    finalProgressReporter?.Report(86);
+                    finalProgressReporter?.Report(80); // 4-20단계 완료 (80%)
                     LogManagerService.LogInfo("🔍 ProcessGamcheonFrozenManagement 메서드 호출 완료...");
-                    finalProgress?.Report("✅ [4-19] 감천냉동 처리 완료");
-                    _stepReporter?.ReportStepCompleted(18); // 4-19 단계 완료
+                    finalProgress?.Report("✅ [4-21] 감천냉동 처리 완료");
+                    _stepReporter?.ReportStepCompleted(19); // 4-20 단계 완료
                     finalProgress?.Report("");
 
-                    // maxStep 체크: 4-19까지만 처리하는 경우 종료
-                    if (maxStep <= 19)
+                    // maxStep 체크: 4-21까지만 처리하는 경우 종료
+                    if (maxStep <= 21)
                     {
-                        finalProgress?.Report($"🛑 [제한] 4-19단계까지만 처리 완료 (maxStep: {maxStep})");
-                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리 및 A4자료 최종파일 생성, 감천냉동 처리까지 완료되었습니다.");
+                        finalProgress?.Report($"🛑 [제한] 4-21단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 프랩원냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리 및 A4자료 최종파일 생성, 감천냉동 처리까지 완료되었습니다.");
                         return true;
                     }
                 }
@@ -1274,17 +1243,18 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                // ===================  = [감천냉동 최종파일 생성] ========================================================
-                // 감천냉동 최종파일 생성(업로드, 카카오워크)
-                // 감천냉동 운송장
-                finalProgress?.Report("💾 [4-20] 감천냉동 최종파일 생성 및 업로드 처리");
-                _stepReporter?.ReportStepProgress(19); // 4-20 단계 (0부터 시작하므로 19)
+                //=======================================================================
+                #region [4-22] 감천냉동최종
+                #endregion
+                //=======================================================================
+                finalProgress?.Report("💾 [4-22] 감천냉동 최종파일 생성 및 업로드 처리");
+                _stepReporter?.ReportStepProgress(21); // 4-22 단계 (0부터 시작하므로 21)
                 LogManagerService.LogInfo("🔍 ProcessGamcheonFrozenFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessGamcheonFrozenFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(90);
+                finalProgressReporter?.Report(84); // 4-21단계 완료 (84%)
                 LogManagerService.LogInfo("🔍 ProcessGamcheonFrozenFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-20] 감천냉동 최종파일 생성 및 업로드 처리 완료");
-                _stepReporter?.ReportStepCompleted(19); // 4-20 단계 완료
+                finalProgress?.Report("✅ [4-22] 감천냉동 최종파일 생성 및 업로드 처리 완료");
+                _stepReporter?.ReportStepCompleted(20); // 4-21 단계 완료
                 finalProgress?.Report("");
 
                 try
@@ -1294,10 +1264,10 @@ namespace LogisticManager.Processors
                     LogManagerService.LogInfo($"✅ ProcessGamcheonFrozenFinalFile 완료 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
                     // maxStep 체크: 4-20까지만 처리하는 경우 종료
-                    if (maxStep <= 20)
+                    if (maxStep <= 22)
                     {
-                        finalProgress?.Report($"🛑 [제한] 4-20단계까지만 처리 완료 (maxStep: {maxStep})");
-                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리 및 A4자료 최종파일 생성, 감천냉동 처리 및 최종파일 생성까지 완료되었습니다.");
+                        finalProgress?.Report($"🛑 [제한] 4-22단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 프랩원냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리 및 A4자료 최종파일 생성, 감천냉동 처리 및 최종파일 생성까지 완료되었습니다.");
                         return true;
                     }
                 }
@@ -1310,24 +1280,27 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                // ===================  [송장출력 최종 처리] ========================================================
+                //=======================================================================
+                #region [4-23] 통합송장
+                #endregion
+                //=======================================================================
                 try
                 {
-                    finalProgress?.Report("❄️ [4-21] 송장출력 최종 처리");           
-                    _stepReporter?.ReportStepProgress(20); // 4-21 단계 (0부터 시작하므로 20)
+                    finalProgress?.Report("❄️ [4-23] 송장출력 최종 처리");           
+                    _stepReporter?.ReportStepProgress(22); // 4-23 단계 (0부터 시작하므로 22)
                     LogManagerService.LogInfo("🔍 ProcessInvoiceFinalManagement 메서드 호출 시작...");
                     await ProcessInvoiceFinalManagement();
-                    finalProgressReporter?.Report(95);
+                    finalProgressReporter?.Report(88); // 4-22단계 완료 (88%)
                     LogManagerService.LogInfo("🔍 ProcessInvoiceFinalManagement 메서드 호출 완료...");
-                    finalProgress?.Report("✅ [4-21] 송장출력 최종 처리 완료");
-                    _stepReporter?.ReportStepCompleted(20); // 4-21 단계 완료
+                    finalProgress?.Report("✅ [4-23] 송장출력 최종 처리 완료");
+                    _stepReporter?.ReportStepCompleted(21); // 4-22 단계 완료
                     finalProgress?.Report("");
 
                     // maxStep 체크: 4-21까지만 처리하는 경우 종료
-                    if (maxStep <= 21)
+                    if (maxStep <= 23)
                     {
-                        finalProgress?.Report($"🛑 [제한] 4-21단계까지만 처리 완료 (maxStep: {maxStep})");
-                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리 및 A4자료 최종파일 생성, 감천냉동 처리 및 최종파일 생성, 송장출력 최종 처리까지 완료되었습니다.");
+                        finalProgress?.Report($"🛑 [제한] 4-23단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 프랩원냉동, 서울공산, 경기공산, 부산청과 처리 및 최종파일 생성, 부산청과자료 처리 및 A4자료 최종파일 생성, 감천냉동 처리 및 최종파일 생성, 송장출력 최종 처리까지 완료되었습니다.");
                         return true;
                     }
                 }
@@ -1340,17 +1313,18 @@ namespace LogisticManager.Processors
                     throw;
                 }
 
-                // ===================  = [송장출력 최종파일 생성 (통합송장)] ========================================================
-                // 송장출력 최종파일 생성(업로드, 카카오워크)
-                // 통합송장
-                finalProgress?.Report("💾 [4-22] 송장출력 최종파일 생성 및 업로드 처리");
-                _stepReporter?.ReportStepProgress(21); // 4-22 단계 (0부터 시작하므로 21)
+                //=======================================================================
+                #region [4-24] 통합송장최종
+                #endregion
+                //=======================================================================
+                finalProgress?.Report("💾 [4-24] 송장출력 최종파일 생성 및 업로드 처리");
+                _stepReporter?.ReportStepProgress(23); // 4-24 단계 (0부터 시작하므로 23)
                 LogManagerService.LogInfo("🔍 ProcessInvoiceFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessInvoiceFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-                finalProgressReporter?.Report(100);
+                finalProgressReporter?.Report(92); // 4-23단계 완료 (92%)
                 LogManagerService.LogInfo("🔍 ProcessInvoiceFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-22] 송장출력 최종파일 생성 및 업로드 처리 완료");
-                _stepReporter?.ReportStepCompleted(21); // 4-22 단계 완료
+                finalProgress?.Report("✅ [4-24] 송장출력 최종파일 생성 및 업로드 처리 완료");
+                _stepReporter?.ReportStepCompleted(23); // 4-24 단계 완료
                 finalProgress?.Report("");
 
                 try
@@ -1361,9 +1335,9 @@ namespace LogisticManager.Processors
 
                     // maxStep 체크: 4-22까지 처리 완료 (전체 처리)
                     // maxStep이 22인 경우는 전체 처리가므로 제한 메시지 표시하지 않음
-                    if (maxStep < 22)
+                    if (maxStep < 24)
                     {
-                        finalProgress?.Report($"🛑 [제한] 4-22단계까지만 처리 완료 (maxStep: {maxStep})");
+                        finalProgress?.Report($"🛑 [제한] 4-24단계까지만 처리 완료 (maxStep: {maxStep})");
                         finalProgress?.Report("🎉 송장출력 메세지부터 송장출력 최종파일 생성까지 완료되었습니다!");
                         return true;
                     }
@@ -1481,8 +1455,9 @@ namespace LogisticManager.Processors
                 
                 // 🎉 전사 물류 시스템 워크플로우 성공적 완료 선언
                 finalProgress?.Report("🎉 물류 시스템 송장 처리 성공!");
+                finalProgressReporter?.Report(100); // 4-24단계 완료 (100%)
                 finalProgress?.Report($"⏱️ 총 처리 시간: {processingDuration.TotalSeconds:F1}초");
-                finalProgress?.Report($"📊 처리 완료: 총 22단계 처리됨");
+                finalProgress?.Report($"📊 처리 완료: 총 24단계 처리됨");
                 finalProgress?.Report($"✅ 최종 상태: 모든 송장 처리 완료");
 
                 return await Task.FromResult(true);
@@ -3077,6 +3052,94 @@ namespace LogisticManager.Processors
                 _progress?.Report(userErrorMessage);
                 
                 throw new Exception($"경기도냉동 처리 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// 프랩원냉동 관리 처리 메서드
+        /// </summary>
+        private async Task ProcessFrapwonFrozenManagement()
+        {
+            const string METHOD_NAME = "ProcessFrapwonFrozenManagement";
+            const string PROCEDURE_NAME = "sp_FrapwonProcessF";
+            
+            var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LOG_PATH);
+            var startTime = DateTime.Now;
+            
+            try
+            {
+                // 처리 시작 로깅
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 프랩원냉동 처리 시작 - {startTime:yyyy-MM-dd HH:mm:ss}");
+                
+                // 프로시저 실행
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 🚀 {PROCEDURE_NAME} 프로시저 호출 시작");
+                
+                string procedureResult = "";
+                var insertCount = 0;                 // 프랩원냉동 처리는 프로시저만 실행하므로 데이터 삽입 건수는 0
+                
+                try
+                {
+                    procedureResult = await ExecutePostProcessProcedureAsync(PROCEDURE_NAME);
+
+                    if (string.IsNullOrEmpty(procedureResult))
+                    {
+                        throw new InvalidOperationException("프로시저 실행 결과가 비어있습니다.");
+                    }
+
+                    // 오류 키워드 확인
+                    var errorKeywords = new[] { "Error", "오류", "실패", "Exception", "SQLSTATE", "ROLLBACK" };
+                    var hasError = errorKeywords.Any(keyword =>
+                        procedureResult.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+
+                    if (hasError)
+                    {
+                        throw new InvalidOperationException($"프로시저 실행 결과에 오류가 포함되어 있습니다: {procedureResult}");
+                    }
+
+                    // 프로시저 실행 완료 로그 - 멀티라인 결과를 각 줄별로 처리
+                    WriteLogWithFlush(logPath, $"[{METHOD_NAME}] ✅ {PROCEDURE_NAME} 프로시저 실행 완료:");
+                    
+                    // procedureResult가 멀티라인 문자열인 경우 각 줄을 개별적으로 로그에 기록
+                    if (!string.IsNullOrEmpty(procedureResult))
+                    {
+                        var resultLines = procedureResult.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (var line in resultLines)
+                        {
+                            if (!string.IsNullOrWhiteSpace(line))
+                            {
+                                WriteLogWithFlush(logPath, line);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteLogWithFlush(logPath, $"[{METHOD_NAME}] ❌ {PROCEDURE_NAME} 프로시저 실행 실패: {ex.Message}");
+                    throw;
+                }
+                
+                // 처리 완료
+                var endTime = DateTime.Now;
+                var duration = endTime - startTime;
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 🎉 프랩원냉동 처리 완료 - 소요시간: {duration.TotalSeconds:F1}초");
+                
+                // 성공 통계 로깅
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 📊 처리 통계 - 데이터: {insertCount:N0}건, 프로시저결과: {procedureResult}, 소요시간: {duration.TotalSeconds:F1}초");
+            }
+            catch (Exception ex)
+            {
+                // 오류 처리 및 로깅
+                var errorTime = DateTime.Now;
+                var errorDuration = errorTime - startTime;
+                
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] ❌ 오류 발생 - {errorTime:yyyy-MM-dd HH:mm:ss} (소요시간: {errorDuration.TotalSeconds:F1}초)");
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] ❌ 오류 상세: {ex.Message}");
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] ❌ 스택 트레이스: {ex.StackTrace}");
+                
+                var userErrorMessage = $"❌ 프랩원냉동 처리 실패: {ex.Message}";
+                _progress?.Report(userErrorMessage);
+                
+                throw new Exception($"프랩원냉동 처리 중 오류 발생: {ex.Message}", ex);
             }
         }
 
@@ -5114,6 +5177,7 @@ namespace LogisticManager.Processors
 
 
         #region 판매입력 데이터 처리 (Sales Input Data Processing)
+        #endregion
 
         /// <returns>처리 성공 여부 (bool)</returns>
         // 판매입력 이카운트 자료(송장출력_주문정보 테이블의 판매입력용 데이터)를 조회하여
@@ -5125,6 +5189,7 @@ namespace LogisticManager.Processors
             const string TABLE_NAME = "송장출력_주문정보";
             const string SHEET_NAME = "Sheet1";
             const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath4";
+            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.SalesData";
             const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
             
                 try
@@ -5323,8 +5388,9 @@ namespace LogisticManager.Processors
         {
             const string METHOD_NAME = "ProcessSeoulFrozenFinalFile";
             const string TABLE_NAME = "송장출력_서울냉동_최종";
-            const string SHEET_NAME = "서울냉동최종";
+            const string SHEET_NAME = "Sheet1";
             const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath7";
+            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.SeoulFrozen";
             const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
             try
@@ -5360,10 +5426,10 @@ namespace LogisticManager.Processors
                 if (seoulFrozenData == null || seoulFrozenData.Rows.Count == 0)
                 {
                     LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 서울냉동 최종 데이터가 없습니다.");
-                    return true;
+                    //return true;
                 }
 
-                LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {seoulFrozenData.Rows.Count:N0}건");
+                LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {seoulFrozenData?.Rows.Count ?? 0:N0}건");
 
                 // 3단계: Excel 파일 생성 (헤더 없음)
                 // {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx  
@@ -5372,6 +5438,13 @@ namespace LogisticManager.Processors
                 var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
                 
                 LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
+                
+                // [한글 주석] null 체크 후 Excel 파일 생성
+                if (seoulFrozenData == null)
+                {
+                    LogManagerService.LogError($"[{METHOD_NAME}] ❌ 서울냉동 데이터가 null입니다.");
+                    return false;
+                }
                 
                 var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(seoulFrozenData, excelFilePath, SHEET_NAME);
                 if (!excelCreated)
@@ -5564,7 +5637,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_경기냉동_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath8";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GyeonggiFrozen";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			// 로그 서비스 초기화 (LogManagerService로 통일)
 			try
@@ -5778,6 +5852,249 @@ namespace LogisticManager.Processors
 		}
 
 		/// <summary>
+		/// 프랩원냉동 최종 파일 처리 메서드
+		/// </summary>
+		/// <returns>처리 성공 여부</returns>
+		public async Task<bool> ProcessFrapwonFrozenFinalFile()
+		{
+			const string METHOD_NAME = "ProcessFrapwonFrozenFinalFile";
+			const string TABLE_NAME = "송장출력_프랩원냉동_최종";
+			const string SHEET_NAME = "Sheet1";
+			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath15";
+			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.FrapwonFrozen";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+
+			// 로그 서비스 초기화 (LogManagerService로 통일)
+			try
+			{
+				LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 프랩원냉동 최종 파일 처리 시작...");
+				LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 현재 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+				//LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 호출 스택 확인 중...");
+
+				LogPathManager.PrintLogPathInfo();
+				LogPathManager.ValidateLogFileLocations();
+
+				// 1단계: 테이블명 확인
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 대상 테이블: {TABLE_NAME}");
+
+				// 2단계: 데이터베이스에서 경기냉동 최종 데이터 조회 (직접 쿼리 사용)
+				// 주소, 수취인명, 전화번호1 기준으로 중복 제거하는 쿼리
+                // 간단한 쿼리
+                //var data = await _databaseCommonService.GetDataFromQuery("SELECT * FROM 테이블명");
+
+                // 매개변수가 있는 쿼리
+                //var data = await _databaseCommonService.GetDataFromQuery(
+                //    "SELECT * FROM 테이블명 WHERE 컬럼 = @값",
+                //    new Dictionary<string, object> { { "@값", "실제값" } }
+                //);
+
+                // 복잡한 쿼리 (JOIN, GROUP BY 등)
+                //var data = await _databaseCommonService.GetDataFromQuery(
+                //    "SELECT t1.*, t2.컬럼 FROM 테이블1 t1 JOIN 테이블2 t2 ON t1.id = t2.id"
+                //);
+				//var sqlQuery = $"SELECT DISTINCT `주소`, `수취인명`, `전화번호1`, * FROM `{TABLE_NAME}`";
+                //var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,
+                //우편번호,주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
+                //                   FROM (SELECT *,
+                //                            ROW_NUMBER() OVER (
+                //                                PARTITION BY 주소, 수취인명, 전화번호1 
+                //                                ORDER BY 주소, 수취인명, 전화번호1 ASC
+                //                            ) AS rn
+                //                          FROM {TABLE_NAME}
+                //                    ) AS ranked_rows
+                //                    WHERE rn = 1";
+
+                var sqlQuery = $@"SELECT *
+                                  FROM {TABLE_NAME}
+                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+
+				var frapwonFrozenData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
+
+				if (frapwonFrozenData == null || frapwonFrozenData.Rows.Count == 0)
+				{
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 프랩원냉동 최종 데이터가 없습니다.");
+					return true; // 데이터가 없는 것은 오류가 아님
+				}
+
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {frapwonFrozenData.Rows.Count:N0}건");
+
+				// 3단계: Excel 파일 생성 (헤더 없음)
+				// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
+				var excelFileName = _fileCommonService.GenerateExcelFileName("프랩원냉동", null);
+				var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
+
+				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
+
+				var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(frapwonFrozenData, excelFilePath, SHEET_NAME);
+				if (!excelCreated)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ Excel 파일 생성 실패: {excelFilePath}");
+					return false;
+				}
+
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Excel 파일 생성 완료: {excelFilePath}");
+
+				// 4단계: Dropbox에 파일 업로드
+				var dropboxFolderPath = ConfigurationManager.AppSettings[DROPBOX_FOLDER_PATH_KEY];
+				if (string.IsNullOrEmpty(dropboxFolderPath))
+				{
+					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {DROPBOX_FOLDER_PATH_KEY} 미설정 상태입니다.");
+					return false;
+				}
+
+				LogManagerService.LogInfo($"🔗 [{METHOD_NAME}] Dropbox 업로드 시작: {dropboxFolderPath}");
+
+				var dropboxFilePath = await _fileCommonService.UploadFileToDropbox(excelFilePath, dropboxFolderPath);
+				if (string.IsNullOrEmpty(dropboxFilePath))
+				{
+					LogManagerService.LogError($"❌ [{METHOD_NAME}] Dropbox 업로드 실패");
+					// 실패 원인 분석을 위한 추가 로깅
+					LogManagerService.LogError($"🔍 [{METHOD_NAME}] Dropbox 업로드 실패 원인 분석:");
+					LogManagerService.LogError($"   - Excel 파일 경로: {excelFilePath}");
+					LogManagerService.LogError($"   - Excel 파일 존재 여부: {File.Exists(excelFilePath)}");
+					LogManagerService.LogError($"   - Dropbox 폴더 설정: {dropboxFolderPath}");
+					return false;
+				}
+
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 업로드 완료: {dropboxFilePath}");
+
+				// [한글 주석] 업로드 성공 시: 파일목록에 파일명, 크기, 업로드시간 표시
+				if (_fileListCallback != null)
+				{
+					try
+					{
+						var uploadedFileInfo = new FileInfo(excelFilePath);
+						var uploadedFileName = Path.GetFileName(excelFilePath);
+						var uploadedFileSize = uploadedFileInfo.Length;
+						var uploadedTime = DateTime.Now;
+
+						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime, dropboxFilePath);
+						LogManagerService.LogInfo($"📋 [{METHOD_NAME}] 파일 목록에 추가됨: {uploadedFileName} ({uploadedFileSize:N0} bytes)");
+					}
+					catch (Exception ex)
+					{
+						LogManagerService.LogWarning($"⚠️ [{METHOD_NAME}] 파일 목록 추가 중 오류: {ex.Message}");
+					}
+				}
+
+				// 5단계: Dropbox 공유 링크 생성
+				LogManagerService.LogInfo($"[{METHOD_NAME}] Dropbox 공유 링크 생성 시작");
+
+				// Dropbox 설정 정보 로깅
+				var dropboxAppKey = ConfigurationManager.AppSettings["Dropbox.AppKey"];
+				var dropboxAppSecret = ConfigurationManager.AppSettings["Dropbox.AppSecret"];
+				var dropboxRefreshToken = ConfigurationManager.AppSettings["Dropbox.RefreshToken"];
+
+				LogManagerService.LogInfo($"🔑 [{METHOD_NAME}] Dropbox 설정 확인:");
+				LogManagerService.LogInfo($"   AppKey: {(string.IsNullOrEmpty(dropboxAppKey) ? "❌ 미설정" : "✅ 설정됨")}");
+				LogManagerService.LogInfo($"   AppSecret: {(string.IsNullOrEmpty(dropboxAppSecret) ? "❌ 미설정" : "✅ 설정됨")}");
+				LogManagerService.LogInfo($"   RefreshToken: {(string.IsNullOrEmpty(dropboxRefreshToken) ? "❌ 미설정" : "✅ 설정됨")}");
+
+				var sharedLink = await _fileCommonService.CreateDropboxSharedLink(dropboxFilePath);
+				if (string.IsNullOrEmpty(sharedLink))
+				{
+					LogManagerService.LogError($"❌ [{METHOD_NAME}] Dropbox 공유 링크 생성 실패");
+					// 실패 원인 분석을 위한 추가 로깅
+					LogManagerService.LogError($"🔍 [{METHOD_NAME}] 공유 링크 생성 실패 원인 분석:\n   - Dropbox 파일 경로: {dropboxFilePath}\n   - Dropbox 폴더 설정: {dropboxFolderPath}\n   - Excel 파일 경로: {excelFilePath}\n   - Dropbox 파일 존재 여부: {File.Exists(excelFilePath)}");
+					return false;
+				}
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
+
+				// 6단계: KakaoWork 채팅방에 알림 전송 (경기냉동 운송장)
+				// 송장 개수 계산 및 시간대별 차수 설정
+				var invoiceCount = frapwonFrozenData?.Rows.Count ?? 0;
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
+				
+				var kakaoWorkService = KakaoWorkService.Instance;
+				var now = DateTime.Now;
+				var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
+				
+				// 채팅방 ID 설정
+				var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+				if (string.IsNullOrEmpty(chatroomId))
+				{
+					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
+					return false;
+				}
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+				
+				try
+				{
+					// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+					// [한글 주석] KakaoWork 알림 전송 파라미터 설명
+					// NotificationType(알림 종류) 목록:
+					//   - SeoulFrozen        : 서울냉동
+					//   - GyeonggiFrozen     : 경기냉동
+					//   - FrapwonFrozen      : 프랩원냉동
+					//   - SeoulGongsan       : 서울공산
+					//   - GyeonggiGongsan    : 경기공산
+					//   - BusanCheonggwa     : 부산청과
+					//   - BusanCheonggwaPrint: 부산청과(출력)
+					//   - GamcheonFrozen     : 감천냉동
+					//   - SalesData          : 판매입력
+					//   - Integrated         : 통합송장
+					//   - Check              : 모니터링체크용(봇방)
+					// 파라미터:
+					//   NotificationType.FrapwonFrozen : 알림 종류(프랩원냉동)
+					//   batch : 시간대별 차수(예: 1차, 2차 등)
+					//   invoiceCount : 실제 송장 개수
+					//   sharedLink : Dropbox 공유 링크(URL)
+					//   chatroomId : 카카오워크 채팅방 ID
+					await kakaoWorkService.SendInvoiceNotificationAsync(
+						NotificationType.FrapwonFrozen,
+						batch,
+						invoiceCount,
+						sharedLink,
+						chatroomId);
+					
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
+				}
+				catch (Exception ex)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+					// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+				}
+
+				// 7단계: 임시 파일 정리
+				try
+				{
+					if (File.Exists(excelFilePath))
+					{
+						File.Delete(excelFilePath);
+						LogManagerService.LogInfo($"[{METHOD_NAME}] 🗑️ 임시 파일 정리 완료: {excelFilePath}");
+					}
+				}
+				catch (Exception ex)
+				{
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 임시 파일 정리 실패: {ex.Message}");
+					// 임시 파일 정리 실패는 전체 프로세스 실패로 처리하지 않음
+				}
+
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ 프랩원냉동 최종 파일 처리 완료");
+				return true;
+			}
+			catch (Exception ex)
+			{
+				var errorMessage = $"❌ [{METHOD_NAME}] 처리 중 오류 발생:\n   오류 내용: {ex.Message}";
+				var stackTraceMessage = $"📋 [{METHOD_NAME}] 스택 트레이스:\n   {ex.StackTrace}";
+
+				// app.log 파일에 오류 상세 정보 기록
+				LogManagerService.LogInfo(errorMessage);
+				LogManagerService.LogInfo(stackTraceMessage);
+
+				// 내부 예외가 있는 경우 추가 로그
+				if (ex.InnerException != null)
+				{
+					var innerErrorMessage = $"📋 [{METHOD_NAME}] 내부 예외:\n   오류 내용: {ex.InnerException.Message}";
+					LogManagerService.LogInfo(innerErrorMessage);
+				}
+
+				return false;
+			}
+		}
+
+		/// <summary>
 		/// 서울공산 최종 파일 처리 - Excel 파일 생성, Dropbox 업로드, Kakao Work 알림 전송
 		/// 
 		/// 📋 주요 기능:
@@ -5794,7 +6111,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_서울공산_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath9";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.SeoulGongsan";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -5830,10 +6148,10 @@ namespace LogisticManager.Processors
 				if (seoulGongsanData == null || seoulGongsanData.Rows.Count == 0)
 				{
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 서울공산 최종 데이터가 없습니다.");
-					return true;
+					//return true;
 				}
 
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {seoulGongsanData.Rows.Count:N0}건");
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {seoulGongsanData?.Rows.Count ?? 0:N0}건");
 
 				// 3단계: Excel 파일 생성 (헤더 없음)
 				// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
@@ -5842,6 +6160,13 @@ namespace LogisticManager.Processors
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
 
+				// [한글 주석] null 체크 후 Excel 파일 생성
+				if (seoulGongsanData == null)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ 서울공산 데이터가 null입니다.");
+					return false;
+				}
+				
 				var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(seoulGongsanData, excelFilePath, SHEET_NAME);
 				if (!excelCreated)
 				{
@@ -6009,7 +6334,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_경기공산_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath10";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GyeonggiGongsan";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -6242,7 +6568,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_부산청과_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath12";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanCheonggwa";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -6460,7 +6787,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_부산청과자료_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath12";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanCheonggwaDoc";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -6693,7 +7021,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_감천냉동_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath13";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GamcheonFrozen";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -6927,7 +7256,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath14";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Integrated";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -7144,7 +7474,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_부산청과_최종변환";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath12";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanExtCheonggwa";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -7432,7 +7763,7 @@ namespace LogisticManager.Processors
         }
 
 
-        #endregion
+        
 
 
     }

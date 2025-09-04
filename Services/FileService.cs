@@ -87,8 +87,26 @@ namespace LogisticManager.Services
         /// </summary>
         public FileService()
         {
-            // settings.json에서 파일 경로들을 읽어옴
-            var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
+            // Application.StartupPath를 사용하여 settings.json 파일 찾기
+            var startupPath = Application.StartupPath;
+            var configSettingsPath = Path.Combine(startupPath, "config", "settings.json");
+            var rootSettingsPath = Path.Combine(startupPath, "settings.json");
+            
+            string settingsPath;
+            
+            // config/settings.json을 우선적으로 사용, 없으면 루트의 settings.json 사용
+            if (File.Exists(configSettingsPath))
+            {
+                settingsPath = configSettingsPath;
+            }
+            else if (File.Exists(rootSettingsPath))
+            {
+                settingsPath = rootSettingsPath;
+            }
+            else
+            {
+                throw new FileNotFoundException("settings.json 파일을 찾을 수 없습니다.");
+            }
             var settings = new Dictionary<string, string>();
             
             try

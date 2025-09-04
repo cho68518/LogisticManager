@@ -432,7 +432,8 @@ namespace LogisticManager.Forms
             string timeText = $"총 처리 시간: {GetFormattedProcessingTime()}";
             
             // 폰트 크기를 더 작게 조정 (화면 크기에 따라)
-            float fontSize = Math.Max(6f, Math.Min(9f, this.Width / 120f));
+            //float fontSize = Math.Max(6f, Math.Min(9f, this.Width / 120f));
+            float fontSize = 9f;
             using (Font font = new Font("맑은 고딕", fontSize, FontStyle.Regular))
             using (StringFormat sf = new StringFormat())
             {

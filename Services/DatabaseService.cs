@@ -327,29 +327,29 @@ namespace LogisticManager.Services
         {
             try
             {
-                // 설정 파일 경로 우선순위: 1) 프로젝트 루트 config/settings.json, 2) 실행 폴더 settings.json
-                var projectRootPath = GetProjectRootPath();
-                var configSettingsPath = Path.Combine(projectRootPath, "config", DatabaseConstants.SETTINGS_FILE_NAME);
-                var executableSettingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DatabaseConstants.SETTINGS_FILE_NAME);
+                // Application.StartupPath를 사용하여 settings.json 파일 찾기
+                var startupPath = Application.StartupPath;
+                var configSettingsPath = Path.Combine(startupPath, "config", DatabaseConstants.SETTINGS_FILE_NAME);
+                var rootSettingsPath = Path.Combine(startupPath, DatabaseConstants.SETTINGS_FILE_NAME);
                 
                 string settingsPath;
                 
-                // 프로젝트 루트의 config/settings.json을 우선적으로 사용
+                // config/settings.json을 우선적으로 사용, 없으면 루트의 settings.json 사용
                 if (File.Exists(configSettingsPath))
                 {
                     settingsPath = configSettingsPath;
-                    LogManagerService.LogInfo($"🔍 DatabaseService: 프로젝트 루트 config/settings.json 사용: {settingsPath}");
+                    LogManagerService.LogInfo($"🔍 DatabaseService: config/settings.json 사용: {settingsPath}");
                 }
-                else if (File.Exists(executableSettingsPath))
+                else if (File.Exists(rootSettingsPath))
                 {
-                    settingsPath = executableSettingsPath;
-                    LogManagerService.LogInfo($"🔍 DatabaseService: 실행 폴더 settings.json 사용: {settingsPath}");
+                    settingsPath = rootSettingsPath;
+                    LogManagerService.LogInfo($"🔍 DatabaseService: 루트 settings.json 사용: {settingsPath}");
                 }
                 else
                 {
                     LogManagerService.LogError($"❌ DatabaseService: 설정 파일을 찾을 수 없습니다.");
-                    LogManagerService.LogError($"   프로젝트 루트: {configSettingsPath}");
-                    LogManagerService.LogError($"   실행 폴더: {executableSettingsPath}");
+                    LogManagerService.LogError($"   config 폴더: {configSettingsPath}");
+                    LogManagerService.LogError($"   루트 폴더: {rootSettingsPath}");
                     throw new InvalidOperationException(DatabaseConstants.ERROR_SETTINGS_FILE_COMPLETELY_MISSING);
                 }
                 

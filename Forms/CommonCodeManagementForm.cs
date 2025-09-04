@@ -752,6 +752,8 @@ namespace LogisticManager.Forms
                 {
                     await DeleteGroupCodeAsync(node);
                 });
+                // [한글 주석] 요구사항: 삭제 기능은 제거하지 말고 사용 불가 처리 (메뉴 숨김)
+                deleteMenuItem.Visible = false;
                 
                 contextMenu.Items.Add(deleteMenuItem);
                 
@@ -940,6 +942,12 @@ namespace LogisticManager.Forms
         {
             try
             {
+                // 비밀번호 확인
+                if (!ValidatePassword())
+                {
+                    return;
+                }
+
                 var commonCodes = GetCommonCodesFromDataGridView();
                 
                 if (commonCodes.Count == 0)
@@ -983,6 +991,12 @@ namespace LogisticManager.Forms
             if (dataGridViewCodes.SelectedRows.Count == 0)
             {
                 MessageBox.Show("삭제할 행을 선택해주세요.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // 비밀번호 확인
+            if (!ValidatePassword())
+            {
                 return;
             }
 
@@ -1166,6 +1180,86 @@ namespace LogisticManager.Forms
             {
                 SetTreeNodeColor(selectedNode, true);
             }
+        }
+
+        /// <summary>
+        /// 비밀번호 확인 메서드
+        /// </summary>
+        /// <returns>비밀번호가 올바르면 true, 그렇지 않으면 false</returns>
+        private bool ValidatePassword()
+        {
+            const string correctPassword = "gram0904";
+            
+            // 커스텀 비밀번호 입력 다이얼로그 생성
+            var passwordForm = new Form
+            {
+                Width = 300,
+                Height = 150,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                StartPosition = FormStartPosition.CenterParent,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                Text = "비밀번호 확인"
+            };
+
+            var label = new Label
+            {
+                Text = "관리자 비밀번호를 입력하세요:",
+                Left = 20,
+                Top = 20,
+                Width = 260
+            };
+
+            var textBox = new TextBox
+            {
+                Left = 20,
+                Top = 45,
+                Width = 260,
+                PasswordChar = '*',
+                UseSystemPasswordChar = true
+            };
+
+            var okButton = new Button
+            {
+                Text = "확인",
+                Left = 100,
+                Top = 75,
+                Width = 80,
+                DialogResult = DialogResult.OK
+            };
+
+            var cancelButton = new Button
+            {
+                Text = "취소",
+                Left = 190,
+                Top = 75,
+                Width = 80,
+                DialogResult = DialogResult.Cancel
+            };
+
+            passwordForm.Controls.AddRange(new Control[] { label, textBox, okButton, cancelButton });
+            passwordForm.AcceptButton = okButton;
+            passwordForm.CancelButton = cancelButton;
+
+            // 텍스트박스에 포커스 설정
+            passwordForm.Load += (s, e) => textBox.Focus();
+
+            var result = passwordForm.ShowDialog();
+            var inputPassword = textBox.Text;
+
+            if (result != DialogResult.OK || string.IsNullOrEmpty(inputPassword))
+            {
+                MessageBox.Show("비밀번호를 입력해주세요.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            if (inputPassword != correctPassword)
+            {
+                MessageBox.Show("비밀번호가 올바르지 않습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+
+            return true;
         }
 
         #endregion

@@ -6,6 +6,7 @@ using LogisticManager.Forms;
 using System.Drawing.Drawing2D;
 using System.Configuration;
 using System.Reflection; // 버전 정보를 얻기 위해 필요
+using System.IO; // 파일 및 경로 처리용
 
 namespace LogisticManager.Forms
 {
@@ -44,6 +45,16 @@ namespace LogisticManager.Forms
         private readonly ApiService _apiService;
         
         /// <summary>
+        /// 공통 코드 리포지토리 - 사용자 인증 및 기타 데이터베이스 작업 담당
+        /// </summary>
+        private readonly ICommonCodeRepository _commonCodeRepository;
+
+        /// <summary>
+        /// 인증 서비스 - 사용자 로그인 및 인증 상태 관리
+        /// </summary>
+        private AuthenticationService _authenticationService = null!;
+        
+        /// <summary>
         /// 사용자가 선택한 Excel 파일의 전체 경로
         /// </summary>
         private string? _selectedFilePath;
@@ -66,6 +77,7 @@ namespace LogisticManager.Forms
         /// 설정 버튼 - 데이터베이스/API 설정 창 열기
         /// </summary>
         private Button btnSettings = null!;
+        private CheckBox chkKakaoSend = null!; // [한글 주석] 카카오워크 전송 여부 체크박스
         
         /// <summary>
         /// 선택된 파일 경로 표시 라벨
@@ -153,6 +165,21 @@ namespace LogisticManager.Forms
         private StatusStrip statusStrip = null!;
         private ToolStripStatusLabel toolStripStatusLabelDateTime = null!;
 
+        /// <summary>
+        /// 현재 로그인된 사용자명 표시 라벨
+        /// </summary>
+        private Label lblCurrentUser = null!;
+
+        /// <summary>
+        /// 툴팁 컨트롤 (사용자명 전체 표시용)
+        /// </summary>
+        private ToolTip toolTip = null!;
+
+        /// <summary>
+        /// 비밀번호 변경 버튼 (열쇠 아이콘)
+        /// </summary>
+        private Button btnChangePassword = null!;
+
         #endregion
 
         #region 생성자 (Constructor)
@@ -163,7 +190,8 @@ namespace LogisticManager.Forms
         /// 초기화 순서:
         /// 1. 폼 기본 설정 (InitializeComponent)
         /// 2. 서비스 객체들 초기화 (FileService, DatabaseService, ApiService)
-        /// 3. UI 컨트롤들 생성 및 배치 (InitializeUI)
+        /// 3. 로그인 체크 (App.config 설정에 따라)
+        /// 4. UI 컨트롤들 생성 및 배치 (InitializeUI)
         /// </summary>
         public MainForm()
         {
@@ -173,6 +201,23 @@ namespace LogisticManager.Forms
             _fileService = new FileService();
             _databaseService = DatabaseService.Instance; // Singleton 인스턴스 사용
             _apiService = new ApiService();
+            _commonCodeRepository = new CommonCodeRepository(_databaseService);
+            _authenticationService = new AuthenticationService(_databaseService);
+            
+            // 로그인 체크 및 처리
+            if (!CheckLoginRequired())
+            {
+                // 로그인이 필요하지 않거나 로그인에 실패한 경우
+                LogMessage("⚠️ 로그인이 완료되지 않았습니다. 프로그램을 종료합니다.");
+                
+                // 폼을 안전하게 닫고 애플리케이션 종료
+                this.BeginInvoke(new Action(() =>
+                {
+                    this.Close();
+                    Application.Exit();
+                }));
+                return;
+            }
             
             InitializeUI();
             
@@ -225,6 +270,12 @@ namespace LogisticManager.Forms
         /// </summary>
         private void InitializeUI()
         {
+            // App.config에서 Login 설정 읽기
+            string loginSetting = System.Configuration.ConfigurationManager.AppSettings["Login"] ?? "N";
+            bool showUserInfo = loginSetting.ToUpper() == "Y";
+            
+            // 로그에 설정값 출력
+            LogMessage($"🔍 MainForm: Login 설정값 = '{loginSetting}', showUserInfo = {showUserInfo}");
             // 폼 기본 설정 (상단 좌측 창 제목에 버전과 차수 정보 표시)
             this.Text = GetBatchTitle($"송장 처리 시스템 ({GetAppVersionString()})");
             this.Size = new Size(1100, 900); // 폼 크기를 1100으로 조정
@@ -234,6 +285,21 @@ namespace LogisticManager.Forms
             this.MinimizeBox = true; // 최소화 버튼 활성화
             this.MinimumSize = new Size(1000, 700); // 최소 크기도 더 크게 조정
             this.BackColor = Color.FromArgb(240, 244, 248); // 연한 회색 배경
+            
+            // 폼 아이콘 설정 (invoice.ico 사용)
+            try
+            {
+                string iconPath = Path.Combine(Application.StartupPath, "invoice.ico");
+                if (File.Exists(iconPath))
+                {
+                    this.Icon = new Icon(iconPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                // 아이콘 로드 실패 시 로그 기록 (사용자에게는 표시하지 않음)
+                LogMessage($"⚠️ 아이콘 로드 실패: {ex.Message}");
+            }
 
             // 타이틀 라벨 생성 및 설정 (배치구분규칙에 따른 동적 타이틀 표시)
             lblTitle = new Label
@@ -266,13 +332,104 @@ namespace LogisticManager.Forms
             btnSettings = CreateModernButton("⚙️ 설정/확인", new Point(690, 80), new Size(90, 40), Color.FromArgb(52, 152, 219));
             btnSettings.Click += BtnSettings_Click;
 
+            // [한글 주석] 카카오워크 전송 체크박스 생성 (설정 버튼 왼쪽)
+            var kakaoCheckValue = System.Configuration.ConfigurationManager.AppSettings["KakaoCheck"] ?? "N";
+            bool isKakaoChecked = kakaoCheckValue.Equals("Y", StringComparison.OrdinalIgnoreCase);
+            chkKakaoSend = new CheckBox
+            {
+                Text = "카카오워크 전송",
+                AutoSize = true,
+                Location = new Point(btnSettings.Location.X - 120, 88), // 설정 버튼 왼쪽에 배치
+                Font = new Font("맑은 고딕", 9F, FontStyle.Bold), // 굵은 글꼴 적용
+                Checked = isKakaoChecked
+            };
+            // [한글 주석] 체크 변경 시 App.config 값 업데이트
+            chkKakaoSend.CheckedChanged += (s, e) =>
+            {
+                try
+                {
+                    // 체크되면 'Y', 아니면 'N'으로 설정
+                    string newValue = chkKakaoSend.Checked ? "Y" : "N";
+                    var config = System.Configuration.ConfigurationManager.OpenExeConfiguration(System.Configuration.ConfigurationUserLevel.None);
+                    if (config.AppSettings.Settings["KakaoCheck"] == null)
+                    {
+                        config.AppSettings.Settings.Add("KakaoCheck", newValue);
+                    }
+                    else
+                    {
+                        config.AppSettings.Settings["KakaoCheck"].Value = newValue;
+                    }
+                    config.Save(System.Configuration.ConfigurationSaveMode.Modified);
+                    System.Configuration.ConfigurationManager.RefreshSection("appSettings");
+                }
+                catch (Exception ex)
+                {
+                    // [한글 주석] 설정 저장 실패 시 사용자에게 안내하고 체크 상태를 되돌림
+                    MessageBox.Show($"설정 저장 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    chkKakaoSend.CheckedChanged -= (s, e) => { };
+                    chkKakaoSend.Checked = !chkKakaoSend.Checked;
+                    chkKakaoSend.CheckedChanged += (s, e) => { };
+                }
+            };
+
             // Dropbox 테스트 버튼 생성 및 설정 (우상단 고정)
             btnDropboxTest = CreateModernButton("☁️ Dropbox 테스트", new Point(550, 80), new Size(130, 40), Color.FromArgb(155, 89, 182));
             btnDropboxTest.Click += BtnDropboxTest_Click;
+            // [한글 주석] 요구사항: 버튼은 삭제하지 말고 화면에서 숨김 처리
+            btnDropboxTest.Visible = false;
 
             // KakaoWork 테스트 버튼 생성 및 설정 (우상단 고정)
             btnKakaoWorkTest = CreateModernButton("💬 KakaoWork 테스트", new Point(410, 80), new Size(130, 40), Color.FromArgb(46, 204, 113));
             btnKakaoWorkTest.Click += BtnKakaoWorkTest_Click;
+            // [한글 주석] 요구사항: 버튼은 삭제하지 말고 화면에서 숨김 처리
+            btnKakaoWorkTest.Visible = false;
+
+            // 툴팁 컨트롤 초기화
+            toolTip = new ToolTip
+            {
+                AutoPopDelay = 5000, // 5초 후 자동으로 사라짐
+                InitialDelay = 1000, // 1초 후 표시
+                ReshowDelay = 500,   // 다시 표시까지 0.5초
+                ShowAlways = true    // 항상 표시
+            };
+
+            // 현재 로그인된 사용자명 표시 라벨 생성 및 설정 (Login 설정에 따라 표시/숨김)
+            lblCurrentUser = new Label
+            {
+                Text = "사용자: 로딩 중...",
+                Location = new Point(790, 50),
+                Size = new Size(280, 25), // 사용자명이 완전히 표시되도록 너비를 280px로 확대
+                Font = new Font("맑은 고딕", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(52, 73, 94),
+                BackColor = Color.Transparent,
+                TextAlign = ContentAlignment.MiddleRight,
+                AutoSize = false, // 고정 크기 사용
+                Visible = showUserInfo, // Login 설정에 따라 표시 여부 결정
+                BorderStyle = BorderStyle.None, // 테두리 제거하여 깔끔하게 표시
+                TabIndex = 100 // 높은 탭 인덱스로 설정하여 다른 컨트롤에 가려지지 않도록 함
+            };
+
+            // 비밀번호 변경 버튼 (열쇠 아이콘) 생성 및 설정 (Login 설정에 따라 표시/숨김)
+            btnChangePassword = new Button
+            {
+                Text = "\uE192", // Segoe MDL2 Assets: Key icon
+                Size = new Size(22, 22),
+                Location = new Point(0, 50),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(240, 244, 248),
+                ForeColor = Color.Black,
+                TabStop = false,
+                Cursor = Cursors.Hand,
+                Visible = showUserInfo // Login 설정에 따라 표시 여부 결정
+            };
+            btnChangePassword.FlatAppearance.BorderSize = 0;
+            btnChangePassword.Font = new Font("Segoe MDL2 Assets", 9F, FontStyle.Regular);
+            btnChangePassword.TextAlign = ContentAlignment.MiddleCenter;
+            btnChangePassword.Margin = new Padding(0);
+            btnChangePassword.Padding = new Padding(0);
+            toolTip.SetToolTip(btnChangePassword, "비밀번호 변경");
+            btnChangePassword.Click += BtnChangePassword_Click;
+            btnChangePassword.BringToFront();
 
             // 종료 버튼 생성 및 설정 (우상단 고정)
             btnExit = CreateModernButton("❌ 종료", new Point(790, 80), new Size(80, 40), Color.FromArgb(231, 76, 60));
@@ -282,6 +439,9 @@ namespace LogisticManager.Forms
             btnStartProcess = CreateModernButton("🚀 송장 처리 시작", new Point(150, 80), new Size(150, 45), Color.FromArgb(46, 204, 113));
             btnStartProcess.Enabled = false;  // 파일이 선택되기 전까지 비활성화
             btnStartProcess.Click += BtnStartProcess_Click;
+
+            // 비활성 상태에서도 손가락 커서 표시를 위해 폼 레벨에서 마우스 이동 감지
+            this.MouseMove += MainForm_MouseMoveForStartProcessCursor;
 
             // 판매입력 데이터 처리 버튼 생성 및 설정 (독립 실행용) - 현재 숨김 처리
             btnSalesDataProcess = CreateModernButton("📊 판매입력 데이터 처리", new Point(180, 160), new Size(150, 45), Color.FromArgb(155, 89, 182));
@@ -367,7 +527,7 @@ namespace LogisticManager.Forms
             // 파일 목록 제목 라벨 생성 및 설정 (모던한 카드 스타일)
             lblFileListTitle = new Label
             {
-                Text = "■ 업로드된 파일 목록",
+                Text = "■ 업로드된 파일 목록 (파일명을 더블클릭하면 파일이 열립니다)",
                 Location = new Point(620, 660), // 로그창 오른쪽에 배치
                 Size = new Size(560, 35),
                 Font = new Font("맑은 고딕", 9F, FontStyle.Regular),
@@ -384,6 +544,9 @@ namespace LogisticManager.Forms
                 Location = new Point(620, 695), // 제목 라벨 아래에 배치
                 Size = new Size(560, 165) // 로그창과 동일한 높이
             };
+            
+            // 파일 열기 이벤트 등록
+            fileListContainer.FileOpened += FileListContainer_FileOpened;
 
             // 파일 목록 판넬 생성 및 설정 (모던한 스타일)
             fileListPanel = new Panel
@@ -472,9 +635,12 @@ namespace LogisticManager.Forms
                 lblTitle,
                 btnSelectFile,
                 lblFilePath,
+                chkKakaoSend,
                 btnSettings,
                 btnDropboxTest,
                 btnKakaoWorkTest,
+                lblCurrentUser,
+                btnChangePassword,
                 btnExit,
                 btnStartProcess,
                 btnSalesDataProcess,
@@ -486,6 +652,10 @@ namespace LogisticManager.Forms
                 fileListPanel,
                 statusStrip
             });
+
+            // Z-Order 최종 보정: 사용자명 라벨과 열쇠 아이콘을 최상위로 올림
+            lblCurrentUser.BringToFront();
+            btnChangePassword.BringToFront();
             
             // 다운로드 버튼 상태 확인 및 로그 출력
             //LogMessage($"🔍 다운로드 버튼 생성 완료: 위치({btnDownloadFiles.Location.X}, {btnDownloadFiles.Location.Y}), 크기({btnDownloadFiles.Size.Width}x{btnDownloadFiles.Size.Height}), 보임여부: {btnDownloadFiles.Visible}");
@@ -534,6 +704,56 @@ namespace LogisticManager.Forms
             
             // 초기 크기 조정 적용 (버튼 위치 설정을 위해)
             MainForm_Resize(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// 마우스가 송장 처리 시작 버튼 위에 있을 때 손가락 모양 커서를 강제로 표시
+        /// </summary>
+        private void MainForm_MouseMoveForStartProcessCursor(object? sender, MouseEventArgs e)
+        {
+            try
+            {
+                if (btnStartProcess != null)
+                {
+                    var clientPoint = btnStartProcess.PointToClient(this.PointToScreen(e.Location));
+                    var within = clientPoint.X >= 0 && clientPoint.Y >= 0 && clientPoint.X < btnStartProcess.Width && clientPoint.Y < btnStartProcess.Height;
+                    if (within)
+                    {
+                        this.Cursor = Cursors.Hand; // 손가락 모양
+                    }
+                    else
+                    {
+                        this.Cursor = Cursors.Default;
+                    }
+                }
+            }
+            catch { /* 안전 무시 */ }
+        }
+
+        /// <summary>
+        /// 비밀번호 변경 버튼 클릭 핸들러
+        /// </summary>
+        private void BtnChangePassword_Click(object? sender, EventArgs e)
+        {
+            try
+            {
+                // 로그인 상태 확인
+                if (_authenticationService == null || !_authenticationService.IsLoggedIn)
+                {
+                    MessageBox.Show(this, "로그인 후 이용 가능합니다.", "안내", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // 비밀번호 변경 폼 표시
+                using (var dlg = new LogisticManager.Forms.ChangePasswordForm(_authenticationService))
+                {
+                    dlg.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"오류: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         /// <summary>
@@ -642,11 +862,31 @@ namespace LogisticManager.Forms
             // 각 버튼의 실제 Width 속성을 사용하여 정확한 위치 계산
             btnExit.Location = new Point(this.ClientSize.Width - rightMargin - btnExit.Width, padding + titleHeight + 20);
             btnSettings.Location = new Point(btnExit.Location.X - btnSettings.Width - buttonSpacing, padding + titleHeight + 20);
+            // [한글 주석] 설정 버튼 왼쪽에 카카오워크 전송 체크박스를 정렬 (세로 중앙 정렬)
+            int kakaoCheckX = btnSettings.Location.X - 10 - chkKakaoSend.Width; // 설정 버튼과 10px 간격
+            int kakaoCheckY = padding + titleHeight + 20 + (btnSettings.Height - chkKakaoSend.Height) / 2;
+            chkKakaoSend.Location = new Point(kakaoCheckX, kakaoCheckY);
             btnDropboxTest.Location = new Point(btnSettings.Location.X - btnDropboxTest.Width - buttonSpacing, padding + titleHeight + 20);
             btnKakaoWorkTest.Location = new Point(btnDropboxTest.Location.X - btnKakaoWorkTest.Width - buttonSpacing, padding + titleHeight + 20);
 
             // 송장 처리 시작 버튼 위치 조정 (파일선택 버튼 오른쪽 옆에 위치)
             btnStartProcess.Location = new Point(btnSelectFile.Location.X + btnSelectFile.Width + 10, btnSelectFile.Location.Y);
+
+            // 사용자명 표시 라벨 및 비밀번호 변경 버튼 위치 조정 (우상단 고정)
+            // 버튼은 가장 오른쪽, 라벨은 버튼 왼쪽에 배치
+            int keyButtonWidth = btnChangePassword.Width;
+            int keyButtonHeight = btnChangePassword.Height;
+            int keyButtonX = this.ClientSize.Width - rightMargin - keyButtonWidth;
+            int keyButtonY = padding + titleHeight - 30 + (25 - keyButtonHeight) / 2; // 라벨 높이(25) 기준 수직 중앙 정렬
+            btnChangePassword.Location = new Point(keyButtonX, keyButtonY);
+
+            // lblCurrentUser.Width가 0이거나 음수가 되는 것을 방지
+            int userLabelWidth = Math.Max(280, lblCurrentUser.Width);
+            int userLabelX = Math.Max(padding, keyButtonX - 6 - userLabelWidth); // 버튼 왼쪽 6px 간격
+            lblCurrentUser.Location = new Point(userLabelX, padding + titleHeight - 30);
+            
+            // 디버그: 사용자명 라벨 위치 확인
+            // LogMessage($"🔍 사용자명 라벨 위치: X={userLabelX}, Y={padding + titleHeight - 30}, Width={userLabelWidth}, Visible={lblCurrentUser.Visible}");
 
             // 진행률 표시바 조정 (현재 숨김 처리됨)
             int progressBarWidth = this.ClientSize.Width - btnStartProcess.Width - (padding * 3);
@@ -966,7 +1206,7 @@ namespace LogisticManager.Forms
                 //   _selectedFilePath : 사용자가 선택한 엑셀 파일 경로
                 //   logCallback       : 로그 메시지 Progress 콜백 (UI 및 로그 기록용)
                 //   progressCallback  : 진행률 Progress 콜백 (UI 진행률 표시용)
-                //   1                 : 처리 단계(1단계, 기본값)  ([4-1]~[4-22])
+                //   1                 : 처리 단계(1단계, 기본값)  ([4-1]~[4-24])
                 var testLevel = ConfigurationManager.AppSettings["TestLevel"] ?? "1"; // app.config에서 테스트 레벨 가져오기
                 var result = await processor.ProcessAsync(_selectedFilePath, logCallback, progressCallback, int.Parse(testLevel));
 
@@ -1180,46 +1420,72 @@ namespace LogisticManager.Forms
                 // - ClickOnce 배포 시 Publish Version이 노출됨
                 // - 일반 실행 시 파일 버전/어셈블리 정보에 기반
                 var productVersion = Application.ProductVersion; // 예: 1.2.3.4 또는 1.2.3+buildmeta
+                
+                // 디버깅: 실제 ProductVersion 값 로그 출력
+                //LogMessage($"🔍 Debug: Application.ProductVersion = '{productVersion}'");
+                
                 if (!string.IsNullOrWhiteSpace(productVersion))
                 {
                     // SemVer의 빌드메타/프리릴리즈(+/ - 이후) 제거
                     var semverCore = productVersion.Split('+', '-')[0];
+                    //LogMessage($"🔍 Debug: SemVer Core = '{semverCore}'");
+                    
                     if (Version.TryParse(semverCore, out var ver))
                     {
-                        // 메이저.마이너.빌드까지만 노출 (짧게)
-                        var shortText = $"v{ver.Major}.{ver.Minor}.{ver.Build}";
+                        // Revision이 0이 아닌 경우 포함하여 표시
+                        var shortText = ver.Revision > 0 
+                            ? $"v{ver.Major}.{ver.Minor}.{ver.Build}.{ver.Revision}"
+                            : $"v{ver.Major}.{ver.Minor}.{ver.Build}";
+                        //LogMessage($"🔍 Debug: Version Object - Major: {ver.Major}, Minor: {ver.Minor}, Build: {ver.Build}, Revision: {ver.Revision}");
+                        //LogMessage($"🔍 Debug: Parsed Version = {shortText}");
                         return shortText;
                     }
                     // 파싱 실패 시 문자열을 점 기준으로 3부분까지만 노출 (메타 제거본 우선)
                     var parts = semverCore.Split('.');
                     var shortParts = parts.Take(Math.Min(3, parts.Length));
-                    return $"v{string.Join('.', shortParts)}";
+                    var fallbackText = $"v{string.Join('.', shortParts)}";
+                    //LogMessage($"🔍 Debug: Fallback Version = {fallbackText}");
+                    return fallbackText;
+                }
+                
+                // Application.ProductVersion이 없는 경우 어셈블리 버전 사용
+                var assemblyVersion = Assembly.GetExecutingAssembly().GetName().Version;
+                if (assemblyVersion != null)
+                {
+                    var assemblyText = $"v{assemblyVersion.Major}.{assemblyVersion.Minor}.{assemblyVersion.Build}";
+                    //LogMessage($"🔍 Debug: Assembly Version = {assemblyText}");
+                    return assemblyText;
                 }
             }
-            catch
+            catch (Exception ex)
             {
                 // ClickOnce API 호출 실패 시 어셈블리 버전으로 폴백
+                LogMessage($"Debug: Exception in ProductVersion: {ex.Message}");
             }
 
             // 폴백: 어셈블리 버전 사용
             var asmVer = Assembly.GetExecutingAssembly().GetName().Version;
             if (asmVer != null)
             {
-                return $"v{asmVer.Major}.{asmVer.Minor}.{asmVer.Build}"; // 짧게 표시
+                var asmText = $"v{asmVer.Major}.{asmVer.Minor}.{asmVer.Build}"; // 짧게 표시
+                //LogMessage($"Debug: Assembly Version = {asmText}");
+                return asmText;
             }
 
             // 추가 안전장치: 버전을 얻지 못한 경우 기본값
+            //LogMessage("Debug: Using default version v0.0.0.0");
             return "v0.0.0.0";
         }
 
         /// <summary>
-        /// 로그 메시지를 텍스트박스에 출력하는 메서드
+        /// 로그 메시지를 텍스트박스와 파일에 출력하는 메서드
         /// 
         /// 기능:
         /// - 현재 시간과 함께 메시지 구성
         /// - UI 스레드에서 안전하게 실행
         /// - 자동 스크롤 및 UI 업데이트
         /// - "[처리 중단]" 메시지는 굵은 폰트와 빨간색으로 표시
+        /// - app.log 파일에도 로그 출력
         /// </summary>
         /// <param name="message">출력할 로그 메시지</param>
         private void LogMessage(string message)
@@ -1227,8 +1493,20 @@ namespace LogisticManager.Forms
             try
             {
                 // 현재 시간과 함께 메시지 구성
-                var timestamp = DateTime.Now.ToString("HH:mm:ss");
+                var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                 var logMessage = $"[{timestamp}] {message}";
+
+                // 파일에 로그 출력 (app.log)
+                try
+                {
+                    var logPath = Path.Combine(Application.StartupPath, "app.log");
+                    File.AppendAllText(logPath, logMessage + Environment.NewLine);
+                }
+                catch (Exception fileEx)
+                {
+                    // 파일 로깅 실패 시 콘솔에 출력
+                    Console.WriteLine($"파일 로깅 실패: {fileEx.Message}");
+                }
 
                 // UI 스레드에서 안전하게 실행
                 if (txtLog.InvokeRequired)
@@ -1467,7 +1745,7 @@ namespace LogisticManager.Forms
                     // Singleton 인스턴스에서 연결 테스트 실행
                     var testResult = _databaseService.TestConnectionWithDetailsAsync().GetAwaiter().GetResult();
                     
-                    LogManagerService.LogInfo($"📊 MainForm: 연결 테스트 결과 = {testResult.IsConnected}");
+                    //LogManagerService.LogInfo($"📊 MainForm: 연결 테스트 결과 = {testResult.IsConnected}");
                     LogManagerService.LogInfo($"📊 MainForm: 메시지 = {testResult.ErrorMessage}");
                     
                     if (testResult.IsConnected)
@@ -1871,6 +2149,61 @@ namespace LogisticManager.Forms
         }
         
         /// <summary>
+        /// 로그인 필요 여부를 확인하고 처리하는 메서드
+        /// </summary>
+        /// <returns>로그인 성공 또는 로그인 불필요 시 true, 로그인 실패 시 false</returns>
+        private bool CheckLoginRequired()
+        {
+            try
+            {
+                // App.config에서 Login 설정 확인
+                var loginRequired = ConfigurationManager.AppSettings["Login"];
+                
+                if (string.IsNullOrEmpty(loginRequired) || loginRequired.ToUpper() != "Y")
+                {
+                    // 로그인이 필요하지 않은 경우
+                    LogMessage("ℹ️ 로그인 기능이 비활성화되어 있습니다.");
+                    return true;
+                }
+                
+                LogMessage("🔐 로그인 기능이 활성화되어 있습니다. 로그인 폼을 표시합니다.");
+                
+                // AuthenticationService 생성 및 MainForm의 인스턴스 업데이트
+                var authService = new AuthenticationService(_databaseService);
+                _authenticationService = authService; // MainForm의 인스턴스 업데이트
+                
+                // 로그인 폼 표시 (모달로 표시하여 메인 폼이 활성화되지 않도록 함)
+                using (var loginForm = new LoginForm(authService, () => UpdateCurrentUserDisplay()))
+                {
+                    // 로그인 폼을 모달로 표시하고 결과 확인
+                    var result = loginForm.ShowDialog(this);
+                    
+                    if (result == DialogResult.OK)
+                    {
+                        // 로그인 성공 (메시지 표시하지 않음)
+                        // LogMessage($"✅ 로그인 성공: {authService.CurrentUser?.Username}");
+                        
+                        // 로그인 성공 후 사용자명 표시 업데이트
+                        this.BeginInvoke(new Action(() => UpdateCurrentUserDisplay()));
+                        
+                        return true;
+                    }
+                    else
+                    {
+                        // 로그인 취소 또는 실패
+                        LogMessage("⚠️ 로그인이 완료되지 않았습니다.");
+                        return false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"⚠️ 로그인 체크 중 오류 발생: {ex.Message}");
+                return false;
+            }
+        }
+        
+        /// <summary>
         /// 배치구분규칙에 따른 타이틀을 반환하는 메서드
         /// </summary>
         /// <param name="baseTitle">기본 타이틀</param>
@@ -2099,6 +2432,28 @@ namespace LogisticManager.Forms
         }
 
         /// <summary>
+        /// 파일 목록에서 파일이 열렸을 때 호출되는 이벤트 핸들러
+        /// </summary>
+        /// <param name="sender">이벤트 발생자</param>
+        /// <param name="e">파일 열기 이벤트 인수</param>
+        private void FileListContainer_FileOpened(object? sender, FileListContainerControl.FileOpenedEventArgs e)
+        {
+            try
+            {
+                LogMessage($"📂 파일이 열렸습니다: {e.FileInfo.FileName}");
+                //LogMessage($"📍 임시 파일 경로: {e.LocalFilePath}");
+                
+                // 파일 열기 성공 로그 기록
+                //LogManagerService.LogInfo($"파일 열기 성공: {e.FileInfo.FileName} -> {e.LocalFilePath}");
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"❌ 파일 열기 이벤트 처리 중 오류: {ex.Message}");
+                LogManagerService.LogError($"파일 열기 이벤트 처리 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// 파일 목록에 파일을 추가하는 메서드
         /// </summary>
         /// <param name="fileName">파일명</param>
@@ -2156,6 +2511,7 @@ namespace LogisticManager.Forms
         /// 
         /// 기능:
         /// - 리소스 정리
+        /// - 임시 파일 정리
         /// - 종료 확인 메시지
         /// </summary>
         /// <param name="e">폼 종료 이벤트 인수</param>
@@ -2169,6 +2525,9 @@ namespace LogisticManager.Forms
                 ProcessingTimeManager.Instance.StepUpdated -= OnStepUpdated;
                 ProcessingTimeManager.Instance.TimeUpdated -= OnTimeUpdated;
                 
+                // 임시 파일 정리
+                CleanupTempFiles();
+                
                 LogMessage("👋 프로그램을 종료합니다.");
                 
                 // 리소스 정리는 GC가 자동으로 처리하므로 별도 작업 불필요
@@ -2180,8 +2539,116 @@ namespace LogisticManager.Forms
             
             base.OnFormClosing(e);
         }
+        
+        /// <summary>
+        /// 임시 파일들을 정리하는 메서드
+        /// </summary>
+        private void CleanupTempFiles()
+        {
+            try
+            {
+                var tempDir = Path.Combine(Path.GetTempPath(), "LogisticManager");
+                if (Directory.Exists(tempDir))
+                {
+                    var files = Directory.GetFiles(tempDir);
+                    var deletedCount = 0;
+                    
+                    foreach (var file in files)
+                    {
+                        try
+                        {
+                            File.Delete(file);
+                            deletedCount++;
+                        }
+                        catch (Exception ex)
+                        {
+                            LogManagerService.LogWarning($"임시 파일 삭제 실패: {file} - {ex.Message}");
+                        }
+                    }
+                    
+                    if (deletedCount > 0)
+                    {
+                        LogManagerService.LogInfo($"임시 파일 정리 완료: {deletedCount}개 파일 삭제");
+                    }
+                    
+                    // 빈 디렉토리 삭제 시도
+                    try
+                    {
+                        Directory.Delete(tempDir);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManagerService.LogWarning($"임시 디렉토리 삭제 실패: {tempDir} - {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogManagerService.LogError($"임시 파일 정리 중 오류: {ex.Message}");
+            }
+        }
 
         #endregion
+
+        /// <summary>
+        /// 현재 로그인된 사용자명을 표시 라벨에 업데이트하는 메서드
+        /// </summary>
+        public void UpdateCurrentUserDisplay()
+        {
+            try
+            {
+                // App.config에서 Login 설정 읽기
+                string loginSetting = System.Configuration.ConfigurationManager.AppSettings["Login"] ?? "N";
+                bool showUserInfo = loginSetting.ToUpper() == "Y";
+                
+                if (lblCurrentUser != null && showUserInfo)
+                {
+                    // 디버그: 사용자명 라벨 상태 확인
+                    LogMessage($"🔍 사용자명 라벨 상태: Visible={lblCurrentUser.Visible}, Location=({lblCurrentUser.Location.X}, {lblCurrentUser.Location.Y}), Size=({lblCurrentUser.Size.Width}x{lblCurrentUser.Size.Height})");
+                    
+                    // _authenticationService에서 현재 사용자 정보 가져오기
+                    if (_authenticationService?.CurrentUser != null)
+                    {
+                        // Users 테이블의 name 컬럼 값을 우선 사용하고, 없으면 username 사용
+                        var displayName = !string.IsNullOrEmpty(_authenticationService.CurrentUser.Name) 
+                            ? _authenticationService.CurrentUser.Name 
+                            : _authenticationService.CurrentUser.Username;
+                        
+                        LogMessage($"🔍 사용자 정보 로드됨: Name='{_authenticationService.CurrentUser.Name}', Username='{_authenticationService.CurrentUser.Username}', DisplayName='{displayName}'");
+                        
+                        // 사용자명이 너무 길 경우 축약하여 표시 (최대 15자)
+                        var truncatedName = displayName.Length > 15 ? displayName.Substring(0, 12) + "..." : displayName;
+                        lblCurrentUser.Text = $"사용자: {truncatedName}";
+                        
+                        // 전체 사용자명을 툴팁으로 표시
+                        toolTip.SetToolTip(lblCurrentUser, $"사용자: {displayName}");
+                        lblCurrentUser.ForeColor = Color.FromArgb(46, 204, 113); // 성공 색상 (녹색)
+                        
+                        // 사용자명 라벨을 확실히 보이도록 설정
+                        lblCurrentUser.Visible = true;
+                        lblCurrentUser.BringToFront();
+                        
+                        LogMessage($"✅ 사용자명 표시 완료: '{lblCurrentUser.Text}'");
+                    }
+                    else
+                    {
+                        LogMessage($"⚠️ _authenticationService 또는 CurrentUser가 null입니다. _authenticationService={(_authenticationService != null ? "존재" : "null")}");
+                        lblCurrentUser.Text = "사용자: 미로그인";
+                        lblCurrentUser.ForeColor = Color.FromArgb(231, 76, 60); // 오류 색상 (빨간색)
+                        lblCurrentUser.Visible = true;
+                    }
+                }
+                else
+                {
+                    LogMessage($"⚠️ lblCurrentUser가 null입니다.");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"❌ 사용자명 표시 업데이트 중 오류: {ex.Message}");
+                LogMessage($"❌ 스택 트레이스: {ex.StackTrace}");
+            }
+        }
 
         /// <summary>
         /// Dropbox 경로 정보를 포함한 리스트 아이템 클래스

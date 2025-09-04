@@ -361,6 +361,7 @@ namespace LogisticManager.Services
             {
                 NotificationType.SeoulFrozen => "서울냉동",
                 NotificationType.GyeonggiFrozen => "경기냉동",
+                NotificationType.FrapwonFrozen => "프랩원냉동",
                 NotificationType.SeoulGongsan => "서울공산",
                 NotificationType.GyeonggiGongsan => "경기공산",
                 NotificationType.BusanCheonggwa => "부산청과",
@@ -388,13 +389,16 @@ namespace LogisticManager.Services
                 // [4-8], [4-10], [4-12], [4-14], [4-16], [4-18], [4-20]: 운송장 타입
                 NotificationType.SeoulFrozen => KakaoWorkMessageType.Shipment,
                 NotificationType.GyeonggiFrozen => KakaoWorkMessageType.Shipment,
+                NotificationType.FrapwonFrozen => KakaoWorkMessageType.Shipment,
                 NotificationType.SeoulGongsan => KakaoWorkMessageType.Shipment,
                 NotificationType.GyeonggiGongsan => KakaoWorkMessageType.Shipment,
                                         NotificationType.BusanCheonggwa => KakaoWorkMessageType.Shipment,
                         NotificationType.BusanCheonggwaPrint => KakaoWorkMessageType.PrintMaterial,
                         NotificationType.GamcheonFrozen => KakaoWorkMessageType.Shipment,
                 
-                // [4-22] 단계: 통합 송장도 Shipment 패턴과 동일하게 사용
+                // [4-22] 단계: 감천냉동 운송장 타입
+                // [4-23] 단계: 송장출력 최종 처리 타입
+                // [4-24] 단계: 통합 송장도 Shipment 패턴과 동일하게 사용
                 NotificationType.Integrated => KakaoWorkMessageType.Shipment,
                 
                 // 기본값: 운송장 타입

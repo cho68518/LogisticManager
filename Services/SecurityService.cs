@@ -97,6 +97,46 @@ namespace LogisticManager.Services
         }
 
         /// <summary>
+        /// 과거 형식(CBC + space padding 키)까지 호환하여 복호화 시도
+        /// </summary>
+        /// <param name="encryptedText">암호화된 텍스트</param>
+        /// <returns>복호화된 텍스트 또는 빈 문자열</returns>
+        public static string DecryptStringCompat(string encryptedText)
+        {
+            // 1차: 현재 형식(ECB + '0' 패딩 키)
+            var ecb = DecryptString(encryptedText);
+            if (!string.IsNullOrEmpty(ecb))
+            {
+                return ecb;
+            }
+
+            // 2차: 레거시 형식(CBC + space 패딩 키 + IV=0)
+            try
+            {
+                if (string.IsNullOrEmpty(encryptedText))
+                    return string.Empty;
+
+                var keyBytesLegacy = Encoding.UTF8.GetBytes(_encryptionKey.PadRight(32).Substring(0, 32)); // space pad
+                var iv = new byte[16];
+                var encryptedBytes = Convert.FromBase64String(encryptedText);
+
+                using var aes = Aes.Create();
+                aes.Key = keyBytesLegacy;
+                aes.IV = iv;
+                aes.Mode = CipherMode.CBC;
+                aes.Padding = PaddingMode.PKCS7;
+
+                using var decryptor = aes.CreateDecryptor();
+                var decryptedBytes = decryptor.TransformFinalBlock(encryptedBytes, 0, encryptedBytes.Length);
+                return Encoding.UTF8.GetString(decryptedBytes);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
         /// <summary>
         /// 환경 변수를 설정하는 메서드 (JSON 파일과 환경 변수 모두 저장)
         /// </summary>
@@ -158,8 +198,28 @@ namespace LogisticManager.Services
         {
             try
             {
-                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-                var backupPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.backup.json");
+                // Application.StartupPath를 사용하여 settings.json 파일 찾기
+                var startupPath = Application.StartupPath;
+                var configSettingsPath = Path.Combine(startupPath, "config", "settings.json");
+                var rootSettingsPath = Path.Combine(startupPath, "settings.json");
+                
+                string settingsPath;
+                
+                // config/settings.json을 우선적으로 사용, 없으면 루트의 settings.json 사용
+                if (File.Exists(configSettingsPath))
+                {
+                    settingsPath = configSettingsPath;
+                }
+                else if (File.Exists(rootSettingsPath))
+                {
+                    settingsPath = rootSettingsPath;
+                }
+                else
+                {
+                    throw new FileNotFoundException("settings.json 파일을 찾을 수 없습니다.");
+                }
+                
+                var backupPath = Path.Combine(Path.GetDirectoryName(settingsPath) ?? startupPath, "settings.backup.json");
                 var settings = new Dictionary<string, string>();
                 
                 // 기존 설정 로드 (파일이 존재하고 크기가 0이 아닌 경우에만)
@@ -227,8 +287,28 @@ namespace LogisticManager.Services
         {
             try
             {
-                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.json");
-                var backupPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.backup.json");
+                // Application.StartupPath를 사용하여 settings.json 파일 찾기
+                var startupPath = Application.StartupPath;
+                var configSettingsPath = Path.Combine(startupPath, "config", "settings.json");
+                var rootSettingsPath = Path.Combine(startupPath, "settings.json");
+                
+                string settingsPath;
+                
+                // config/settings.json을 우선적으로 사용, 없으면 루트의 settings.json 사용
+                if (File.Exists(configSettingsPath))
+                {
+                    settingsPath = configSettingsPath;
+                }
+                else if (File.Exists(rootSettingsPath))
+                {
+                    settingsPath = rootSettingsPath;
+                }
+                else
+                {
+                    throw new FileNotFoundException("settings.json 파일을 찾을 수 없습니다.");
+                }
+                
+                var backupPath = Path.Combine(Path.GetDirectoryName(settingsPath) ?? startupPath, "settings.backup.json");
                 
                 // 메인 파일에서 로드 시도
                 if (File.Exists(settingsPath))
@@ -318,20 +398,17 @@ namespace LogisticManager.Services
             
             try
             {
+                // DecryptString과 동일한 방식(ECB + PKCS7, 동일 키 패딩)으로 암호화하여 상호 운용 보장
+                var keyBytes = Encoding.UTF8.GetBytes(_encryptionKey.PadRight(32, '0'));
                 using var aes = Aes.Create();
-                aes.Key = Encoding.UTF8.GetBytes(_encryptionKey.PadRight(32).Substring(0, 32));
-                aes.IV = new byte[16];
-                
+                aes.Key = keyBytes;
+                aes.Mode = CipherMode.ECB;
+                aes.Padding = PaddingMode.PKCS7;
+
                 using var encryptor = aes.CreateEncryptor();
-                using var msEncrypt = new MemoryStream();
-                using var csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write);
-                using var swEncrypt = new StreamWriter(csEncrypt);
-                
-                swEncrypt.Write(plainText);
-                swEncrypt.Flush();
-                csEncrypt.FlushFinalBlock();
-                
-                return Convert.ToBase64String(msEncrypt.ToArray());
+                var plainBytes = Encoding.UTF8.GetBytes(plainText);
+                var encryptedBytes = encryptor.TransformFinalBlock(plainBytes, 0, plainBytes.Length);
+                return Convert.ToBase64String(encryptedBytes);
             }
             catch (Exception ex)
             {

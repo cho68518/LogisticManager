@@ -103,7 +103,26 @@ namespace LogisticManager
         {
             try
             {
-                var settingsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DatabaseConstants.SETTINGS_FILE_NAME);
+                // Application.StartupPath를 사용하여 settings.json 파일 찾기
+                var startupPath = Application.StartupPath;
+                var configSettingsPath = Path.Combine(startupPath, "config", DatabaseConstants.SETTINGS_FILE_NAME);
+                var rootSettingsPath = Path.Combine(startupPath, DatabaseConstants.SETTINGS_FILE_NAME);
+                
+                string settingsPath;
+                
+                // config/settings.json을 우선적으로 사용, 없으면 루트의 settings.json 사용
+                if (File.Exists(configSettingsPath))
+                {
+                    settingsPath = configSettingsPath;
+                }
+                else if (File.Exists(rootSettingsPath))
+                {
+                    settingsPath = rootSettingsPath;
+                }
+                else
+                {
+                    throw new FileNotFoundException("settings.json 파일을 찾을 수 없습니다.");
+                }
                 
                 // 설정 파일 경로 검증
                 var (pathValid, pathMessage) = SettingsValidationService.ValidateSettingsFilePath(settingsPath);

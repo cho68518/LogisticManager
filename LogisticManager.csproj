@@ -19,10 +19,10 @@
     <!-- 프로그램 정보 -->
     <AssemblyTitle>LogisticManager</AssemblyTitle>
     <AssemblyDescription>물류 관리 시스템</AssemblyDescription>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
-    <ProductVersion>1.0.0.0</ProductVersion>
-    <InformationalVersion>1.0.0.0</InformationalVersion>
+    <AssemblyVersion>1.0.0.36</AssemblyVersion>
+    <FileVersion>1.0.0.36</FileVersion>
+    <ProductVersion>1.0.0.36</ProductVersion>
+    <InformationalVersion>1.0.0.36</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -43,21 +43,15 @@
     <PackageReference Include="Microsoft.VisualBasic" Version="10.3.0" />
   </ItemGroup>
 
-  
-
-  <ItemGroup>
-    <!-- 필요한 설정 파일들만 포함 -->
-    <EmbeddedResource Include="App.config">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </EmbeddedResource>
-  </ItemGroup>
-
   <ItemGroup>
     <!-- 설정 파일을 출력 디렉토리로 복사 -->
     <Content Include="config\run-app.bat" />
     <Content Include="config\settings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="invoice.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>	  
   </ItemGroup>
 
   <ItemGroup>
@@ -87,9 +81,21 @@
     <None Remove="config\run-app.bat" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="App.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <Publish>true</Publish>
+    </None>
+  </ItemGroup>
+
   <PropertyGroup>
     <!-- 단일 파일 빌드 시 리소스 포함 -->
     <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <ApplicationIcon>invoice.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <Optimize>True</Optimize>
   </PropertyGroup>
 
 </Project> 
