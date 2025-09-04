@@ -5189,8 +5189,8 @@ namespace LogisticManager.Processors
             const string TABLE_NAME = "송장출력_주문정보";
             const string SHEET_NAME = "Sheet1";
             const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath4";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.SalesData";
-            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.SalesData";
+            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
             
                 try
                 {
@@ -5390,8 +5390,8 @@ namespace LogisticManager.Processors
             const string TABLE_NAME = "송장출력_서울냉동_최종";
             const string SHEET_NAME = "Sheet1";
             const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath7";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.SeoulFrozen";
-            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.SeoulFrozen";
+            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
             try
             {
@@ -5637,8 +5637,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_경기냉동_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath8";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GyeonggiFrozen";
-            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GyeonggiFrozen";
+            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			// 로그 서비스 초기화 (LogManagerService로 통일)
 			try
@@ -5689,10 +5689,12 @@ namespace LogisticManager.Processors
 				if (gyeonggiFrozenData == null || gyeonggiFrozenData.Rows.Count == 0)
 				{
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 경기냉동 최종 데이터가 없습니다.");
-					return true; // 데이터가 없는 것은 오류가 아님
+					//return true; // 데이터가 없는 것은 오류가 아님
 				}
-
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {gyeonggiFrozenData.Rows.Count:N0}건");
+				else
+				{
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {gyeonggiFrozenData.Rows.Count:N0}건");
+				}
 
 				// 3단계: Excel 파일 생성 (헤더 없음)
 				// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
@@ -5701,7 +5703,7 @@ namespace LogisticManager.Processors
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
 
-				var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(gyeonggiFrozenData, excelFilePath, SHEET_NAME);
+				var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(gyeonggiFrozenData ?? new DataTable(), excelFilePath, SHEET_NAME);
 				if (!excelCreated)
 				{
 					LogManagerService.LogError($"[{METHOD_NAME}] ❌ Excel 파일 생성 실패: {excelFilePath}");
@@ -5861,8 +5863,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_프랩원냉동_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath15";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.FrapwonFrozen";
-            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.FrapwonFrozen";
+            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			// 로그 서비스 초기화 (LogManagerService로 통일)
 			try
@@ -5912,11 +5914,14 @@ namespace LogisticManager.Processors
 
 				if (frapwonFrozenData == null || frapwonFrozenData.Rows.Count == 0)
 				{
+					// 한글 주석: 데이터가 없는 경우 경고 로그만 남기고 정상 종료 처리
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 프랩원냉동 최종 데이터가 없습니다.");
-					//return true; // 데이터가 없는 것은 오류가 아님
+					//return true; // 데이터가 없는 것은 오류가 아님 (경고만 출력)
 				}
-
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {frapwonFrozenData.Rows.Count:N0}건");
+				else
+				{
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {frapwonFrozenData.Rows.Count:N0}건");
+				}
 
 				// 3단계: Excel 파일 생성 (헤더 없음)
 				// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
@@ -5925,14 +5930,23 @@ namespace LogisticManager.Processors
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
 
-				var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(frapwonFrozenData, excelFilePath, SHEET_NAME);
-				if (!excelCreated)
+				// 데이터가 있는 경우에만 Excel 파일 생성
+				if (frapwonFrozenData != null)
 				{
-					LogManagerService.LogError($"[{METHOD_NAME}] ❌ Excel 파일 생성 실패: {excelFilePath}");
-					return false;
-				}
+					var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(frapwonFrozenData ?? new DataTable(), excelFilePath, SHEET_NAME);
+					if (!excelCreated)
+					{
+						LogManagerService.LogError($"[{METHOD_NAME}] ❌ Excel 파일 생성 실패: {excelFilePath}");
+						return false;
+					}
 
-				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Excel 파일 생성 완료: {excelFilePath}");
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Excel 파일 생성 완료: {excelFilePath}");
+				}
+				else
+				{
+					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ 데이터가 없어 Excel 파일 생성을 건너뜁니다.");
+					return true; // 데이터가 없는 것은 오류가 아님
+				}
 
 				// 4단계: Dropbox에 파일 업로드
 				var dropboxFolderPath = ConfigurationManager.AppSettings[DROPBOX_FOLDER_PATH_KEY];
@@ -6111,8 +6125,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_서울공산_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath9";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.SeoulGongsan";
-            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.SeoulGongsan";
+            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -6334,8 +6348,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_경기공산_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath10";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GyeonggiGongsan";
-            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GyeonggiGongsan";
+            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -6568,8 +6582,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_부산청과_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath12";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanCheonggwa";
-            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanCheonggwa";
+            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -6787,8 +6801,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_부산청과자료_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath12";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanCheonggwaDoc";
-            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanCheonggwaDoc";
+            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -7021,8 +7035,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_감천냉동_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath13";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GamcheonFrozen";
-            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GamcheonFrozen";
+            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -7256,8 +7270,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath14";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Integrated";
-            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Integrated";
+            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
@@ -7474,8 +7488,8 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_부산청과_최종변환";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath12";
-			//const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanExtCheonggwa";
-            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanExtCheonggwa";
+            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
 			try
 			{
