@@ -1,36 +1,45 @@
-﻿2025-08-28 15:45:15 [INFO] === 프로그램 시작: 2025-08-28 15:45:15 ===
-2025-08-28 15:45:15 [INFO] 🔍 Program.Main: 프로그램 시작
-2025-08-28 15:45:15 [INFO] 🔍 Program.Main: Windows Forms 설정 시작
-2025-08-28 15:45:15 [INFO] ✅ Program.Main: Windows Forms 설정 완료
-2025-08-28 15:45:15 [INFO] 🔍 Program.Main: 데이터베이스 연결 테스트 시작
-2025-08-28 15:45:15 [INFO] ✅ Program.Main: 데이터베이스 연결 테스트 완료!
-2025-08-28 15:45:15 [INFO] 🔍 Program.Main: MainForm 생성 시작
-2025-08-28 15:45:15 [INFO] 🔍 DatabaseService: settings.json에서 직접 데이터베이스 설정을 읽어옵니다.
-2025-08-28 15:45:15 [INFO] 🔍 DatabaseService: 프로젝트 루트 경로: C:\Work\LogisticManager
-2025-08-28 15:45:15 [INFO] 🔍 DatabaseService: 프로젝트 루트 config/settings.json 사용: C:\Work\LogisticManager\config\settings.json
-2025-08-28 15:45:15 [INFO] ✅ settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.
-2025-08-28 15:45:15 [INFO] ✅ 설정 파일을 성공적으로 읽었습니다.
+﻿2025-09-04 11:15:45 [INFO] === 프로그램 시작: 2025-09-04 11:15:45 ===
+2025-09-04 11:15:45 [INFO] 🔍 Program.Main: 프로그램 시작
+2025-09-04 11:15:45 [INFO] 🔍 Program.Main: Windows Forms 설정 시작
+2025-09-04 11:15:45 [INFO] ✅ Program.Main: Windows Forms 설정 완료
+2025-09-04 11:15:45 [INFO] 🔍 Program.Main: 데이터베이스 연결 테스트 시작
+2025-09-04 11:15:45 [INFO] ✅ Program.Main: 데이터베이스 연결 테스트 완료!
+2025-09-04 11:15:45 [INFO] 🔍 Program.Main: MainForm 생성 시작
+2025-09-04 11:15:45 [INFO] 🔍 DatabaseService: settings.json에서 직접 데이터베이스 설정을 읽어옵니다.
+2025-09-04 11:15:45 [INFO] 🔍 DatabaseService: config/settings.json 사용: C:\Work\LogisticManager\bin\Debug\net8.0-windows\win-x64\config\settings.json
+2025-09-04 11:15:45 [INFO] ✅ settings.json에서 데이터베이스 설정을 성공적으로 읽어왔습니다.
+2025-09-04 11:15:45 [INFO] ✅ 설정 파일을 성공적으로 읽었습니다.
 
 데이터베이스 연결 정보가 올바르게 설정되었습니다.
-2025-08-28 15:45:15 [INFO] ✅ DatabaseService: 비밀번호 복호화 성공
-2025-08-28 15:45:15 [INFO] 🔗 DatabaseService: 최종 설정값
-2025-08-28 15:45:15 [INFO]    서버: gramwonlogis2.mycafe24.com
-2025-08-28 15:45:15 [INFO]    데이터베이스: gramwonlogis2
-2025-08-28 15:45:15 [INFO] 📊 DatabaseService: 연결 정보 상세
-2025-08-28 15:45:15 [INFO]    서버: gramwonlogis2.mycafe24.com
-2025-08-28 15:45:15 [INFO]    데이터베이스: gramwonlogis2
-2025-08-28 15:45:15 [INFO] ✅ DatabaseService 초기화 완료
-2025-08-28 15:45:15 [BATCH] 현재 시간: 15:45:15, TimeSpan: 15:45:15.6913660
-2025-08-28 15:45:15 [BATCH] 현재 시간: 15:45:15, TimeSpan: 15:45:15.6984314
-2025-08-28 15:45:15 [BATCH] 현재 시간: 15:45:15, TimeSpan: 15:45:15.7384729
-2025-08-28 15:45:15 [BATCH] 현재 시간: 15:45:15, TimeSpan: 15:45:15.7386931
-2025-08-28 15:45:15 [INFO] 🔍 MainForm: 기존 DB 정보 - Server: gramwonlogis2.mycafe24.com
-2025-08-28 15:45:15 [INFO] 🔍 MainForm: 기존 DB 정보 - Database: gramwonlogis2
-2025-08-28 15:45:15 [INFO] 📊 MainForm: 연결 테스트 결과 = True
-2025-08-28 15:45:15 [INFO] 📊 MainForm: 메시지 = 연결 성공
-2025-08-28 15:45:15 [INFO] 🔍 MainForm: 최신 DB 정보 - Server: gramwonlogis2.mycafe24.com
-2025-08-28 15:45:15 [INFO] 🔍 MainForm: 최신 DB 정보 - Database: gramwonlogis2
-2025-08-28 15:45:15 [INFO] ✅ MainForm: 연결 성공 처리 완료
-2025-08-28 15:45:15 [INFO] ✅ Program.Main: MainForm 생성 완료
-2025-08-28 15:45:15 [INFO] 🔍 Program.Main: MainForm 실행 시작
-2025-08-28 15:45:21 [INFO] ✅ Program.Main: MainForm 실행 완료
+2025-09-04 11:15:45 [INFO] ✅ DatabaseService: 비밀번호 복호화 성공
+2025-09-04 11:15:45 [INFO] 🔗 DatabaseService: 최종 설정값
+2025-09-04 11:15:45 [INFO]    서버: gramwonlogis2.mycafe24.com
+2025-09-04 11:15:45 [INFO]    데이터베이스: gramwonlogis2
+2025-09-04 11:15:45 [INFO] 📊 DatabaseService: 연결 정보 상세
+2025-09-04 11:15:45 [INFO]    서버: gramwonlogis2.mycafe24.com
+2025-09-04 11:15:45 [INFO]    데이터베이스: gramwonlogis2
+2025-09-04 11:15:45 [INFO] ✅ DatabaseService 초기화 완료
+2025-09-04 11:15:46 [INFO] 🔍 MainForm: 기존 DB 정보 - Server: gramwonlogis2.mycafe24.com
+2025-09-04 11:15:46 [INFO] 🔍 MainForm: 기존 DB 정보 - Database: gramwonlogis2
+2025-09-04 11:15:46 [INFO] 📊 MainForm: 메시지 = 연결 성공
+2025-09-04 11:15:46 [INFO] 🔍 MainForm: 최신 DB 정보 - Server: gramwonlogis2.mycafe24.com
+2025-09-04 11:15:46 [INFO] 🔍 MainForm: 최신 DB 정보 - Database: gramwonlogis2
+2025-09-04 11:15:46 [INFO] ✅ MainForm: 연결 성공 처리 완료
+2025-09-04 11:15:46 [INFO] ✅ Program.Main: MainForm 생성 완료
+2025-09-04 11:15:46 [INFO] 🔍 Program.Main: MainForm 실행 시작
+2025-09-04 11:15:51 [INFO] 셀 값 설정 시작
+2025-09-04 11:15:57 [INFO] 기존 공통코드 수정: USER_ROLE.ADMIN
+2025-09-04 11:15:57 [INFO] 기존 공통코드 수정: USER_ROLE.USER
+2025-09-04 11:15:57 [INFO] 기존 공통코드 수정: USER_ROLE.GUEST
+2025-09-04 11:15:57 [INFO] 기존 공통코드 수정: USER_ROLE.NEW_20250904111333
+2025-09-04 11:15:57 [INFO] 새 공통코드 추가: USER_ROLE.NEW_20250904111551
+2025-09-04 11:15:57 [INFO] 공통코드 일괄 저장 완료: 5개 처리됨
+2025-09-04 11:16:07 [INFO] 공통코드 삭제 처리 시작: USER_ROLE.NEW_20250904111551
+2025-09-04 11:16:07 [INFO] 삭제 대상 공통코드 존재 확인: 1개
+2025-09-04 11:16:07 [INFO] 공통코드 삭제 완료: USER_ROLE.NEW_20250904111551, 영향받은 행: 1개
+2025-09-04 11:16:08 [INFO] === 삭제 버튼 클릭 이벤트 완료 ===
+2025-09-04 11:16:17 [INFO] 공통코드 삭제 처리 시작: USER_ROLE.NEW_20250904111333
+2025-09-04 11:16:17 [INFO] 삭제 대상 공통코드 존재 확인: 1개
+2025-09-04 11:16:17 [INFO] 공통코드 삭제 완료: USER_ROLE.NEW_20250904111333, 영향받은 행: 1개
+2025-09-04 11:16:18 [INFO] === 삭제 버튼 클릭 이벤트 완료 ===
+2025-09-04 11:16:28 [INFO] ✅ Program.Main: MainForm 실행 완료

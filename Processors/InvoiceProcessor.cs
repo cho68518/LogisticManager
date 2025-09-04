@@ -5913,7 +5913,7 @@ namespace LogisticManager.Processors
 				if (frapwonFrozenData == null || frapwonFrozenData.Rows.Count == 0)
 				{
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 프랩원냉동 최종 데이터가 없습니다.");
-					return true; // 데이터가 없는 것은 오류가 아님
+					//return true; // 데이터가 없는 것은 오류가 아님
 				}
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {frapwonFrozenData.Rows.Count:N0}건");
