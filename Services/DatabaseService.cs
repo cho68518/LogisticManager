@@ -1588,34 +1588,29 @@ namespace LogisticManager.Services
                 var insertDataSql = GenerateInsertDataSql(tempTableName, dataTable);
                 command.CommandText = insertDataSql;
                 
-                // 배치 처리로 데이터 삽입
-                var batchSize = 1000; // 배치 크기
+                // ✅ 16GB 환경 최적화: 단순한 전체 데이터 삽입
+                // 배치 처리 없이 전체 데이터를 한 번에 삽입
                 var totalRows = dataTable.Rows.Count;
                 
-                for (int i = 0; i < totalRows; i += batchSize)
+                LogManagerService.LogInfo($"🚀 전체 데이터 삽입 시작 - 총 {totalRows:N0}행 (16GB 환경 최적화)");
+                
+                // 전체 데이터 파라미터 설정
+                for (int rowIndex = 0; rowIndex < totalRows; rowIndex++)
                 {
-                    var currentBatchSize = Math.Min(batchSize, totalRows - i);
-                    var batchSql = insertDataSql;
+                    var row = dataTable.Rows[rowIndex];
                     
-                    // 배치별 파라미터 설정
-                    for (int j = 0; j < currentBatchSize; j++)
+                    for (int colIndex = 0; colIndex < dataTable.Columns.Count; colIndex++)
                     {
-                        var rowIndex = i + j;
-                        var row = dataTable.Rows[rowIndex];
+                        var columnName = dataTable.Columns[colIndex].ColumnName;
+                        var value = row[colIndex] ?? DBNull.Value;
                         
-                        for (int colIndex = 0; colIndex < dataTable.Columns.Count; colIndex++)
-                        {
-                            var columnName = dataTable.Columns[colIndex].ColumnName;
-                            var value = row[colIndex] ?? DBNull.Value;
-                            
-                            var parameterName = $"@p{rowIndex}_{colIndex}";
-                            command.Parameters.AddWithValue(parameterName, value);
-                        }
+                        var parameterName = $"@p{rowIndex}_{colIndex}";
+                        command.Parameters.AddWithValue(parameterName, value);
                     }
-                    
-                    await command.ExecuteNonQueryAsync();
-                    LogManagerService.LogInfo($"DatabaseService: 배치 데이터 삽입 완료 - {i + 1}~{i + currentBatchSize}행 / 총 {totalRows}행");
                 }
+                
+                await command.ExecuteNonQueryAsync();
+                LogManagerService.LogInfo($"✅ 전체 데이터 삽입 완료 - 총 {totalRows:N0}행 (16GB 환경 최적화)");
 
                 // 3단계: 프로시저 호출 (임시 테이블명을 파라미터로 전달)
                 LogManagerService.LogInfo($"DatabaseService: 프로시저 호출 시작 - 프로시저명: {procedureName}");

@@ -147,7 +147,7 @@ namespace LogisticManager.Services
                 // 로그 기록
                 LogManagerService.LogInfo($"🕒 ProcessingTimeManager: 처리 시간 측정 시작");
                 LogManagerService.LogInfo($"   시작 시간: {_startTime:yyyy-MM-dd HH:mm:ss.fff}");
-                LogManagerService.LogInfo($"   목표 TestLevel: {_targetTestLevel}");
+                LogManagerService.LogInfo($"   : {_targetTestLevel}");
 
                 // 이벤트 발생
                 ProcessingStarted?.Invoke(this, new ProcessingTimeEventArgs(_startTime.Value, null, TimeSpan.Zero));

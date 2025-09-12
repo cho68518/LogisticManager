@@ -467,10 +467,9 @@ namespace LogisticManager.Services
                 }
 
                 var totalRows = data.Rows.Count;
-                var batchSize = 500; // 배치 크기
                 var processedRows = 0;
 
-                progress?.Report($"🔄 배치 처리 시작: 총 {totalRows:N0}행, 배치 크기: {batchSize}");
+                progress?.Report($"🚀 전체 데이터 처리 시작: 총 {totalRows:N0}행 (16GB 환경 최적화)");
 
                 using (var connection = new MySqlConnection(_databaseService.GetConnectionString()))
                 {
@@ -478,39 +477,24 @@ namespace LogisticManager.Services
                     
                     try
                     {
-                        for (int i = 0; i < totalRows; i += batchSize)
-                        {
-                            var currentBatchSize = Math.Min(batchSize, totalRows - i);
-                            var batchData = data.Clone();
-                            
-                            // 현재 배치의 데이터 복사
-                            for (int j = 0; j < currentBatchSize; j++)
-                            {
-                                batchData.ImportRow(data.Rows[i + j]);
-                            }
+                        // ✅ 16GB 환경 최적화: 단순한 전체 데이터 처리
+                        // 배치 처리 없이 전체 데이터를 한 번에 처리
+                        processedRows = await ProcessBatchDataAsync(connection, data, tableName, progress);
 
-                            // 배치 데이터 처리
-                            var batchProcessed = await ProcessBatchDataAsync(connection, batchData, tableName, progress);
-                            processedRows += batchProcessed;
-
-                            var progressPercentage = (i + currentBatchSize) * 100 / totalRows;
-                            progress?.Report($"📊 배치 처리 진행률: {progressPercentage}% ({processedRows:N0}/{totalRows:N0}행)");
-                        }
-
-                        progress?.Report($"✅ 배치 처리 완료: 총 {processedRows:N0}행 처리됨");
+                        progress?.Report($"✅ 전체 데이터 처리 완료: 총 {processedRows:N0}행 처리됨");
                         progress?.Report("");
                         return processedRows;
                     }
                     catch (Exception ex)
                     {
-                        progress?.Report($"❌ 배치 처리 중 오류 발생: {ex.Message}");
+                        progress?.Report($"❌ 전체 데이터 처리 중 오류 발생: {ex.Message}");
                         throw;
                     }
                 }
             }
             catch (Exception ex)
             {
-                progress?.Report($"❌ 배치 처리 실패: {ex.Message}");
+                progress?.Report($"❌ 전체 데이터 처리 실패: {ex.Message}");
                 throw;
             }
         }
@@ -552,10 +536,9 @@ namespace LogisticManager.Services
                 }
 
                 var totalRows = data.Rows.Count;
-                var batchSize = 500; // 배치 크기
                 var processedRows = 0;
 
-                progress?.Report($"🔄 배치 처리 시작: 총 {totalRows:N0}행, 배치 크기: {batchSize}");
+                progress?.Report($"🚀 전체 데이터 처리 시작: 총 {totalRows:N0}행 (16GB 환경 최적화)");
 
                 using (var connection = new MySqlConnection(_databaseService.GetConnectionString()))
                 {
@@ -563,39 +546,24 @@ namespace LogisticManager.Services
                     
                     try
                     {
-                        for (int i = 0; i < totalRows; i += batchSize)
-                        {
-                            var currentBatchSize = Math.Min(batchSize, totalRows - i);
-                            var batchData = data.Clone();
-                            
-                            // 현재 배치의 데이터 복사
-                            for (int j = 0; j < currentBatchSize; j++)
-                            {
-                                batchData.ImportRow(data.Rows[i + j]);
-                            }
+                        // ✅ 16GB 환경 최적화: 단순한 전체 데이터 처리
+                        // 배치 처리 없이 전체 데이터를 한 번에 처리
+                        processedRows = await ProcessBatchDataAsync(connection, data, tableName, progress);
 
-                            // 배치 데이터 처리
-                            var batchProcessed = await ProcessBatchDataAsync(connection, batchData, tableName, progress);
-                            processedRows += batchProcessed;
-
-                            var progressPercentage = (i + currentBatchSize) * 100 / totalRows;
-                            progress?.Report($"📊 배치 처리 진행률: {progressPercentage}% ({processedRows:N0}/{totalRows:N0}행)");
-                        }
-
-                        progress?.Report($"✅ 배치 처리 완료: 총 {processedRows:N0}행 처리됨");
+                        progress?.Report($"✅ 전체 데이터 처리 완료: 총 {processedRows:N0}행 처리됨");
                         progress?.Report("");
                         return processedRows;
                     }
                     catch (Exception ex)
                     {
-                        progress?.Report($"❌ 배치 처리 중 오류 발생: {ex.Message}");
+                        progress?.Report($"❌ 전체 데이터 처리 중 오류 발생: {ex.Message}");
                         throw;
                     }
                 }
             }
             catch (Exception ex)
             {
-                progress?.Report($"❌ 배치 처리 실패: {ex.Message}");
+                progress?.Report($"❌ 전체 데이터 처리 실패: {ex.Message}");
                 throw;
             }
         }

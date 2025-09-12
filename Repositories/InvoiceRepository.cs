@@ -240,92 +240,83 @@ namespace LogisticManager.Repositories
                 return 0; // 삽입된 행 수 0 반환
             }
 
-            // === 2단계: 배치 처리 통계 변수 초기화 ===
+            // === 2단계: 16GB 환경 최적화 - 단순한 전체 데이터 처리 ===
             var totalRows = invoiceList.Count;     // 전체 처리할 행 수
             var processedRows = 0;                 // 실제 처리 완료된 행 수
             
-            // UI에 배치 처리 시작 정보 알림 (커스텀 테이블명 포함)
-            progress?.Report($"📊 총 {totalRows}건의 데이터를 배치 처리합니다... (테이블: {tableName}, 배치 크기: {batchSize}건)");
+            // UI에 전체 처리 시작 정보 알림 (16GB 환경 최적화)
+            progress?.Report($"🚀 총 {totalRows}건의 데이터를 전체 처리합니다... (테이블: {tableName}, 16GB 환경 최적화)");
+            LogManagerService.LogInfo($"🚀 전체 데이터 처리 시작 - 총 {totalRows:N0}건 (16GB 환경 최적화)");
             
             try
             {
-                // === 3단계: 배치 단위 순차 처리 루프 ===
-                // 전체 데이터를 batchSize 크기씩 나누어 순차적으로 처리
-                for (int i = 0; i < totalRows; i += batchSize)
+                // === 3단계: 16GB 환경 최적화 - 단순한 전체 데이터 처리 ===
+                // 배치 처리 없이 전체 데이터를 한 번에 처리
+                var allQueries = new List<(string sql, Dictionary<string, object> parameters)>();
+                
+                // === 3-1: 전체 데이터의 쿼리 목록 준비 ===
+                foreach (var invoice in invoiceList)
                 {
-                    // === 3-1: 현재 배치의 쿼리 목록 준비 ===
-                    var batchQueries = new List<(string sql, Dictionary<string, object> parameters)>();
-                    
-                    // 현재 배치의 끝 인덱스 계산 (전체 데이터 범위를 벗어나지 않도록)
-                    var endIndex = Math.Min(i + batchSize, totalRows);
-                    
-                    // === 3-2: 현재 배치 범위의 각 송장 데이터 처리 ===
-                    for (int j = i; j < endIndex; j++)
+                    // === 개별 송장 데이터 유효성 검사 ===
+                    // InvoiceDto.IsValid(): 필수 필드 존재 여부 및 비즈니스 규칙 검증
+                    if (invoice.IsValid())
                     {
-                        var invoice = invoiceList[j];
-                        
-                        // === 개별 송장 데이터 유효성 검사 ===
-                        // InvoiceDto.IsValid(): 필수 필드 존재 여부 및 비즈니스 규칙 검증
-                        if (invoice.IsValid())
-                        {
-                            // 유효한 데이터인 경우 INSERT 쿼리 및 매개변수 생성 (커스텀 테이블명 사용)
-                            var (sql, parameters) = BuildInsertQuery(tableName, invoice);
-                            batchQueries.Add((sql, parameters));
-                        }
-                        // 유효하지 않은 데이터는 자동으로 스킵됨 (로그 없이 조용히 처리)
+                        // 유효한 데이터인 경우 INSERT 쿼리 및 매개변수 생성 (커스텀 테이블명 사용)
+                        var (sql, parameters) = BuildInsertQuery(tableName, invoice);
+                        allQueries.Add((sql, parameters));
                     }
-                    
-                    // === 3-3: 생성된 배치 쿼리 실행 ===
-                    // 배치에 유효한 쿼리가 하나라도 있는 경우에만 DB 실행
-                    if (batchQueries.Count > 0)
-                    {
-                        var batchLog = $"[InvoiceRepository] 배치 {i / batchSize + 1} 실행 시작 - 쿼리 수: {batchQueries.Count}";
-                        LogManagerService.LogInfo($"{batchLog}");
-                        
-                        // === 첫 번째 쿼리 상세 로깅 ===
-                        if (batchQueries.Count > 0)
-                        {
-                            var firstQuery = batchQueries.First();
-                            var sqlLog = $"[InvoiceRepository] 첫 번째 쿼리 SQL: {firstQuery.sql}";
-                            var paramLog = $"[InvoiceRepository] 첫 번째 쿼리 매개변수: {string.Join(", ", firstQuery.parameters.Select(p => $"{p.Key}={p.Value}"))}";
-                            
-                            LogManagerService.LogInfo($"{sqlLog}");
-                            LogManagerService.LogInfo($"{paramLog}");
-                        }
-                        
-                        // === 트랜잭션 단위 배치 실행 ===
-                        // ExecuteParameterizedTransactionAsync: 모든 쿼리를 하나의 트랜잭션으로 실행
-                        // 하나라도 실패하면 전체 배치 롤백되어 데이터 일관성 보장
-                        var success = await _databaseService.ExecuteParameterizedTransactionAsync(batchQueries);
-                        
-                        var resultLog = $"[InvoiceRepository] 배치 {i / batchSize + 1} 실행 결과: {(success ? "성공" : "실패")}";
-                        LogManagerService.LogInfo($"{resultLog}");
-                        
-                        // === 배치 실행 결과 검증 ===
-                        if (!success)
-                        {
-                            var failureLog = $"[InvoiceRepository] 배치 {i / batchSize + 1} 삽입 실패 - 상세 정보 로깅 완료";
-                            LogManagerService.LogError($"{failureLog}");
-                            throw new InvalidOperationException($"배치 삽입 실패 (배치 {i / batchSize + 1})");
-                        }
-                        
-                        // === 처리 통계 업데이트 ===
-                        processedRows += batchQueries.Count;
-                        
-                        // === 실시간 진행률 계산 및 UI 업데이트 ===
-                        var progressPercentage = (int)((double)processedRows / totalRows * 100);
-                        progress?.Report($"📈 데이터 삽입 진행률: {progressPercentage}% ({processedRows}/{totalRows}건)");
-                    }
-                    // batchQueries.Count == 0인 경우: 해당 배치의 모든 데이터가 유효성 검사 실패
+                    // 유효하지 않은 데이터는 자동으로 스킵됨 (로그 없이 조용히 처리)
                 }
                 
-                // === 4단계: 전체 배치 처리 완료 보고 ===
-                progress?.Report($"✅ 배치 삽입 완료: 총 {processedRows}건 처리됨 (테이블: {tableName})");
+                // === 3-2: 전체 쿼리 실행 ===
+                if (allQueries.Count > 0)
+                {
+                    var totalLog = $"[InvoiceRepository] 전체 데이터 처리 시작 - 총 쿼리 수: {allQueries.Count:N0}건";
+                    LogManagerService.LogInfo($"{totalLog}");
+                    
+                    // === 첫 번째 쿼리 상세 로깅 ===
+                    if (allQueries.Count > 0)
+                    {
+                        var firstQuery = allQueries.First();
+                        var sqlLog = $"[InvoiceRepository] 첫 번째 쿼리 SQL: {firstQuery.sql}";
+                        var paramLog = $"[InvoiceRepository] 첫 번째 쿼리 매개변수: {string.Join(", ", firstQuery.parameters.Select(p => $"{p.Key}={p.Value}"))}";
+                        
+                        LogManagerService.LogInfo($"{sqlLog}");
+                        LogManagerService.LogInfo($"{paramLog}");
+                    }
+                    
+                    // === 트랜잭션 단위 전체 실행 ===
+                    // ExecuteParameterizedTransactionAsync: 모든 쿼리를 하나의 트랜잭션으로 실행
+                    // 하나라도 실패하면 전체 롤백되어 데이터 일관성 보장
+                    var success = await _databaseService.ExecuteParameterizedTransactionAsync(allQueries);
+                    
+                    var resultLog = $"[InvoiceRepository] 전체 데이터 처리 결과: {(success ? "성공" : "실패")}";
+                    LogManagerService.LogInfo($"{resultLog}");
+                    
+                    // === 전체 실행 결과 검증 ===
+                    if (!success)
+                    {
+                        var failureLog = $"[InvoiceRepository] 전체 데이터 삽입 실패 - 상세 정보 로깅 완료";
+                        LogManagerService.LogError($"{failureLog}");
+                        throw new InvalidOperationException($"전체 데이터 삽입 실패");
+                    }
+                    
+                    // === 처리 통계 업데이트 ===
+                    processedRows = allQueries.Count;
+                    
+                    // === 진행률 완료 보고 ===
+                    progress?.Report($"📈 데이터 삽입 완료: 100% ({processedRows:N0}/{totalRows:N0}건)");
+                }
+                
+                // === 4단계: 전체 처리 완료 보고 ===
+                progress?.Report($"✅ 전체 데이터 삽입 완료: 총 {processedRows:N0}건 처리됨 (테이블: {tableName})");
+                LogManagerService.LogInfo($"✅ 전체 데이터 삽입 완료: 총 {processedRows:N0}건 처리됨 (테이블: {tableName}) - 16GB 환경 최적화");
                 return processedRows; // 실제 DB에 삽입된 행 수 반환
             }
             catch (Exception ex)
             {
-                progress?.Report($"❌ 배치 삽입 실패: {ex.Message}");
+                progress?.Report($"❌ 전체 데이터 삽입 실패: {ex.Message}");
+                LogManagerService.LogError($"❌ 전체 데이터 삽입 실패: {ex.Message}");
                 throw;
             }
         }

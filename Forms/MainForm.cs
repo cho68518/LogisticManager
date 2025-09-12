@@ -61,6 +61,15 @@ namespace LogisticManager.Forms
 
         #endregion
 
+        #region 속성 (Properties)
+        
+        /// <summary>
+        /// 선택된 차수 정보를 반환하는 속성
+        /// </summary>
+        public string SelectedBatch => cmbBatch?.SelectedItem?.ToString() ?? "1차";
+        
+        #endregion
+
         #region UI 컨트롤 (UI Controls)
         
         /// <summary>
@@ -78,6 +87,7 @@ namespace LogisticManager.Forms
         /// </summary>
         private Button btnSettings = null!;
         private CheckBox chkKakaoSend = null!; // [한글 주석] 카카오워크 전송 여부 체크박스
+        private ComboBox cmbBatch = null!; // [한글 주석] 차수 선택 콤보박스
         
         /// <summary>
         /// 선택된 파일 경로 표시 라벨
@@ -276,8 +286,8 @@ namespace LogisticManager.Forms
             
             // 로그에 설정값 출력
             LogMessage($"🔍 MainForm: Login 설정값 = '{loginSetting}', showUserInfo = {showUserInfo}");
-            // 폼 기본 설정 (상단 좌측 창 제목에 버전과 차수 정보 표시)
-            this.Text = GetBatchTitle($"송장 처리 시스템 ({GetAppVersionString()})");
+            // 폼 기본 설정 (상단 좌측 창 제목에 차수 정보만 표시, 버전 숨김)
+            this.Text = GetBatchTitle("송장 처리 시스템");
             this.Size = new Size(1100, 900); // 폼 크기를 1100으로 조정
             this.StartPosition = FormStartPosition.CenterScreen;
             this.FormBorderStyle = FormBorderStyle.Sizable; // 크기 조절 가능하도록 변경
@@ -332,17 +342,148 @@ namespace LogisticManager.Forms
             btnSettings = CreateModernButton("⚙️ 설정/확인", new Point(690, 80), new Size(90, 40), Color.FromArgb(52, 152, 219));
             btnSettings.Click += BtnSettings_Click;
 
-            // [한글 주석] 카카오워크 전송 체크박스 생성 (설정 버튼 왼쪽)
+            // [한글 주석] 카카오워크 전송 그룹박스 생성
+            var grpKakao = new GroupBox
+            {
+                Text = "알림 설정",
+                Location = new Point(0, 0), // 임시 위치, MainForm_Resize에서 실제 위치 설정
+                Size = new Size(150, 50),
+                Font = new Font("맑은 고딕", 8F, FontStyle.Bold),
+                ForeColor = Color.Blue, // 파란색 텍스트로 변경
+                BackColor = Color.Transparent // 배경색 제거
+            };
+
+            // [한글 주석] 카카오워크 전송 체크박스 생성 (그룹박스 내부에 배치)
             var kakaoCheckValue = System.Configuration.ConfigurationManager.AppSettings["KakaoCheck"] ?? "N";
             bool isKakaoChecked = kakaoCheckValue.Equals("Y", StringComparison.OrdinalIgnoreCase);
             chkKakaoSend = new CheckBox
             {
                 Text = "카카오워크 전송",
                 AutoSize = true,
-                Location = new Point(btnSettings.Location.X - 120, 88), // 설정 버튼 왼쪽에 배치
+                Location = new Point(10, 20), // 그룹박스 내부 위치
                 Font = new Font("맑은 고딕", 9F, FontStyle.Bold), // 굵은 글꼴 적용
                 Checked = isKakaoChecked
             };
+            // 그룹박스 텍스트는 파란색이지만, 체크박스 텍스트는 기본 텍스트 색상으로 유지
+            chkKakaoSend.ForeColor = SystemColors.ControlText;
+            
+            // 그룹박스에 체크박스 추가
+            grpKakao.Controls.Add(chkKakaoSend);
+
+            // [한글 주석] 차수 선택 그룹박스 생성
+            var grpBatch = new GroupBox
+            {
+                Text = "차수 선택",
+                Location = new Point(0, 0), // 임시 위치, MainForm_Resize에서 실제 위치 설정
+                Size = new Size(120, 50),
+                Font = new Font("맑은 고딕", 8F, FontStyle.Bold),
+                ForeColor = Color.Blue, // 파란색 텍스트로 변경
+                BackColor = Color.FromArgb(240, 248, 255) // 연한 파란색 배경
+            };
+
+            // [한글 주석] 차수 선택 콤보박스 생성 (그룹박스 내부에 배치)
+            cmbBatch = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Location = new Point(10, 20), // 그룹박스 내부 위치
+                Size = new Size(100, 25),
+                Font = new Font("맑은 고딕", 9F),
+                BackColor = Color.White,
+                FlatStyle = FlatStyle.Flat
+            };
+            
+            // 그룹박스에 콤보박스 추가
+            grpBatch.Controls.Add(cmbBatch);
+            
+            // 차수 옵션 추가 (1차~5차, 특별 차수는 별도 표시)
+            for (int i = 1; i <= 5; i++)
+            {
+                cmbBatch.Items.Add($"{i}차");
+            }
+            cmbBatch.Items.Add("막차");
+            cmbBatch.Items.Add("추가");
+            
+            // 현재 차수로 설정 (BatchTimeService의 배치 타입을 콤보박스 형식에 맞게 변환)
+            var currentBatchType = BatchTimeService.Instance.GetCurrentBatchType();
+            string currentBatch = "1차"; // 기본값
+            
+            // BatchTimeService의 배치 타입을 콤보박스 형식으로 변환
+            switch (currentBatchType)
+            {
+                case "1차": currentBatch = "1차"; break;
+                case "2차": currentBatch = "2차"; break;
+                case "3차": currentBatch = "3차"; break;
+                case "4차": currentBatch = "4차"; break;
+                case "5차": currentBatch = "5차"; break;
+                case "막차": currentBatch = "막차"; break;
+                case "추가": currentBatch = "추가"; break;
+                case "기타": currentBatch = "추가"; break;
+                case "대기": 
+                    // 배치 시간이 아닌 경우 가장 가까운 다음 배치로 설정
+                    currentBatch = GetNextBatch();
+                    break;
+                default: currentBatch = "1차"; break;
+            }
+            
+            // 프로그램 시작 시 현재 시간에 맞는 차수를 콤보박스에 한 번만 설정
+            try
+            {
+                var currentTime = DateTime.Now.ToString("HH:mm:ss");
+                LogMessage($"🕒 프로그램 시작 시 차수 설정 시작: {currentTime} → {currentBatchType} → {currentBatch}");
+                
+                // 콤보박스에 항목이 있는지 확인
+                if (cmbBatch.Items.Count > 0)
+                {
+                    // SelectedItem으로 설정 시도
+                    cmbBatch.SelectedItem = currentBatch;
+                    
+                    // SelectedItem이 제대로 설정되었는지 확인
+                    if (cmbBatch.SelectedItem?.ToString() != currentBatch)
+                    {
+                        // SelectedItem으로 설정되지 않았다면 SelectedIndex로 시도
+                        int targetIndex = cmbBatch.Items.IndexOf(currentBatch);
+                        if (targetIndex >= 0)
+                        {
+                            cmbBatch.SelectedIndex = targetIndex;
+                            LogMessage($"✅ SelectedIndex로 차수 설정 성공: {currentBatch} (인덱스: {targetIndex})");
+                        }
+                        else
+                        {
+                            LogMessage($"⚠️ 콤보박스에 '{currentBatch}' 항목이 없음, 기본값(1차) 사용");
+                            cmbBatch.SelectedIndex = 0; // 첫 번째 항목(1차) 선택
+                        }
+                    }
+                    else
+                    {
+                        LogMessage($"✅ SelectedItem으로 차수 설정 성공: {currentBatch}");
+                    }
+                }
+                else
+                {
+                    LogMessage($"⚠️ 콤보박스에 항목이 없음, 기본값(1차) 사용");
+                    cmbBatch.SelectedIndex = 0; // 첫 번째 항목(1차) 선택
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"⚠️ 차수 설정 실패, 기본값(1차) 사용: {ex.Message}");
+                cmbBatch.SelectedIndex = 0; // 첫 번째 항목(1차) 선택
+            }
+            
+            // [한글 주석] 콤보박스 선택 변경 이벤트 추가
+            cmbBatch.SelectedIndexChanged += (s, e) =>
+            {
+                try
+                {
+                    var selectedBatch = cmbBatch.SelectedItem?.ToString() ?? "1차";
+                    LogMessage($"🔄 사용자가 차수를 변경했습니다: {selectedBatch}");
+                }
+                catch (Exception ex)
+                {
+                    LogMessage($"⚠️ 차수 변경 이벤트 처리 중 오류: {ex.Message}");
+                }
+            };
+            
             // [한글 주석] 체크 변경 시 App.config 값 업데이트
             chkKakaoSend.CheckedChanged += (s, e) =>
             {
@@ -634,8 +775,9 @@ namespace LogisticManager.Forms
             {
                 lblTitle,
                 btnSelectFile,
+                grpBatch, // 차수 선택 그룹박스 추가
+                grpKakao, // 카카오워크 알림 그룹박스 추가
                 lblFilePath,
-                chkKakaoSend,
                 btnSettings,
                 btnDropboxTest,
                 btnKakaoWorkTest,
@@ -677,8 +819,7 @@ namespace LogisticManager.Forms
             // 초기 로그 메시지 출력
             LogMessage("🎉 송장 처리 시스템이 시작되었습니다.");
             LogMessage("📁 파일을 선택하고 '송장 처리 시작' 버튼을 클릭하세요.");
-            
-            // 화면 하단 파일목록에 샘플 데이터 주입 로직 제거됨
+            // 현재 선택된 콤보박스 차수를 로그로 남김 (한글 주석)
             
             // 현재 날짜/시간을 상태표시줄 라벨에 표시
             UpdateDateTimeDisplay();
@@ -689,7 +830,11 @@ namespace LogisticManager.Forms
                 Interval = 1000, // 1초 = 1,000ms
                 Enabled = true
             };
-            dateTimeTimer.Tick += (sender, e) => UpdateDateTimeDisplay();
+            dateTimeTimer.Tick += (sender, e) => 
+            {
+                UpdateDateTimeDisplay();
+                // 차수 자동 업데이트 제거 - 프로그램 시작 시 한 번만 설정
+            };
             
             // UI 초기화 완료 후 배치 타이틀 설정 및 타이머 시작
             UpdateBatchTitle();
@@ -862,10 +1007,24 @@ namespace LogisticManager.Forms
             // 각 버튼의 실제 Width 속성을 사용하여 정확한 위치 계산
             btnExit.Location = new Point(this.ClientSize.Width - rightMargin - btnExit.Width, padding + titleHeight + 20);
             btnSettings.Location = new Point(btnExit.Location.X - btnSettings.Width - buttonSpacing, padding + titleHeight + 20);
-            // [한글 주석] 설정 버튼 왼쪽에 카카오워크 전송 체크박스를 정렬 (세로 중앙 정렬)
-            int kakaoCheckX = btnSettings.Location.X - 10 - chkKakaoSend.Width; // 설정 버튼과 10px 간격
-            int kakaoCheckY = padding + titleHeight + 20 + (btnSettings.Height - chkKakaoSend.Height) / 2;
-            chkKakaoSend.Location = new Point(kakaoCheckX, kakaoCheckY);
+            // [한글 주석] 설정 버튼 왼쪽에 그룹박스들을 정렬
+            // 카카오워크 그룹박스 위치 설정
+            int kakaoGroupX = btnSettings.Location.X - 20 - 150; // 설정 버튼과 20px 간격 (그룹박스 너비 150px)
+            int kakaoGroupY = padding + titleHeight + 15; // 버튼보다 약간 위에 배치
+            if (this.Controls.OfType<GroupBox>().Any(g => g.Text == "알림 설정"))
+            {
+                var grpKakao = this.Controls.OfType<GroupBox>().First(g => g.Text == "알림 설정");
+                grpKakao.Location = new Point(kakaoGroupX, kakaoGroupY);
+            }
+            
+            // 차수 선택 그룹박스 위치 설정
+            int batchGroupX = kakaoGroupX - 20 - 120; // 카카오워크 그룹박스와 20px 간격 (그룹박스 너비 120px)
+            int batchGroupY = padding + titleHeight + 15; // 카카오워크 그룹박스와 같은 높이
+            if (this.Controls.OfType<GroupBox>().Any(g => g.Text == "차수 선택"))
+            {
+                var grpBatch = this.Controls.OfType<GroupBox>().First(g => g.Text == "차수 선택");
+                grpBatch.Location = new Point(batchGroupX, batchGroupY);
+            }
             btnDropboxTest.Location = new Point(btnSettings.Location.X - btnDropboxTest.Width - buttonSpacing, padding + titleHeight + 20);
             btnKakaoWorkTest.Location = new Point(btnDropboxTest.Location.X - btnKakaoWorkTest.Width - buttonSpacing, padding + titleHeight + 20);
 
@@ -1157,6 +1316,54 @@ namespace LogisticManager.Forms
                 return;
             }
 
+            // 차수 검증 로직 추가
+            try
+            {
+                // 현재 선택된 차수 가져오기
+                string selectedBatch = SelectedBatch;
+                
+                // 차수 검증 실행
+                bool isBatchValid = BatchTimeService.Instance.IsBatchTimeValid(selectedBatch);
+                
+                // 차수가 올바르지 않은 경우 확인 다이얼로그 표시
+                if (!isBatchValid)
+                {
+                    string mismatchMessage = BatchTimeService.Instance.GetBatchMismatchMessage(selectedBatch);
+                    
+                    // 사용자에게 확인 다이얼로그 표시
+                    DialogResult result = MessageBox.Show(
+                        mismatchMessage,
+                        "차수 불일치 확인",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning,
+                        MessageBoxDefaultButton.Button2 // 기본 선택을 "아니오"로 설정
+                    );
+                    
+                    // 사용자가 "아니오"를 선택한 경우 처리 중단
+                    if (result == DialogResult.No)
+                    {
+                        LogManagerService.LogInfo($"[MainForm] 사용자가 차수 불일치로 인해 송장처리를 취소했습니다. 선택된 차수: {selectedBatch}");
+                        return;
+                    }
+                    
+                    // 사용자가 "예"를 선택한 경우 계속 진행
+                    LogManagerService.LogInfo($"[MainForm] 사용자가 차수 불일치에도 불구하고 송장처리를 계속 진행합니다. 선택된 차수: {selectedBatch}");
+                }
+                else
+                {
+                    LogManagerService.LogInfo($"[MainForm] 차수 검증 통과: 선택된 차수 {selectedBatch}가 현재 시간대와 일치합니다.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // 차수 검증 중 오류 발생 시 로그 기록하고 계속 진행
+                LogManagerService.LogError($"[MainForm] 차수 검증 중 오류 발생: {ex.Message}");
+                MessageBox.Show($"차수 검증 중 오류가 발생했습니다.\n\n오류: {ex.Message}\n\n계속 진행하시겠습니까?", 
+                    "차수 검증 오류", 
+                    MessageBoxButtons.YesNo, 
+                    MessageBoxIcon.Warning);
+            }
+
             try
             {
                 // 송장처리 시작 시 파일목록 클리어
@@ -1165,6 +1372,9 @@ namespace LogisticManager.Forms
                 // 통합 시간 관리자 시작 (송장처리 시작 버튼 클릭 시점)
                 ProcessingTimeManager.Instance.StartProcessing();
                 
+                // [한글 주석] 현재 선택된 차수를 앱 로그에 기록
+                LogManagerService.LogInfo($"[MainForm] 송장처리 시작 - 선택 차수: {SelectedBatch}");
+
                 // UI 상태 변경
                 btnStartProcess.Enabled = false;
                 btnSelectFile.Enabled = false;
@@ -1206,9 +1416,10 @@ namespace LogisticManager.Forms
                 //   _selectedFilePath : 사용자가 선택한 엑셀 파일 경로
                 //   logCallback       : 로그 메시지 Progress 콜백 (UI 및 로그 기록용)
                 //   progressCallback  : 진행률 Progress 콜백 (UI 진행률 표시용)
-                //   1                 : 처리 단계(1단계, 기본값)  ([4-1]~[4-24])
+                //   testLevel         : 처리 단계(1단계, 기본값)  ([4-1]~[4-24])
+                //   SelectedBatch    : 사용자가 선택한 차수 (콤보박스에서 선택된 값)
                 var testLevel = ConfigurationManager.AppSettings["TestLevel"] ?? "1"; // app.config에서 테스트 레벨 가져오기
-                var result = await processor.ProcessAsync(_selectedFilePath, logCallback, progressCallback, int.Parse(testLevel));
+                var result = await processor.ProcessAsync(_selectedFilePath, logCallback, progressCallback, int.Parse(testLevel), SelectedBatch);
 
                 // 처리 결과에 따른 메시지 표시 (약간의 지연을 두어 로그 순서 보장)
                 await Task.Delay(100); // UI 업데이트를 위한 짧은 지연
@@ -1611,7 +1822,7 @@ namespace LogisticManager.Forms
                 }
                 
                 LogMessage("🕒 송장 처리 시간 측정이 시작되었습니다.");
-                LogMessage($"📊 목표 TestLevel: {ProcessingTimeManager.Instance.TargetTestLevel}");
+                LogMessage($"📊 목표 Level: {ProcessingTimeManager.Instance.TargetTestLevel}");
             }
             catch (Exception ex)
             {
@@ -2228,6 +2439,79 @@ namespace LogisticManager.Forms
         }
         
         /// <summary>
+        /// 현재 시간이 배치 시간이 아닌 경우 가장 가까운 다음 배치를 반환하는 메서드
+        /// </summary>
+        /// <returns>다음 배치 문자열</returns>
+        private string GetNextBatch()
+        {
+            try
+            {
+                DateTime now = DateTime.Now;
+                TimeSpan currentTime = now.TimeOfDay;
+                
+                LogMessage($"GetNextBatch 호출: 현재 시간 {now:HH:mm:ss}");
+                
+                // 현재 시간 이후의 다음 배치 시간대를 찾기 (KakaoWorkService 규칙 적용)
+                if (currentTime >= new TimeSpan(0, 0, 0) && currentTime < new TimeSpan(1, 0, 0))
+                {
+                    LogMessage($"00:00~01:00 시간대 → 다음 배치: 1차");
+                    return "1차"; // 00:00~01:00 → 1차
+                }
+                else if (currentTime >= new TimeSpan(23, 0, 0) && currentTime < new TimeSpan(24, 0, 0))
+                {
+                    LogMessage($"23:00~24:00 시간대 → 다음 배치: 1차");
+                    return "1차"; // 23:00~24:00 → 다음날 1차
+                }
+                else if (currentTime >= new TimeSpan(1, 0, 0) && currentTime <= new TimeSpan(7, 0, 0))
+                {
+                    LogMessage($"1차 배치 시간대 → 다음 배치: 2차");
+                    return "2차"; // 1차 배치 중 → 2차
+                }
+                else if (currentTime > new TimeSpan(7, 0, 0) && currentTime <= new TimeSpan(10, 0, 0))
+                {
+                    LogMessage($"2차 배치 시간대 → 다음 배치: 3차");
+                    return "3차"; // 2차 배치 중 → 3차
+                }
+                else if (currentTime > new TimeSpan(10, 0, 0) && currentTime <= new TimeSpan(11, 0, 0))
+                {
+                    LogMessage($"3차 배치 시간대 → 다음 배치: 4차");
+                    return "4차"; // 3차 배치 중 → 4차
+                }
+                else if (currentTime > new TimeSpan(11, 0, 0) && currentTime <= new TimeSpan(13, 0, 0))
+                {
+                    LogMessage($"4차 배치 시간대 → 다음 배치: 5차");
+                    return "5차"; // 4차 배치 중 → 5차
+                }
+                else if (currentTime > new TimeSpan(13, 0, 0) && currentTime <= new TimeSpan(15, 0, 0))
+                {
+                    LogMessage($"5차 배치 시간대 → 다음 배치: 막차");
+                    return "막차"; // 5차 배치 중 → 막차
+                }
+                else if (currentTime > new TimeSpan(15, 0, 0) && currentTime <= new TimeSpan(18, 0, 0))
+                {
+                    LogMessage($"막차 배치 시간대 → 다음 배치: 추가");
+                    return "추가"; // 막차 배치 중 → 추가
+                }
+                else if (currentTime > new TimeSpan(18, 0, 0) && currentTime <= new TimeSpan(23, 0, 0))
+                {
+                    LogMessage($"추가 배치 시간대 → 다음 배치: 1차");
+                    return "1차"; // 추가 배치 중 → 다음날 1차
+                }
+                else
+                {
+                    // 배치 시간이 아닌 경우 가장 가까운 다음 배치로 설정
+                    LogMessage($"알 수 없는 시간대 → 기본값: 1차");
+                    return "1차"; // 기본값
+                }
+            }
+            catch (Exception ex)
+            {
+                LogMessage($"⚠️ 다음 배치 계산 실패: {ex.Message}");
+                return "1차"; // 오류 시 기본값
+            }
+        }
+        
+        /// <summary>
         /// 타이틀을 현재 배치구분에 맞게 업데이트하는 메서드
         /// </summary>
         private void UpdateBatchTitle()
@@ -2244,8 +2528,8 @@ namespace LogisticManager.Forms
                     //LogMessage($"📝 새 타이틀 생성: {newTitle}");
                     lblTitle.Text = newTitle;
                     
-                    // 폼 타이틀도 함께 업데이트 (차수 정보 포함)
-                    var formTitle = GetBatchTitle($"송장 처리 시스템 ({GetAppVersionString()})");
+                    // 폼 타이틀도 함께 업데이트 (차수 정보만 포함, 버전 숨김)
+                    var formTitle = GetBatchTitle("송장 처리 시스템");
                     //LogMessage($"🖼️ 폼 타이틀 업데이트: {formTitle}");
                     this.Text = formTitle;
                     

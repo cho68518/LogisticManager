@@ -234,7 +234,7 @@ namespace LogisticManager.Services
         }
 
         /// <summary>
-        /// KakaoWork 연결 상태를 테스트
+        /// KakaoWork 연결 상태를 테스트 (실제 메시지 전송 없이)
         /// </summary>
         /// <returns>연결 성공 여부</returns>
         public async Task<bool> TestConnectionAsync()
@@ -258,34 +258,16 @@ namespace LogisticManager.Services
                     LogMessage($"  {kvp.Key}: {kvp.Value}");
                 }
 
-                // 새로운 메시지 빌더를 사용하여 테스트 메시지 생성
-                var testPayload = KakaoWorkMessageBuilder.Build(
-                    KakaoWorkMessageType.SalesInput,
-                    "2차",
-                    "https://example.com/test");
-                
-                // 첫 번째 채팅방 ID 설정
-                testPayload.ConversationId = _chatroomIds.First().Value;
-
-                var jsonOptions = new JsonSerializerOptions
-                {
-                    WriteIndented = false,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
-                    IncludeFields = false
-                };
-                var jsonPayload = JsonSerializer.Serialize(testPayload, jsonOptions);
-
-                LogMessage($"📦 테스트 JSON 페이로드: {jsonPayload}");
-
-                var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync("https://api.kakaowork.com/v1/messages.send", content);
+                // 실제 메시지 전송 없이 연결만 테스트
+                // KakaoWork API의 사용자 정보 조회 엔드포인트 사용 (메시지 전송 없음)
+                var response = await _httpClient.GetAsync("https://api.kakaowork.com/v1/users.me");
                 
                 LogMessage($"📡 HTTP 상태 코드: {response.StatusCode}");
                 
                 if (response.IsSuccessStatusCode)
                 {
                     var responseContent = await response.Content.ReadAsStringAsync();
-                    LogMessage($"✅ KakaoWork 연결 성공: {responseContent}");
+                    LogMessage($"✅ KakaoWork 연결 성공 (사용자 정보 조회): {responseContent}");
                     return true;
                 }
                 else
@@ -447,7 +429,7 @@ namespace LogisticManager.Services
                 // 한글 주석: 현재 시간 기반 배치 구분
                 var now = DateTime.Now;
                 var timeString = now.ToString("MM월 dd일 HH시 mm분");
-                var batch = GetBatchByTime(now.Hour, now.Minute);
+                var batch = BatchTimeService.Instance.GetCurrentBatchType();
                 LogMessage($"⏰ 현재 시간: {timeString}, 배치: {batch}");
 
                 // 한글 주석: 채팅방 ID가 명시적으로 전달되지 않으면 기본값 사용
@@ -546,33 +528,6 @@ namespace LogisticManager.Services
 
             // 한글 주석: 설정된 채팅방이 없으면 빈 문자열 반환
             return string.Empty;
-        }
-
-        /// <summary>
-        /// 현재 시간을 기반으로 배치를 구분하는 메서드
-        /// </summary>
-        /// <param name="hour">시간 (0-23)</param>
-        /// <param name="minute">분 (0-59)</param>
-        /// <returns>배치 구분 문자열</returns>
-        public string GetBatchByTime(int hour, int minute)
-        {
-            // 한글 주석: 시간대별 배치 구분
-            if (1 <= hour && hour <= 7)
-                return "1차";
-            else if (8 <= hour && hour <= 10)
-                return "2차";
-            else if (hour == 11)
-                return "3차";
-            else if (12 <= hour && hour <= 13)
-                return "4차";
-            else if (14 <= hour && hour <= 15)
-                return "5차";
-            else if (16 <= hour && hour <= 18)
-                return "막차";
-            else if (19 <= hour && hour <= 23)
-                return "추가";
-            else
-                return "";
         }
 
         #endregion

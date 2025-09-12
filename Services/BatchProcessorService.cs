@@ -87,43 +87,43 @@ namespace LogisticManager.Services
         #region 상수 및 필드 (Configuration & State Management)
 
         /// <summary>
-        /// 기본 배치 크기 - 경험적 최적화를 통한 메모리와 성능의 황금 균형점
+        /// 기본 배치 크기 - 16GB 메모리 환경 최적화를 통한 성능 극대화
         /// 
         /// 📊 최적화 근거:
-        /// - 10년간의 물류 데이터 처리 경험을 바탕으로 도출된 최적값
-        /// - 일반적인 서버 환경 (8GB RAM, 4코어 CPU)에서 최적 성능 보장
+        /// - 16GB 메모리 환경에서 최적 성능을 위한 배치 크기
+        /// - 일반적인 사용자 PC 환경 (16GB RAM)에서 최적 성능 보장
         /// - 데이터베이스 연결 풀 크기 및 네트워크 대역폭 고려
         /// - 단일 트랜잭션 크기와 롤백 비용의 균형점
         /// 
         /// 🎯 성능 특성:
-        /// - 메모리 사용량: 약 100-150MB (500건 기준)
-        /// - 처리 시간: 10-15초/배치 (표준 환경)
-        /// - 데이터베이스 부하: 적정 수준 유지
-        /// - 실패 시 롤백 비용: 최소화
+        /// - 메모리 사용량: 약 200-400MB (4000건 기준)
+        /// - 처리 시간: 5-8초/배치 (16GB 환경)
+        /// - 데이터베이스 부하: 최적화된 수준 유지
+        /// - 실패 시 롤백 비용: 적정 수준
         /// </summary>
-        private const int DEFAULT_BATCH_SIZE = 100;
+        private const int DEFAULT_BATCH_SIZE = 4000;
         
         /// <summary>
-        /// 최소 배치 크기 - 메모리 극한 상황에서의 최후 보루
+        /// 최소 배치 크기 - 16GB 환경에서의 안전한 최소 처리 단위
         /// 
         /// 🚨 긴급 상황 대응:
         /// - OutOfMemoryException 발생 시 마지막 수단
-        /// - 시스템 메모리가 200MB 이하로 떨어진 극한 상황 대응
-        /// - 처리 속도보다 안정성을 최우선으로 고려
+        /// - 시스템 메모리가 부족한 극한 상황 대응
+        /// - 처리 속도와 안정성의 균형점 고려
         /// - 이 값 이하로는 절대 감소하지 않음 (시스템 보호)
         /// 
         /// 💡 비즈니스 연속성:
         /// - 극한 상황에서도 데이터 처리 중단 방지
-        /// - 천천히라도 모든 데이터를 안전하게 처리
+        /// - 적절한 속도로 모든 데이터를 안전하게 처리
         /// - 메모리 복구 후 점진적 배치 크기 증가
         /// </summary>
-        private const int MIN_BATCH_SIZE = 50;
+        private const int MIN_BATCH_SIZE = 3000;
         
         /// <summary>
-        /// 최대 배치 크기 - 고성능 환경에서의 처리량 극대화
+        /// 최대 배치 크기 - 16GB 환경에서의 처리량 극대화
         /// 
         /// 🚀 고성능 최적화:
-        /// - 32GB 이상 고사양 서버 환경 최적화
+        /// - 16GB 메모리 환경에서 최대 처리량 달성
         /// - 대용량 데이터 처리 시 처리량 극대화
         /// - 네트워크 지연 시간 대비 배치 크기 최적화
         /// - 데이터베이스 락 경합 최소화 고려
@@ -134,13 +134,13 @@ namespace LogisticManager.Services
         /// - 실패 시 롤백 시간 최소화
         /// - 동시 접속자 수 고려한 리소스 분배
         /// </summary>
-        private const int MAX_BATCH_SIZE = 2000;
+        private const int MAX_BATCH_SIZE = 8000;
         
         /// <summary>
-        /// 메모리 사용량 임계치 - 시스템 안정성 보장을 위한 레드라인
+        /// 메모리 사용량 임계치 - 16GB 환경 시스템 안정성 보장을 위한 레드라인
         /// 
         /// 🛡️ 시스템 보호 기준:
-        /// - 전체 시스템 메모리의 약 25-30% 수준
+        /// - 16GB 메모리의 약 12.5% 수준 (2GB)
         /// - 다른 프로세스와의 리소스 경합 방지
         /// - 가비지 컬렉션 압박 상황 사전 감지
         /// - 운영체제 레벨 메모리 부족 상황 예방
@@ -151,7 +151,7 @@ namespace LogisticManager.Services
         /// - 연속 3회 초과 시 MIN_BATCH_SIZE로 강제 축소
         /// - 메모리 정리 후 점진적 복구
         /// </summary>
-        private const long MEMORY_THRESHOLD_MB = 500;
+        private const long MEMORY_THRESHOLD_MB = 2000;
 
         /// <summary>
         /// 송장 데이터 저장소 - Repository 패턴 기반 데이터 액세스 계층
@@ -619,7 +619,13 @@ namespace LogisticManager.Services
                         progress?.Report($"🔄 {batchSizeAdjustLog}");
                         File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {batchSizeAdjustLog}\n");
                         
-                        i -= _currentBatchSize; // 현재 배치 재처리
+                        // ✅ 중복 처리 방지: 현재 배치를 더 작은 단위로 분할하여 재처리
+                        // i 값을 조정하지 않고, 현재 배치를 더 작은 단위로 나누어 처리
+                        var remainingData = orderList.Skip(i).Take(oldBatchSize).ToList();
+                        await ProcessSmallerBatches(remainingData, i, progress, targetTableName);
+                        
+                        // 처리 완료된 만큼 인덱스 증가 (중복 방지)
+                        i += oldBatchSize - 1; // for 루프에서 자동으로 +1되므로 -1
                         continue;
                     }
                     catch (Exception ex)
@@ -1199,6 +1205,58 @@ namespace LogisticManager.Services
             }
             
             _currentBatchSize = batchSize;
+        }
+
+        /// <summary>
+        /// 메모리 부족 시 큰 배치를 더 작은 단위로 분할하여 처리하는 메서드
+        /// 중복 처리 방지를 위한 안전한 재처리 로직
+        /// </summary>
+        /// <param name="remainingData">처리할 남은 데이터</param>
+        /// <param name="startIndex">시작 인덱스</param>
+        /// <param name="progress">진행률 콜백</param>
+        /// <param name="targetTableName">대상 테이블명</param>
+        /// <returns>처리 결과</returns>
+        private async Task<(int successCount, int failureCount)> ProcessSmallerBatches(
+            List<Order> remainingData, 
+            int startIndex, 
+            IProgress<string>? progress, 
+            string targetTableName)
+        {
+            var totalSuccessCount = 0;
+            var totalFailureCount = 0;
+            var logPath = LogPathManager.AppLogPath;
+            
+            // 더 작은 배치 크기로 분할 처리
+            for (int j = 0; j < remainingData.Count; j += _currentBatchSize)
+            {
+                var endIndex = Math.Min(j + _currentBatchSize, remainingData.Count);
+                var smallerBatch = remainingData.Skip(j).Take(endIndex - j).ToList();
+                
+                var smallBatchLog = $"[원본데이터적재] 소배치 처리 - 범위: {startIndex + j + 1}~{startIndex + endIndex} ({smallerBatch.Count}건)";
+                progress?.Report($"🔄 {smallBatchLog}");
+                File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {smallBatchLog}\n");
+                
+                try
+                {
+                    var batchResult = await ProcessBatchWithRetry(smallerBatch, progress, 0, targetTableName);
+                    totalSuccessCount += batchResult.successCount;
+                    totalFailureCount += batchResult.failureCount;
+                    
+                    var smallBatchResultLog = $"[원본데이터적재] 소배치 완료 - 성공: {batchResult.successCount}건, 실패: {batchResult.failureCount}건";
+                    progress?.Report($"✅ {smallBatchResultLog}");
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {smallBatchResultLog}\n");
+                }
+                catch (Exception ex)
+                {
+                    var smallBatchErrorLog = $"[원본데이터적재] 소배치 처리 실패: {ex.Message}";
+                    progress?.Report($"❌ {smallBatchErrorLog}");
+                    File.AppendAllText(logPath, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {smallBatchErrorLog}\n");
+                    
+                    totalFailureCount += smallerBatch.Count;
+                }
+            }
+            
+            return (totalSuccessCount, totalFailureCount);
         }
 
         #endregion

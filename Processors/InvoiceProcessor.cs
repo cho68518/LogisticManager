@@ -107,9 +107,9 @@ namespace LogisticManager.Processors
         /// - 적응형 배치 크기
         /// - 오류 복구 및 재시도 로직
         /// 
-        /// 🔗 의존성: BatchProcessorService
+        /// 🔗 의존성: BatchProcessorService (제거됨 - 단순 처리로 대체)
         /// </summary>
-        private readonly BatchProcessorService _batchProcessor;
+        // private readonly BatchProcessorService _batchProcessor; // 16GB 환경에서 불필요
         
         /// <summary>
         /// 데이터베이스 서비스 - MySQL 데이터베이스 연결 및 쿼리 실행 담당
@@ -172,6 +172,16 @@ namespace LogisticManager.Processors
         /// </summary>
         /// <value>파일 목록 추가 콜백</value>
         private readonly Action<string, long, DateTime, string?>? _fileListCallback;
+        
+        /// <summary>
+        /// 사용자가 선택한 차수 - KakaoWork 메시지 전송 시 사용
+        /// 
+        /// 📋 주요 기능:
+        /// - 사용자 선택 차수 우선 사용
+        /// - 시간 기반 자동 계산 백업
+        /// - KakaoWork 알림 메시지에 차수 정보 포함
+        /// </summary>
+        private string? _selectedBatch;
 
         #endregion
 
@@ -203,8 +213,8 @@ namespace LogisticManager.Processors
             // Repository 패턴 구현
             _invoiceRepository = new InvoiceRepository(dbService);
             
-            // 배치 처리 서비스 초기화
-            _batchProcessor = new BatchProcessorService(_invoiceRepository);
+            // 배치 처리 서비스 초기화 (16GB 환경에서 제거 - 단순 처리로 대체)
+            // _batchProcessor = new BatchProcessorService(_invoiceRepository);
             
             // 진행률 콜백 설정
             _progress = progress;
@@ -291,8 +301,9 @@ namespace LogisticManager.Processors
         /// <param name="progress">진행 상황 텍스트 콜백</param>
         /// <param name="progressReporter">진행률 퍼센트 콜백</param>
         /// <param name="maxStep">최대 처리 단계 (1~24, 기본값: 24)</param>
+        /// <param name="selectedBatch">사용자가 선택한 차수 (기본값: null, 시간 기반 자동 계산)</param>
         /// <returns>처리 성공 여부</returns>
-        public async Task<bool> ProcessAsync(string filePath, IProgress<string>? progress = null, IProgress<int>? progressReporter = null, int maxStep = 24)
+        public async Task<bool> ProcessAsync(string filePath, IProgress<string>? progress = null, IProgress<int>? progressReporter = null, int maxStep = 24, string? selectedBatch = null)
         {
             // 입력 파일 경로 검증
             if (string.IsNullOrEmpty(filePath))
@@ -309,6 +320,18 @@ namespace LogisticManager.Processors
             try
             {
                 // ==================== 전처리: 콜백 우선순위 결정 및 초기 상태 설정 ====================
+                
+                // === 사용자 선택 차수 저장 ===
+                // 사용자가 선택한 차수가 있으면 우선 사용, 없으면 시간 기반 자동 계산 사용
+                _selectedBatch = selectedBatch;
+                if (!string.IsNullOrEmpty(selectedBatch))
+                {
+                    LogManagerService.LogInfo($"🎯 사용자 선택 차수 사용: {selectedBatch}");
+                }
+                else
+                {
+                    LogManagerService.LogInfo($"⏰ 시간 기반 차수 자동 계산 사용");
+                }
                 
                 // === 진행률 콜백 우선순위 결정 (매개변수 > 생성자 설정) ===
                 // 유연한 콜백 시스템: 메서드 호출 시점에 다른 콜백을 사용할 수 있도록 지원
@@ -336,17 +359,7 @@ namespace LogisticManager.Processors
                 // 진행률 초기화 (0%에서 시작)
                 finalProgressReporter?.Report(0);
 
-                //TestLevel 1
-                //if (ConfigurationManager.AppSettings["TestLevel"] == "1")
-                //{
-                    
-                //}
-                //else
-                //{
-                    
-                //}
-
-                // ==================== 1단계: 다중 쇼핑몰 Excel 데이터 통합 및 검증 (0-5%) ====================
+                // ==================== 1단계: Excel 데이터 통합 및 검증 (0-5%) ====================
                 finalProgress?.Report("📖 [1단계] Excel 파일 분석 중... ");
                 
                 // UI 업데이트를 위한 짧은 지연
@@ -354,7 +367,30 @@ namespace LogisticManager.Processors
 
                 // - 지정한 엑셀 파일에서 "order_table" 시트의 데이터를 DataTable로 읽어옵니다.
                 var originalData = _fileService.ReadExcelToDataTable(filePath, "order_table");
-                
+
+                // 중복 제거
+                //var distinctData = originalData.AsEnumerable()
+                //    .GroupBy(row => string.Join("|", row.ItemArray))
+                //    .Select(g => g.First())
+                //    .CopyToDataTable();
+
+                // ✅ 올바른 사용 - distinctData 사용
+                //if (distinctData.Rows.Count == 0)  // 중복 제거 후 데이터 개수
+                //{
+                //    return false;
+                //}
+
+                //var tempFilePath = Path.Combine(Path.GetTempPath(), $"distinct_{Guid.NewGuid()}.xlsx");
+                //_fileService.SaveDataTableToExcel(distinctData, tempFilePath, "Sheet1");
+
+
+                // ✅ 올바른 사용 - distinctData 사용
+                //var insertCount = distinctData.Rows.Count;  // 중복 제거 후 데이터 개수
+                //finalProgress?.Report($"✅ 중복제거후 - {insertCount:N0}행");
+
+                // ✅ 후속 처리도 distinctData 사용
+                //var result = await ProcessData(distinctData);
+
                 //===========================================================================================
                 // === [1단계] 데이터가 존재할 때만 ReadExcelToDataTable 및 후속 처리 진행
                 // 새로운 방식: 프로시저를 통한 데이터 처리 (컬럼매핑 우회)
@@ -423,7 +459,7 @@ namespace LogisticManager.Processors
                 // === 2단계 완료 및 성능 통계 보고 ===
                 finalProgressReporter?.Report(8); // 4-2단계 완료 (8%)
                 finalProgress?.Report("✅ [2단계 완료] 프로시저를 통한 데이터 처리 완료");
-                finalProgress?.Report("📈 다음 단계: 1차 데이터 정제 및 비즈니스 규칙 적용 준비 완료");
+                //finalProgress?.Report("📈 다음 단계: 1차 데이터 정제 및 비즈니스 규칙 적용 준비 완료");
 
                 //----------------------------------------------------------------------------------------------
                 // 3단계: 1차 데이터 정제 및 비즈니스 규칙 적용
@@ -1707,11 +1743,22 @@ namespace LogisticManager.Processors
                     return; // 처리할 데이터가 없으므로 메서드 종료
                 }
                 
-                // 적응형 배치 처리로 대용량 데이터 삽입
-                progress?.Report("🚀 대용량 배치 처리 시작...");
-                LogManagerService.LogInfo($"🚀 대용량 배치 처리 시작...");
+                // ✅ 16GB 환경 최적화: 단순한 전체 데이터 처리 방식
+                progress?.Report("🚀 전체 데이터 처리 시작...");
+                LogManagerService.LogInfo($"🚀 전체 데이터 처리 시작... (16GB 환경 최적화)");
                 
-                var (successCount, failureCount) = await _batchProcessor.ProcessLargeDatasetAsync(validOrders, progress, false, tableName);
+                // 메모리 사용량 사전 체크
+                var estimatedMemoryUsage = EstimateMemoryUsage(validOrders);
+                LogManagerService.LogInfo($"[메모리체크] 예상 메모리 사용량: {estimatedMemoryUsage}MB");
+                
+                if (estimatedMemoryUsage > 1000) // 1GB 초과 시 경고
+                {
+                    LogManagerService.LogWarning($"[메모리체크] ⚠️ 높은 메모리 사용량 예상: {estimatedMemoryUsage}MB");
+                }
+                
+                // 단순한 전체 데이터 처리
+                var successCount = await _invoiceRepository.InsertBatchAsync(validOrders, tableName);
+                var failureCount = validOrders.Count - successCount;
                 
                 // 처리 결과 분석 및 성능 통계
                 progress?.Report($"✅ 원본 데이터 적재 완료: 성공 {successCount:N0}건, 실패 {failureCount:N0}건 (테이블: {tableName})");
@@ -1734,10 +1781,10 @@ namespace LogisticManager.Processors
                     LogManagerService.LogInfo($"[원본데이터적재] 모든 데이터 처리 성공! - 성공률: 100% ({validOrders.Count:N0}건)");
                 }
                 
-                // 배치 처리 성능 통계 수집 및 출력
-                var (currentBatchSize, currentMemoryMB, availableMemoryMB) = _batchProcessor.GetStatus();
-                LogManagerService.LogInfo($"[빌드정보] 배치 처리 완료 - 테이블: {tableName}, 최종 배치 크기: {currentBatchSize}, 메모리 사용량: {currentMemoryMB}MB, 가용 메모리: {availableMemoryMB}MB");
-                LogManagerService.LogInfo($"[빌드정보] 배치 처리 완료 - 테이블: {tableName}, 최종 배치 크기: {currentBatchSize}, 메모리 사용량: {currentMemoryMB}MB, 가용 메모리: {availableMemoryMB}MB");
+                // 메모리 사용량 최종 통계
+                var finalMemoryMB = GC.GetTotalMemory(false) / 1024 / 1024;
+                LogManagerService.LogInfo($"[빌드정보] 전체 처리 완료 - 테이블: {tableName}, 총 처리: {validOrders.Count:N0}건, 메모리 사용량: {finalMemoryMB}MB");
+                LogManagerService.LogInfo($"[빌드정보] 16GB 환경 최적화 적용 - 배치 처리 제거로 성능 향상");
             }
             catch (Exception ex)
             {
@@ -1793,7 +1840,7 @@ namespace LogisticManager.Processors
         private async Task ProcessMergePacking()
         {
             const string METHOD_NAME = "ProcessMergePacking";
-            const string PROCEDURE_NAME = "sp_MergePacking";
+            const string PROCEDURE_NAME = "sp_MergePacking2";
             const string CONFIG_KEY = "DropboxFolderPath2";
             const string PROCEDURE_CONFIG_KEY = "ExcelProcessor.Proc3";
                     
@@ -2332,7 +2379,7 @@ namespace LogisticManager.Processors
         private async Task ProcessInvoiceSplit1()
         {
             const string METHOD_NAME = "ProcessInvoiceSplit1";
-            const string PROCEDURE_NAME = "sp_InvoiceSplit";
+            const string PROCEDURE_NAME = "sp_InvoiceSplit2";
             const string CONFIG_KEY = "DropboxFolderPath3";
             const string PROCEDURE_CONFIG_KEY = "ExcelProcessor.Proc4";
             
@@ -2515,7 +2562,7 @@ namespace LogisticManager.Processors
         private async Task ProcessTalkDealUnavailable()
         {
             const string METHOD_NAME = "ProcessTalkDealUnavailable";
-            const string PROCEDURE_NAME = "sp_TalkDealUnavailable";
+            const string PROCEDURE_NAME = "sp_TalkDealUnavailable2";
             const string CONFIG_KEY = "DropboxFolderPath5";
             const string PROCEDURE_CONFIG_KEY = "ExcelProcessor.Proc5";            
             
@@ -2695,7 +2742,7 @@ namespace LogisticManager.Processors
         private async Task ProcessInvoiceManagement()
         {
             const string METHOD_NAME = "ProcessInvoiceManagement";
-            const string PROCEDURE_NAME = "sp_ProcessStarInvoice";
+            const string PROCEDURE_NAME = "sp_ProcessStarInvoice2";
             const string CONFIG_KEY = "DropboxFolderPath6";
             const string PROCEDURE_CONFIG_KEY = "ExcelProcessor.Proc6";
             
@@ -2879,7 +2926,7 @@ namespace LogisticManager.Processors
         private async Task ProcessSeoulFrozenManagement()
         {
             const string METHOD_NAME = "ProcessSeoulFrozenManagement";
-            const string PROCEDURE_NAME = "sp_SeoulProcessF";
+            const string PROCEDURE_NAME = "sp_SeoulProcessF2";
             
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LOG_PATH);
             var startTime = DateTime.Now;
@@ -2973,7 +3020,7 @@ namespace LogisticManager.Processors
         private async Task ProcessGyeonggiFrozenManagement()
         {
             const string METHOD_NAME = "ProcessGyeonggiFrozenManagement";
-            const string PROCEDURE_NAME = "sp_GyeonggiProcessF";
+            const string PROCEDURE_NAME = "sp_GyeonggiProcessF2";
             
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LOG_PATH);
             var startTime = DateTime.Now;
@@ -3061,7 +3108,7 @@ namespace LogisticManager.Processors
         private async Task ProcessFrapwonFrozenManagement()
         {
             const string METHOD_NAME = "ProcessFrapwonFrozenManagement";
-            const string PROCEDURE_NAME = "sp_FrapwonProcessF";
+            const string PROCEDURE_NAME = "sp_FrapwonProcessF2";
             
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LOG_PATH);
             var startTime = DateTime.Now;
@@ -3160,7 +3207,7 @@ namespace LogisticManager.Processors
         private async Task ProcessGamcheonFrozenManagement()
         {
             const string METHOD_NAME = "ProcessGamcheonFrozenManagement";
-            const string PROCEDURE_NAME = "sp_GamcheonProcessF";
+            const string PROCEDURE_NAME = "sp_GamcheonProcessF2";
             
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LOG_PATH);
             var startTime = DateTime.Now;
@@ -3259,7 +3306,7 @@ namespace LogisticManager.Processors
         private async Task ProcessInvoiceFinalManagement()
         {
             const string METHOD_NAME = "ProcessInvoiceFinalManagement";
-            const string PROCEDURE_NAME = "sp_InvoiceFinalProcess";
+            const string PROCEDURE_NAME = "sp_InvoiceFinalProcess2";
             
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LOG_PATH);
             var startTime = DateTime.Now;
@@ -3272,12 +3319,22 @@ namespace LogisticManager.Processors
                 // 프로시저 실행
                 WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 🚀 {PROCEDURE_NAME} 프로시저 호출 시작");
                 
+                // 선택된 차수 가져오기
+                var selectedBatch = GetCurrentBatch();
+                WriteLogWithFlush(logPath, $"[{METHOD_NAME}] 🎯 사용할 차수: {selectedBatch}");
+                
+                // 프로시저 파라미터 설정
+                var parameters = new Dictionary<string, object>
+                {
+                    { "p_batch", selectedBatch }
+                };
+                
                 string procedureResult = "";
                 var insertCount = 0;                 // 송장출력 최종 처리는 프로시저만 실행하므로 데이터 삽입 건수는 0
                 
                 try
                 {
-                    procedureResult = await ExecutePostProcessProcedureAsync(PROCEDURE_NAME);
+                    procedureResult = await ExecutePostProcessProcedureAsync(PROCEDURE_NAME, parameters);
 
                     if (string.IsNullOrEmpty(procedureResult))
                     {
@@ -3348,7 +3405,7 @@ namespace LogisticManager.Processors
         private async Task ProcessSeoulGongsanManagement()
         {
             const string METHOD_NAME = "ProcessSeoulGongsanManagement";
-            const string PROCEDURE_NAME = "sp_SeoulGongsanProcessF";
+            const string PROCEDURE_NAME = "sp_SeoulGongsanProcessF2";
             
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LOG_PATH);
             var startTime = DateTime.Now;
@@ -3441,7 +3498,7 @@ namespace LogisticManager.Processors
         private async Task ProcessGyeonggiGongsanManagement()
         {
             const string METHOD_NAME = "ProcessGyeonggiGongsanManagement";
-            const string PROCEDURE_NAME = "sp_GyeonggiGongsanProcessF";
+            const string PROCEDURE_NAME = "sp_GyeonggiGongsanProcessF2";
             
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LOG_PATH);
             var startTime = DateTime.Now;
@@ -3534,7 +3591,7 @@ namespace LogisticManager.Processors
         private async Task ProcessBusanCheonggwaManagement()
         {
             const string METHOD_NAME = "ProcessBusanCheonggwaManagement";
-            const string PROCEDURE_NAME = "sp_BusanCheonggwaProcessF";
+            const string PROCEDURE_NAME = "sp_BusanCheonggwaProcessF2";
             
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LOG_PATH);
             var startTime = DateTime.Now;
@@ -3627,7 +3684,7 @@ namespace LogisticManager.Processors
         private async Task ProcessBusanCheonggwaDoc()
         {
             const string METHOD_NAME = "ProcessBusanCheonggwaDoc";
-            const string PROCEDURE_NAME = "sp_BusanCheonggwaDocProcess";
+            const string PROCEDURE_NAME = "sp_BusanCheonggwaDocProcess2";
             
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LOG_PATH);
             var startTime = DateTime.Now;
@@ -3721,7 +3778,7 @@ namespace LogisticManager.Processors
         // {
         //     const string METHOD_NAME = "ProcessBusanExtShipmentManagement";
         //     const string TABLE_NAME = "송장출력_부산청과_외부출고";
-        //     const string PROCEDURE_NAME = "sp_BusanExtShipmentProcess";
+        //     const string PROCEDURE_NAME = "sp_BusanExtShipmentProcess2";
         //     const string CONFIG_KEY = "DropboxFolderPath11";
         //     
         //     var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, LOG_PATH);
@@ -4069,11 +4126,22 @@ namespace LogisticManager.Processors
         // }
 
         /// <summary>
-        /// 후처리 프로시저 실행 (공용)
+        /// 후처리 프로시저 실행 (공용) - 파라미터 없음
         /// </summary>
         /// <param name="procedureName">프로시저명</param>
         /// <returns>프로시저 실행 결과</returns>
         private async Task<string> ExecutePostProcessProcedureAsync(string procedureName)
+        {
+            return await ExecutePostProcessProcedureAsync(procedureName, null);
+        }
+
+        /// <summary>
+        /// 후처리 프로시저 실행 (공용) - 파라미터 포함
+        /// </summary>
+        /// <param name="procedureName">프로시저명</param>
+        /// <param name="parameters">프로시저 파라미터</param>
+        /// <returns>프로시저 실행 결과</returns>
+        private async Task<string> ExecutePostProcessProcedureAsync(string procedureName, Dictionary<string, object>? parameters)
         {
             try
             {
@@ -4082,7 +4150,7 @@ namespace LogisticManager.Processors
                 WriteLogWithFlush(logPath, procedureLog);
                 
                 // ExecuteStoredProcedureAsync 사용으로 프로시저 결과 캐치
-                var result = await ExecuteStoredProcedureAsync(procedureName);
+                var result = await ExecuteStoredProcedureAsync(procedureName, parameters);
                 
                 // ExecuteStoredProcedureAsync에서 이미 상세 로깅을 수행하므로 간단한 완료 메시지만 기록
                 var resultLog = $"[ExecutePostProcessProcedure] {procedureName} 프로시저 실행 완료";
@@ -4118,7 +4186,7 @@ namespace LogisticManager.Processors
         /// </summary>
         /// <param name="procedureName">프로시저명</param>
         /// <returns>프로시저 실행 결과 또는 오류 메시지</returns>
-        private async Task<string> ExecuteStoredProcedureAsync(string procedureName)
+        private async Task<string> ExecuteStoredProcedureAsync(string procedureName, Dictionary<string, object>? parameters = null)
         {
             var logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "app.log");
             
@@ -4126,6 +4194,13 @@ namespace LogisticManager.Processors
             {
                 var procedureLog = $"[ExecuteStoredProcedure] {procedureName} 프로시저 실행 시작";
                 WriteLogWithFlush(logPath, procedureLog);
+                
+                // 파라미터 로깅
+                if (parameters != null && parameters.Count > 0)
+                {
+                    var paramLog = $"[ExecuteStoredProcedure] 📋 프로시저 파라미터: {string.Join(", ", parameters.Select(p => $"{p.Key}={p.Value}"))}";
+                    WriteLogWithFlush(logPath, paramLog);
+                }
                 
                 // DatabaseService 직접 사용으로 MySQL 오류 정확한 캐치
                 try
@@ -4151,10 +4226,30 @@ namespace LogisticManager.Processors
                         using (var command = connection.CreateCommand())
                         {
                             command.CommandType = CommandType.Text;
-                            command.CommandText = $"CALL {procedureName}()";
+                            
+                            // 파라미터가 있으면 파라미터를 포함한 CALL 문 생성
+                            if (parameters != null && parameters.Count > 0)
+                            {
+                                var paramNames = string.Join(", ", parameters.Keys.Select(k => $"@{k}"));
+                                command.CommandText = $"CALL {procedureName}({paramNames})";
+                                
+                                // 파라미터 추가
+                                foreach (var param in parameters)
+                                {
+                                    var dbParam = command.CreateParameter();
+                                    dbParam.ParameterName = $"@{param.Key}";
+                                    dbParam.Value = param.Value ?? DBNull.Value;
+                                    command.Parameters.Add(dbParam);
+                                }
+                            }
+                            else
+                            {
+                                command.CommandText = $"CALL {procedureName}()";
+                            }
+                            
                             command.CommandTimeout = 300; // 5분 타임아웃
                             
-                            var executeLog = $"[ExecuteStoredProcedure] 🔍 프로시저 실행 중: CALL {procedureName}()";
+                            var executeLog = $"[ExecuteStoredProcedure] 🔍 프로시저 실행 중: {command.CommandText}";
                             WriteLogWithFlush(logPath, executeLog);
                             
                             // 변수 선언을 using 블록 밖으로 이동
@@ -4798,9 +4893,8 @@ namespace LogisticManager.Processors
                         var notificationType = GetNotificationTypeByCenter(centerName);
                         
                         // === 배치 식별자 생성 ===
-                        // 시간대별 차수 설정 (1차~막차, 추가)
-                        var now = DateTime.Now;
-                        var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+                        // 사용자 선택 차수 우선 사용, 없으면 시간대별 차수 설정 (1차~막차, 추가)
+                        var batch = GetCurrentBatch();
                         
                         // === 송장 개수 계산 (현재는 임시값) ===
                         // TODO: 실제 처리된 송장 개수를 DB에서 조회하여 정확한 값 사용
@@ -5177,7 +5271,6 @@ namespace LogisticManager.Processors
 
 
         #region 판매입력 데이터 처리 (Sales Input Data Processing)
-        #endregion
 
         /// <returns>처리 성공 여부 (bool)</returns>
         // 판매입력 이카운트 자료(송장출력_주문정보 테이블의 판매입력용 데이터)를 조회하여
@@ -5190,7 +5283,6 @@ namespace LogisticManager.Processors
             const string SHEET_NAME = "Sheet1";
             const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath4";
             const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.SalesData";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
             
                 try
                 {
@@ -5210,16 +5302,23 @@ namespace LogisticManager.Processors
                 if (salesData == null || salesData.Rows.Count == 0)
                 {
                     LogManagerService.LogWarning($"⚠️ [{METHOD_NAME}] 판매입력 데이터가 없습니다.");
-                    return true; // 데이터가 없는 것은 오류가 아님
+                    //return true; // 데이터가 없어도 엑셀 파일 생성하도록 주석 처리
                 }
 
-                LogManagerService.LogInfo($"📊 [{METHOD_NAME}] 데이터 조회 완료: {salesData.Rows.Count:N0}건");
+                LogManagerService.LogInfo($"📊 [{METHOD_NAME}] 데이터 조회 완료: {salesData?.Rows.Count ?? 0:N0}건");
 
                 // 3단계: Excel 파일 생성 (헤더 없음)
                 var excelFileName = _fileCommonService.GenerateExcelFileName("판매입력", "이카운트자료");
                 var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
                 
                 LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
+                
+                // [한글 주석] null 체크 후 Excel 파일 생성
+                if (salesData == null)
+                {
+                    LogManagerService.LogError($"[{METHOD_NAME}] ❌ 판매입력 데이터가 null입니다.");
+                    return false;
+                }
                 
                 // SaveDataTableToExcelWithoutHeader : 헤더없음
                 // SaveDataTableToExcel : 헤더포함
@@ -5295,41 +5394,63 @@ namespace LogisticManager.Processors
 
                 LogManagerService.LogInfo($"✅ [{METHOD_NAME}] Dropbox 공유 링크 생성 완료: {sharedLink}");
 
-                // 6단계: KakaoWork 채팅방에 알림 전송 (판매입력)
-				// 송장 개수 계산 및 시간대별 차수 설정
-				var invoiceCount = salesData?.Rows.Count ?? 0;
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
-				
-				var kakaoWorkService = KakaoWorkService.Instance;
-				var now = DateTime.Now;
-				var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
-				LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
-				
-				// 채팅방 ID 설정
-				var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
-				if (string.IsNullOrEmpty(chatroomId))
+                				// 6단계: KakaoWork 채팅방에 알림 전송 (판매입력)
+				// === KakaoCheck 설정 확인 ===
+				if (!IsKakaoWorkEnabled())
 				{
-					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
-					return false;
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoCheck 설정이 'Y'가 아닙니다. 카카오워크 알림 전송을 건너뜁니다.");
 				}
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
-				
-				try
+				else
 				{
-					// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
-					await kakaoWorkService.SendInvoiceNotificationAsync(
-						NotificationType.SalesData,
-						batch,
-						invoiceCount,
-						sharedLink,
-						chatroomId);
+					// 송장 개수 계산 및 차수 설정
+					//var invoiceCount = salesData?.Rows.Count ?? 0;
+
+                    var invoiceCount = 0;
+                    if (salesData != null && salesData.Rows.Count > 0)
+                    {
+                        // LINQ를 사용하여 중복 제거 후 개수 계산
+                        invoiceCount = salesData.AsEnumerable()
+                            .GroupBy(row => new
+                            {
+                                Address = row.Field<string>("주소"),
+                                Recipient = row.Field<string>("수취인명"),
+                                Phone = row.Field<string>("전화번호1")
+                            })
+                            .Count();
+                    }
+
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
 					
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
-				}
-				catch (Exception ex)
-				{
-					LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
-					// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+					var kakaoWorkService = KakaoWorkService.Instance;
+					var batch = GetCurrentBatch();
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 🎯 사용할 배치: {batch}");
+					
+					// 채팅방 ID 설정
+					var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+					if (string.IsNullOrEmpty(chatroomId))
+					{
+						LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
+						return false;
+					}
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+					
+					try
+					{
+						// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+						await kakaoWorkService.SendInvoiceNotificationAsync(
+							NotificationType.SalesData,
+							batch,
+							invoiceCount,
+							sharedLink,
+							chatroomId);
+						
+						LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
+					}
+					catch (Exception ex)
+					{
+						LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+						// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+					}
 				}
                 
 
@@ -5391,7 +5512,6 @@ namespace LogisticManager.Processors
             const string SHEET_NAME = "Sheet1";
             const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath7";
             const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.SeoulFrozen";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
 
             try
             {
@@ -5419,8 +5539,7 @@ namespace LogisticManager.Processors
                 //                    ) AS ranked_rows
                 //                    WHERE rn = 1";
                 var sqlQuery = $@"SELECT *
-                                  FROM {TABLE_NAME}
-                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+                                  FROM {TABLE_NAME}";
 				var seoulFrozenData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
                 if (seoulFrozenData == null || seoulFrozenData.Rows.Count == 0)
@@ -5530,53 +5649,60 @@ namespace LogisticManager.Processors
                 LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
 
                 // 6단계: KakaoWork 채팅방에 알림 전송 (서울냉동 운송장)
-                // 송장 개수 계산 및 시간대별 차수 설정
-                var invoiceCount = seoulFrozenData?.Rows.Count ?? 0;
-                LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
-                
-                var kakaoWorkService = KakaoWorkService.Instance;
-                var now = DateTime.Now;
-                var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
-                LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
-                
-                // 채팅방 ID 설정
-                var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
-                if (string.IsNullOrEmpty(chatroomId))
+                // === KakaoCheck 설정 확인 ===
+                if (!IsKakaoWorkEnabled())
                 {
-                    LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
-                    return false;
+                    LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoCheck 설정이 'Y'가 아닙니다. 카카오워크 알림 전송을 건너뜁니다.");
                 }
-                LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
-                
-                try
+                else
                 {
-                    // KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
-                    // KakaoWork 알림 전송 메서드 파라미터 설명:
-                    // - NotificationType.SeoulFrozen: 알림 타입(서울냉동 운송장)
-                    //      SeoulFrozen (서울냉동)
-                    //      GyeonggiFrozen (경기냉동)
-                    //      SeoulGongsan (서울공산)
-                    //      GyeonggiGongsan (경기공산)
-                    //      BusanCheonggwa (부산청과)
-                    //      BusanCheonggwaPrint (부산청과A4자료)
-                    //      GamcheonFrozen (감천냉동)
-                    // - batch: 시간대별 차수(예: 1차, 2차 등)
-                    // - invoiceCount: 실제 송장 개수
-                    // - sharedLink: Dropbox 공유 링크(URL)
-                    // - chatroomId: 채팅방 ID
-                    await kakaoWorkService.SendInvoiceNotificationAsync(
-                        NotificationType.SeoulFrozen,
-                        batch,
-                        invoiceCount,
-                        sharedLink,
-                        chatroomId);
+                    // 송장 개수 계산 및 시간대별 차수 설정
+                    //var invoiceCount = seoulFrozenData?.Rows.Count ?? 0;
+                    var invoiceCount = 0;
+                    if (seoulFrozenData != null && seoulFrozenData.Rows.Count > 0)
+                    {
+                        // LINQ를 사용하여 중복 제거 후 개수 계산
+                        invoiceCount = seoulFrozenData.AsEnumerable()
+                            .GroupBy(row => new
+                            {
+                                Address = row.Field<string>("주소"),
+                                Recipient = row.Field<string>("수취인명"),
+                                Phone = row.Field<string>("전화번호1")
+                            })
+                            .Count();
+                    }                    
+                    LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
                     
-                    LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
-                }
-                catch (Exception ex)
-                {
-                    LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
-                    // 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+                    var kakaoWorkService = KakaoWorkService.Instance;
+                    var batch = GetCurrentBatch();
+                    LogManagerService.LogInfo($"[{METHOD_NAME}] 🎯 사용할 배치: {batch}");
+                    
+                    // 채팅방 ID 설정
+                    var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+                    if (string.IsNullOrEmpty(chatroomId))
+                    {
+                        LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
+                        return false;
+                    }
+                    LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+                    
+                    try
+                    {
+                        // KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+                        await kakaoWorkService.SendInvoiceNotificationAsync(
+                            NotificationType.SeoulFrozen,
+                            batch,
+                            invoiceCount,
+                            sharedLink,
+                            chatroomId);
+                        
+                        LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
+                    }
+                    catch (Exception ex)
+                    {
+                        LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+                        // 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+                    }
                 }
 
                 // 7단계: 임시 파일 정리
@@ -5637,8 +5763,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_경기냉동_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath8";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GyeonggiFrozen";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GyeonggiFrozen";
 
 			// 로그 서비스 초기화 (LogManagerService로 통일)
 			try
@@ -5680,21 +5805,22 @@ namespace LogisticManager.Processors
                 //                    ) AS ranked_rows
                 //                    WHERE rn = 1";
 
+                //var sqlQuery = $@"SELECT *
+                //                  FROM {TABLE_NAME}
+                //                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+
                 var sqlQuery = $@"SELECT *
-                                  FROM {TABLE_NAME}
-                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+                                  FROM {TABLE_NAME}";
 
 				var gyeonggiFrozenData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (gyeonggiFrozenData == null || gyeonggiFrozenData.Rows.Count == 0)
 				{
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 경기냉동 최종 데이터가 없습니다.");
-					//return true; // 데이터가 없는 것은 오류가 아님
+					//return true; // 데이터가 없어도 엑셀 파일 생성하도록 주석 처리
 				}
-				else
-				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {gyeonggiFrozenData.Rows.Count:N0}건");
-				}
+
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {gyeonggiFrozenData?.Rows.Count ?? 0:N0}건");
 
 				// 3단계: Excel 파일 생성 (헤더 없음)
 				// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
@@ -5703,7 +5829,14 @@ namespace LogisticManager.Processors
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
 
-				var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(gyeonggiFrozenData ?? new DataTable(), excelFilePath, SHEET_NAME);
+				// [한글 주석] null 체크 후 Excel 파일 생성
+				if (gyeonggiFrozenData == null)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ 경기냉동 데이터가 null입니다.");
+					return false;
+				}
+
+				var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(gyeonggiFrozenData, excelFilePath, SHEET_NAME);
 				if (!excelCreated)
 				{
 					LogManagerService.LogError($"[{METHOD_NAME}] ❌ Excel 파일 생성 실패: {excelFilePath}");
@@ -5779,40 +5912,60 @@ namespace LogisticManager.Processors
 				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
 
 				// 6단계: KakaoWork 채팅방에 알림 전송 (경기냉동 운송장)
-				// 송장 개수 계산 및 시간대별 차수 설정
-				var invoiceCount = gyeonggiFrozenData?.Rows.Count ?? 0;
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
-				
-				var kakaoWorkService = KakaoWorkService.Instance;
-				var now = DateTime.Now;
-				var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
-				LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
-				
-				// 채팅방 ID 설정
-				var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
-				if (string.IsNullOrEmpty(chatroomId))
+				// === KakaoCheck 설정 확인 ===
+				if (!IsKakaoWorkEnabled())
 				{
-					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
-					return false;
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoCheck 설정이 'Y'가 아닙니다. 카카오워크 알림 전송을 건너뜁니다.");
 				}
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
-				
-				try
+				else
 				{
-					// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
-					await kakaoWorkService.SendInvoiceNotificationAsync(
-						NotificationType.GyeonggiFrozen,
-						batch,
-						invoiceCount,
-						sharedLink,
-						chatroomId);
+					// 송장 개수 계산 및 차수 설정
+					//var invoiceCount = gyeonggiFrozenData?.Rows.Count ?? 0;
+                    var invoiceCount = 0;
+                    if (gyeonggiFrozenData != null && gyeonggiFrozenData.Rows.Count > 0)
+                    {
+                        // LINQ를 사용하여 중복 제거 후 개수 계산
+                        invoiceCount = gyeonggiFrozenData.AsEnumerable()
+                            .GroupBy(row => new
+                            {
+                                Address = row.Field<string>("주소"),
+                                Recipient = row.Field<string>("수취인명"),
+                                Phone = row.Field<string>("전화번호1")
+                            })
+                            .Count();
+                    }                    
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
 					
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
-				}
-				catch (Exception ex)
-				{
-					LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
-					// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+					var kakaoWorkService = KakaoWorkService.Instance;
+					var batch = GetCurrentBatch();
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 🎯 사용할 배치: {batch}");
+					
+					// 채팅방 ID 설정
+					var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+					if (string.IsNullOrEmpty(chatroomId))
+					{
+						LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
+						return false;
+					}
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+					
+					try
+					{
+						// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+						await kakaoWorkService.SendInvoiceNotificationAsync(
+							NotificationType.GyeonggiFrozen,
+							batch,
+							invoiceCount,
+							sharedLink,
+							chatroomId);
+						
+						LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
+					}
+					catch (Exception ex)
+					{
+						LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+						// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+					}
 				}
 
 				// 7단계: 임시 파일 정리
@@ -5863,8 +6016,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_프랩원냉동_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath15";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.FrapwonFrozen";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.FrapwonFrozen";
 
 			// 로그 서비스 초기화 (LogManagerService로 통일)
 			try
@@ -5907,21 +6059,17 @@ namespace LogisticManager.Processors
                 //                    WHERE rn = 1";
 
                 var sqlQuery = $@"SELECT *
-                                  FROM {TABLE_NAME}
-                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+                                  FROM {TABLE_NAME}";
 
 				var frapwonFrozenData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (frapwonFrozenData == null || frapwonFrozenData.Rows.Count == 0)
 				{
-					// 한글 주석: 데이터가 없는 경우 경고 로그만 남기고 정상 종료 처리
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 프랩원냉동 최종 데이터가 없습니다.");
-					//return true; // 데이터가 없는 것은 오류가 아님 (경고만 출력)
+					//return true; // 데이터가 없어도 엑셀 파일 생성하도록 주석 처리
 				}
-				else
-				{
-					LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {frapwonFrozenData.Rows.Count:N0}건");
-				}
+
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {frapwonFrozenData?.Rows.Count ?? 0:N0}건");
 
 				// 3단계: Excel 파일 생성 (헤더 없음)
 				// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
@@ -5930,23 +6078,22 @@ namespace LogisticManager.Processors
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
 
-				// 데이터가 있는 경우에만 Excel 파일 생성
-				if (frapwonFrozenData != null)
+				// [한글 주석] null 체크 후 Excel 파일 생성 (빈 데이터여도 파일은 만들어야 함)
+				if (frapwonFrozenData == null)
 				{
-					var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(frapwonFrozenData ?? new DataTable(), excelFilePath, SHEET_NAME);
-					if (!excelCreated)
-					{
-						LogManagerService.LogError($"[{METHOD_NAME}] ❌ Excel 파일 생성 실패: {excelFilePath}");
-						return false;
-					}
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ 프랩원냉동 데이터가 null입니다.");
+					return false;
+				}
 
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Excel 파일 생성 완료: {excelFilePath}");
-				}
-				else
+				// [한글 주석] 빈 데이터여도 엑셀 파일 생성 (데이터가 없어도 파일은 만들어야 함)
+				var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(frapwonFrozenData, excelFilePath, SHEET_NAME);
+				if (!excelCreated)
 				{
-					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ 데이터가 없어 Excel 파일 생성을 건너뜁니다.");
-					return true; // 데이터가 없는 것은 오류가 아님
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ Excel 파일 생성 실패: {excelFilePath}");
+					return false;
 				}
+
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Excel 파일 생성 완료: {excelFilePath}");
 
 				// 4단계: Dropbox에 파일 업로드
 				var dropboxFolderPath = ConfigurationManager.AppSettings[DROPBOX_FOLDER_PATH_KEY];
@@ -6014,60 +6161,61 @@ namespace LogisticManager.Processors
 				}
 				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
 
-				// 6단계: KakaoWork 채팅방에 알림 전송 (경기냉동 운송장)
-				// 송장 개수 계산 및 시간대별 차수 설정
-				var invoiceCount = frapwonFrozenData?.Rows.Count ?? 0;
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
-				
-				var kakaoWorkService = KakaoWorkService.Instance;
-				var now = DateTime.Now;
-				var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
-				LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
-				
-				// 채팅방 ID 설정
-				var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
-				if (string.IsNullOrEmpty(chatroomId))
+				// 6단계: KakaoWork 채팅방에 알림 전송 (프랩원냉동 운송장)
+				// === KakaoCheck 설정 확인 ===
+				if (!IsKakaoWorkEnabled())
 				{
-					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
-					return false;
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoCheck 설정이 'Y'가 아닙니다. 카카오워크 알림 전송을 건너뜁니다.");
 				}
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
-				
-				try
+				else
 				{
-					// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
-					// [한글 주석] KakaoWork 알림 전송 파라미터 설명
-					// NotificationType(알림 종류) 목록:
-					//   - SeoulFrozen        : 서울냉동
-					//   - GyeonggiFrozen     : 경기냉동
-					//   - FrapwonFrozen      : 프랩원냉동
-					//   - SeoulGongsan       : 서울공산
-					//   - GyeonggiGongsan    : 경기공산
-					//   - BusanCheonggwa     : 부산청과
-					//   - BusanCheonggwaPrint: 부산청과(출력)
-					//   - GamcheonFrozen     : 감천냉동
-					//   - SalesData          : 판매입력
-					//   - Integrated         : 통합송장
-					//   - Check              : 모니터링체크용(봇방)
-					// 파라미터:
-					//   NotificationType.FrapwonFrozen : 알림 종류(프랩원냉동)
-					//   batch : 시간대별 차수(예: 1차, 2차 등)
-					//   invoiceCount : 실제 송장 개수
-					//   sharedLink : Dropbox 공유 링크(URL)
-					//   chatroomId : 카카오워크 채팅방 ID
-					await kakaoWorkService.SendInvoiceNotificationAsync(
-						NotificationType.FrapwonFrozen,
-						batch,
-						invoiceCount,
-						sharedLink,
-						chatroomId);
+					// 송장 개수 계산 및 차수 설정
+					//var invoiceCount = frapwonFrozenData?.Rows.Count ?? 0;
+                    var invoiceCount = 0;
+                    if (frapwonFrozenData != null && frapwonFrozenData.Rows.Count > 0)
+                    {
+                        // LINQ를 사용하여 중복 제거 후 개수 계산
+                        invoiceCount = frapwonFrozenData.AsEnumerable()
+                            .GroupBy(row => new
+                            {
+                                Address = row.Field<string>("주소"),
+                                Recipient = row.Field<string>("수취인명"),
+                                Phone = row.Field<string>("전화번호1")
+                            })
+                            .Count();
+                    }                    
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
 					
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
-				}
-				catch (Exception ex)
-				{
-					LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
-					// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+					var kakaoWorkService = KakaoWorkService.Instance;
+					var batch = GetCurrentBatch();
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 🎯 사용할 배치: {batch}");
+					
+					// 채팅방 ID 설정
+					var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+					if (string.IsNullOrEmpty(chatroomId))
+					{
+						LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
+						return false;
+					}
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+					
+					try
+					{
+						// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+						await kakaoWorkService.SendInvoiceNotificationAsync(
+							NotificationType.FrapwonFrozen,
+							batch,
+							invoiceCount,
+							sharedLink,
+							chatroomId);
+						
+						LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
+					}
+					catch (Exception ex)
+					{
+						LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+						// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+					}
 				}
 
 				// 7단계: 임시 파일 정리
@@ -6125,8 +6273,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_서울공산_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath9";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.SeoulGongsan";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.SeoulGongsan";
 
 			try
 			{
@@ -6154,8 +6301,7 @@ namespace LogisticManager.Processors
                 //                    WHERE rn = 1";
 
                 var sqlQuery = $@"SELECT *
-                                  FROM {TABLE_NAME}
-                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+                                  FROM {TABLE_NAME}";
 
 				var seoulGongsanData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
@@ -6257,40 +6403,60 @@ namespace LogisticManager.Processors
 				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
 
 				// 6단계: KakaoWork 채팅방에 알림 전송 (서울공산 운송장)
-				// 송장 개수 계산 및 시간대별 차수 설정
-				var invoiceCount = seoulGongsanData?.Rows.Count ?? 0;
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
-				
-				var kakaoWorkService = KakaoWorkService.Instance;
-				var now = DateTime.Now;
-				var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
-				LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
-				
-				// 채팅방 ID 설정
-				var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
-				if (string.IsNullOrEmpty(chatroomId))
+				// === KakaoCheck 설정 확인 ===
+				if (!IsKakaoWorkEnabled())
 				{
-					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
-					return false;
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoCheck 설정이 'Y'가 아닙니다. 카카오워크 알림 전송을 건너뜁니다.");
 				}
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
-				
-				try
+				else
 				{
-					// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
-					await kakaoWorkService.SendInvoiceNotificationAsync(
-						NotificationType.SeoulGongsan,
-						batch,
-						invoiceCount,
-						sharedLink,
-						chatroomId);
+					// 송장 개수 계산 및 차수 설정
+					//var invoiceCount = seoulGongsanData?.Rows.Count ?? 0;
+                    var invoiceCount = 0;
+                    if (seoulGongsanData != null && seoulGongsanData.Rows.Count > 0)
+                    {
+                        // LINQ를 사용하여 중복 제거 후 개수 계산
+                        invoiceCount = seoulGongsanData.AsEnumerable()
+                            .GroupBy(row => new
+                            {
+                                Address = row.Field<string>("주소"),
+                                Recipient = row.Field<string>("수취인명"),
+                                Phone = row.Field<string>("전화번호1")
+                            })
+                            .Count();
+                    }                    
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
 					
-					LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
-				}
-				catch (Exception ex)
-				{
-					LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
-					// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+					var kakaoWorkService = KakaoWorkService.Instance;
+					var batch = GetCurrentBatch();
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 🎯 사용할 배치: {batch}");
+					
+					// 채팅방 ID 설정
+					var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID];
+					if (string.IsNullOrEmpty(chatroomId))
+					{
+						LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID} 미설정 상태입니다.");
+						return false;
+					}
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 💬 KakaoWork 채팅방 ID: {chatroomId}");
+					
+					try
+					{
+						// KakaoWork 알림 전송 (시간대별 차수 + 실제 송장 개수 + 채팅방 ID)
+						await kakaoWorkService.SendInvoiceNotificationAsync(
+							NotificationType.SeoulGongsan,
+							batch,
+							invoiceCount,
+							sharedLink,
+							chatroomId);
+						
+						LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
+					}
+					catch (Exception ex)
+					{
+						LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+						// 알림 전송 실패는 전체 프로세스 실패로 처리하지 않음
+					}
 				}
 
 				// 7단계: 임시 파일 정리
@@ -6348,8 +6514,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_경기공산_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath10";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GyeonggiGongsan";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GyeonggiGongsan";
 
 			try
 			{
@@ -6377,18 +6542,17 @@ namespace LogisticManager.Processors
                 //                    WHERE rn = 1";
 
                 var sqlQuery = $@"SELECT *
-                                  FROM {TABLE_NAME}
-                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+                                  FROM {TABLE_NAME}";
 
 				var gyeonggiGongsanData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (gyeonggiGongsanData == null || gyeonggiGongsanData.Rows.Count == 0)
 				{
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 경기공산 최종 데이터가 없습니다.");
-					return true;
+					//return true; // 데이터가 없어도 엑셀 파일 생성하도록 주석 처리
 				}
 
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {gyeonggiGongsanData.Rows.Count:N0}건");
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {gyeonggiGongsanData?.Rows.Count ?? 0:N0}건");
 
 				// 3단계: Excel 파일 생성 (헤더 없음)
 				// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
@@ -6398,6 +6562,13 @@ namespace LogisticManager.Processors
 				var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
+
+				// [한글 주석] null 체크 후 Excel 파일 생성
+				if (gyeonggiGongsanData == null)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ 경기공산 데이터가 null입니다.");
+					return false;
+				}
 
 				var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(gyeonggiGongsanData, excelFilePath, SHEET_NAME);
 				if (!excelCreated)
@@ -6479,12 +6650,25 @@ namespace LogisticManager.Processors
 				if (IsKakaoWorkEnabled())
 				{
 					// 송장 개수 계산 및 시간대별 차수 설정
-					var invoiceCount = gyeonggiGongsanData?.Rows.Count ?? 0;
+					//var invoiceCount = gyeonggiGongsanData?.Rows.Count ?? 0;
+                    var invoiceCount = 0;
+                    if (gyeonggiGongsanData != null && gyeonggiGongsanData.Rows.Count > 0)
+                    {
+                        // LINQ를 사용하여 중복 제거 후 개수 계산
+                        invoiceCount = gyeonggiGongsanData.AsEnumerable()
+                            .GroupBy(row => new
+                            {
+                                Address = row.Field<string>("주소"),
+                                Recipient = row.Field<string>("수취인명"),
+                                Phone = row.Field<string>("전화번호1")
+                            })
+                            .Count();
+                    }                    
 					LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
 					
 					var kakaoWorkService = KakaoWorkService.Instance;
 					var now = DateTime.Now;
-					var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+					var batch = GetCurrentBatch();
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
 					
 					// 채팅방 ID 설정
@@ -6582,8 +6766,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_부산청과_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath12";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanCheonggwa";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanCheonggwa";
 
 			try
 			{
@@ -6611,18 +6794,17 @@ namespace LogisticManager.Processors
                 //                    WHERE rn = 1";
 
                 var sqlQuery = $@"SELECT *
-                                  FROM {TABLE_NAME}
-                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+                                  FROM {TABLE_NAME}";
 
 				var busanCheonggwaData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (busanCheonggwaData == null || busanCheonggwaData.Rows.Count == 0)
 				{
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 부산청과 최종 데이터가 없습니다.");
-					return true;
+					//return true; // 데이터가 없어도 엑셀 파일 생성하도록 주석 처리
 				}
 
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {busanCheonggwaData.Rows.Count:N0}건");
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {busanCheonggwaData?.Rows.Count ?? 0:N0}건");
 
 				// 3단계: Excel 파일 생성 (헤더 없음)
 				// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
@@ -6632,6 +6814,13 @@ namespace LogisticManager.Processors
 				var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
+
+				// [한글 주석] null 체크 후 Excel 파일 생성
+				if (busanCheonggwaData == null)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ 부산청과 데이터가 null입니다.");
+					return false;
+				}
 
 				var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(busanCheonggwaData, excelFilePath, SHEET_NAME);
 				if (!excelCreated)
@@ -6713,12 +6902,25 @@ namespace LogisticManager.Processors
 				if (IsKakaoWorkEnabled())
 				{
 					// 송장 개수 계산 및 시간대별 차수 설정
-					var invoiceCount = busanCheonggwaData?.Rows.Count ?? 0;
+					//var invoiceCount = busanCheonggwaData?.Rows.Count ?? 0;
+                    var invoiceCount = 0;
+                    if (busanCheonggwaData != null && busanCheonggwaData.Rows.Count > 0)
+                    {
+                        // LINQ를 사용하여 중복 제거 후 개수 계산
+                        invoiceCount = busanCheonggwaData.AsEnumerable()
+                            .GroupBy(row => new
+                            {
+                                Address = row.Field<string>("주소"),
+                                Recipient = row.Field<string>("수취인명"),
+                                Phone = row.Field<string>("전화번호1")
+                            })
+                            .Count();
+                    }                    
 					LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
 					
 					var kakaoWorkService = KakaoWorkService.Instance;
 					var now = DateTime.Now;
-					var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+					var batch = GetCurrentBatch();
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
 					
 					// 채팅방 ID 설정
@@ -6801,8 +7003,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_부산청과자료_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath12";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanCheonggwaDoc";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanCheonggwaDoc";
 
 			try
 			{
@@ -6837,10 +7038,10 @@ namespace LogisticManager.Processors
 				if (busanCheonggwaDocData == null || busanCheonggwaDocData.Rows.Count == 0)
 				{
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 부산청과 자료 데이터가 없습니다.");
-					return true;
+					//return true; // 데이터가 없어도 엑셀 파일 생성하도록 주석 처리
 				}
 
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {busanCheonggwaDocData.Rows.Count:N0}건");
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {busanCheonggwaDocData?.Rows.Count ?? 0:N0}건");
 
 				// 3단계: Excel 파일 생성 (헤더 없음)
 				// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
@@ -6850,6 +7051,13 @@ namespace LogisticManager.Processors
 				var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
+
+				// [한글 주석] null 체크 후 Excel 파일 생성
+				if (busanCheonggwaDocData == null)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ 부산청과 자료 데이터가 null입니다.");
+					return false;
+				}
 
                 // SaveDataTableToExcelWithoutHeader : 헤더없음
                 // SaveDataTableToExcel : 헤더포함
@@ -6938,7 +7146,7 @@ namespace LogisticManager.Processors
                     
                     var kakaoWorkService = KakaoWorkService.Instance;
                     var now = DateTime.Now;
-                    var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+                    var batch = GetCurrentBatch();
                     LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
                     
                     // 채팅방 ID 설정
@@ -7035,8 +7243,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_감천냉동_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath13";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GamcheonFrozen";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.GamcheonFrozen";
 
 			try
 			{
@@ -7064,18 +7271,17 @@ namespace LogisticManager.Processors
                 //                    WHERE rn = 1";
 
                 var sqlQuery = $@"SELECT *
-                                  FROM {TABLE_NAME}
-                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+                                  FROM {TABLE_NAME}";
 
 				var gamcheonFrozenData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (gamcheonFrozenData == null || gamcheonFrozenData.Rows.Count == 0)
 				{
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 감천냉동 최종 데이터가 없습니다.");
-					return true;
+					//return true; // 데이터가 없어도 엑셀 파일 생성하도록 주석 처리
 				}
 
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {gamcheonFrozenData.Rows.Count:N0}건");
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {gamcheonFrozenData?.Rows.Count ?? 0:N0}건");
 
 				// 3단계: Excel 파일 생성 (헤더 포함)
 				// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
@@ -7085,6 +7291,13 @@ namespace LogisticManager.Processors
 				var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
+
+				// [한글 주석] null 체크 후 Excel 파일 생성
+				if (gamcheonFrozenData == null)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ 감천냉동 데이터가 null입니다.");
+					return false;
+				}
 
                 // SaveDataTableToExcelWithoutHeader : 헤더없음
                 // SaveDataTableToExcel : 헤더포함
@@ -7168,12 +7381,25 @@ namespace LogisticManager.Processors
 				if (IsKakaoWorkEnabled())
 				{
 					// 송장 개수 계산 및 시간대별 차수 설정
-					var invoiceCount = gamcheonFrozenData?.Rows.Count ?? 0;
+					//var invoiceCount = gamcheonFrozenData?.Rows.Count ?? 0;
+                    var invoiceCount = 0;
+                    if (gamcheonFrozenData != null && gamcheonFrozenData.Rows.Count > 0)
+                    {
+                        // LINQ를 사용하여 중복 제거 후 개수 계산
+                        invoiceCount = gamcheonFrozenData.AsEnumerable()
+                            .GroupBy(row => new
+                            {
+                                Address = row.Field<string>("주소"),
+                                Recipient = row.Field<string>("수취인명"),
+                                Phone = row.Field<string>("전화번호1")
+                            })
+                            .Count();
+                    }                    
 					LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
 					
 					var kakaoWorkService = KakaoWorkService.Instance;
 					var now = DateTime.Now;
-					var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+					var batch = GetCurrentBatch();
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
 					
 					// 채팅방 ID 설정
@@ -7270,8 +7496,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_최종";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath14";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Integrated";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Integrated";
 
 			try
 			{
@@ -7299,18 +7524,17 @@ namespace LogisticManager.Processors
                 //                    WHERE rn = 1";
 
                 var sqlQuery = $@"SELECT *
-                                  FROM {TABLE_NAME}
-                                  ORDER BY 주소, 수취인명, 전화번호1 ASC";
+                                  FROM {TABLE_NAME}";
 
 				var invoiceFinalData = await _databaseCommonService.GetDataFromQuery(sqlQuery);
 
 				if (invoiceFinalData == null || invoiceFinalData.Rows.Count == 0)
 				{
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 송장출력 최종 데이터가 없습니다.");
-					return true;
+					//return true; // 데이터가 없어도 엑셀 파일 생성하도록 주석 처리
 				}
 
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {invoiceFinalData.Rows.Count:N0}건");
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {invoiceFinalData?.Rows.Count ?? 0:N0}건");
 
 				// 3단계: Excel 파일 생성 (헤더 없음)
 				// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
@@ -7320,6 +7544,13 @@ namespace LogisticManager.Processors
 				var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
+
+				// [한글 주석] null 체크 후 Excel 파일 생성
+				if (invoiceFinalData == null)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ 송장출력 최종 데이터가 null입니다.");
+					return false;
+				}
 
                 // SaveDataTableToExcelWithoutHeader : 헤더없음
                 // SaveDataTableToExcel : 헤더포함
@@ -7403,12 +7634,25 @@ namespace LogisticManager.Processors
 				if (IsKakaoWorkEnabled())
 				{
 					// 송장 개수 계산 및 시간대별 차수 설정
-					var invoiceCount = invoiceFinalData?.Rows.Count ?? 0;
+					//var invoiceCount = invoiceFinalData?.Rows.Count ?? 0;
+                    var invoiceCount = 0;
+                    if (invoiceFinalData != null && invoiceFinalData.Rows.Count > 0)
+                    {
+                        // LINQ를 사용하여 중복 제거 후 개수 계산
+                        invoiceCount = invoiceFinalData.AsEnumerable()
+                            .GroupBy(row => new
+                            {
+                                Address = row.Field<string>("주소"),
+                                Recipient = row.Field<string>("수취인명"),
+                                Phone = row.Field<string>("전화번호1")
+                            })
+                            .Count();
+                    }                    
 					LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
 					
 					var kakaoWorkService = KakaoWorkService.Instance;
 					var now = DateTime.Now;
-					var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+					var batch = GetCurrentBatch();
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
 					
 					// 채팅방 ID 설정
@@ -7488,8 +7732,7 @@ namespace LogisticManager.Processors
 			const string TABLE_NAME = "송장출력_부산청과_최종변환";
 			const string SHEET_NAME = "Sheet1";
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath12";
-			const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanExtCheonggwa";
-            //const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.Check";
+            const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.BusanExtCheonggwa";
 
 			try
 			{
@@ -7525,10 +7768,10 @@ namespace LogisticManager.Processors
 				if (busanCheonggwaExtData == null || busanCheonggwaExtData.Rows.Count == 0)
 				{
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 부산청과 외부출고 최종 데이터가 없습니다.");
-					return true;
+					//return true; // 데이터가 없어도 엑셀 파일 생성하도록 주석 처리
 				}
 
-				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {busanCheonggwaExtData.Rows.Count:N0}건");
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {busanCheonggwaExtData?.Rows.Count ?? 0:N0}건");
 
 				// 3단계: Excel 파일 생성 (헤더 없음)
 				// {접두사}_{설명}_{YYMMDD}_{HH}시{MM}분.xlsx
@@ -7538,6 +7781,13 @@ namespace LogisticManager.Processors
 				var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
+
+				// [한글 주석] null 체크 후 Excel 파일 생성
+				if (busanCheonggwaExtData == null)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ 부산청과 외부출고 데이터가 null입니다.");
+					return false;
+				}
 
 				var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(busanCheonggwaExtData, excelFilePath, SHEET_NAME);
 				if (!excelCreated)
@@ -7605,7 +7855,7 @@ namespace LogisticManager.Processors
 					
 					var kakaoWorkService = KakaoWorkService.Instance;
 					var now = DateTime.Now;
-					var batch = kakaoWorkService.GetBatchByTime(now.Hour, now.Minute);
+					var batch = GetCurrentBatch();
 					LogManagerService.LogInfo($"[{METHOD_NAME}] ⏰ 현재 시간: {now:HH:mm}, 배치: {batch}");
 					
 					// 채팅방 ID 설정
@@ -7776,8 +8026,105 @@ namespace LogisticManager.Processors
             }
         }
 
+        /// <summary>
+        /// 현재 사용할 차수를 가져오는 헬퍼 메서드
+        /// 사용자 선택 차수가 있으면 우선 사용, 없으면 현재 시간 기반으로 계산
+        /// </summary>
+        /// <returns>사용할 차수 문자열</returns>
+        private string GetCurrentBatch()
+        {
+            // 사용자가 선택한 차수가 있으면 우선 사용
+            if (!string.IsNullOrEmpty(_selectedBatch))
+            {
+                LogManagerService.LogInfo($"🎯 사용자 선택 차수 사용: {_selectedBatch}");
+                return _selectedBatch;
+            }
+            
+            // 사용자 선택 차수가 없으면 현재 시간 기반으로 계산 (BatchTimeService 사용)
+            var now = DateTime.Now;
+            var timeBasedBatch = BatchTimeService.Instance.GetCurrentBatchType();
+            LogManagerService.LogInfo($"⏰ 시간 기반 차수 계산: {now:HH:mm} → {timeBasedBatch}");
+            return timeBasedBatch;
+        }
 
-        
+        /// <summary>
+        /// 메모리 사용량을 추정하는 메서드 (16GB 환경 최적화용)
+        /// 
+        /// 📊 계산 방식:
+        /// - 각 Order 객체의 대략적인 메모리 사용량 계산
+        /// - 문자열 필드들의 평균 길이 기반 추정
+        /// - 객체 오버헤드 및 .NET 런타임 비용 고려
+        /// 
+        /// 💡 사용 목적:
+        /// - 16GB 환경에서 안전한 전체 처리 여부 판단
+        /// - 메모리 부족 상황 사전 감지
+        /// - 처리 방식 결정 (단순 처리 vs 배치 처리)
+        /// </summary>
+        /// <param name="orders">처리할 주문 데이터 목록</param>
+        /// <returns>예상 메모리 사용량 (MB 단위)</returns>
+        private long EstimateMemoryUsage(List<Order> orders)
+        {
+            try
+            {
+                if (orders == null || orders.Count == 0)
+                {
+                    return 0;
+                }
+
+                // 샘플 데이터로 평균 메모리 사용량 계산
+                var sampleSize = Math.Min(100, orders.Count); // 최대 100개 샘플
+                var sampleOrders = orders.Take(sampleSize).ToList();
+                
+                long totalEstimatedBytes = 0;
+                
+                foreach (var order in sampleOrders)
+                {
+                    // 기본 객체 오버헤드 (약 24바이트)
+                    totalEstimatedBytes += 24;
+                    
+                    // 문자열 필드들의 예상 크기 (UTF-16 기준, 2바이트/문자)
+                    totalEstimatedBytes += (order.RecipientName?.Length ?? 0) * 2;
+                    totalEstimatedBytes += (order.Address?.Length ?? 0) * 2;
+                    totalEstimatedBytes += (order.ProductName?.Length ?? 0) * 2;
+                    totalEstimatedBytes += (order.OrderNumber?.Length ?? 0) * 2;
+                    totalEstimatedBytes += (order.RecipientPhone1?.Length ?? 0) * 2;
+                    totalEstimatedBytes += (order.ZipCode?.Length ?? 0) * 2;
+                    totalEstimatedBytes += (order.StoreName?.Length ?? 0) * 2;
+                    totalEstimatedBytes += (order.ShippingMessage?.Length ?? 0) * 2;
+                    
+                    // 숫자 필드들 (int, decimal 등)
+                    totalEstimatedBytes += 4; // Quantity (int)
+                    totalEstimatedBytes += 8; // ShippingCost (decimal)
+                    totalEstimatedBytes += 4; // BoxSize (int)
+                    totalEstimatedBytes += 4; // PrintCount (int)
+                    
+                    // 기타 오버헤드 (속성, 메서드 등)
+                    totalEstimatedBytes += 50;
+                }
+                
+                // 평균 계산 및 전체 데이터에 적용
+                var averageBytesPerOrder = totalEstimatedBytes / sampleSize;
+                var totalEstimatedBytesForAll = averageBytesPerOrder * orders.Count;
+                
+                // .NET 런타임 오버헤드 (약 20% 추가)
+                totalEstimatedBytesForAll = (long)(totalEstimatedBytesForAll * 1.2);
+                
+                // MB 단위로 변환
+                var estimatedMemoryMB = totalEstimatedBytesForAll / (1024 * 1024);
+                
+                LogManagerService.LogInfo($"[메모리추정] 샘플 크기: {sampleSize}건, 평균/건: {averageBytesPerOrder}바이트, 전체 예상: {estimatedMemoryMB}MB");
+                
+                return estimatedMemoryMB;
+            }
+            catch (Exception ex)
+            {
+                LogManagerService.LogWarning($"[메모리추정] 메모리 사용량 추정 중 오류: {ex.Message}");
+                // 오류 시 보수적 추정값 반환 (1건당 1KB)
+                return (orders?.Count ?? 0) / 1024;
+            }
+        }
+
+        #endregion
 
 
     }
