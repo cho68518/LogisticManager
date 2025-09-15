@@ -342,6 +342,7 @@ namespace LogisticManager.Services
             return type switch
             {
                 NotificationType.SeoulFrozen => "서울냉동",
+                NotificationType.SeoulFrozen2 => "서울냉장",
                 NotificationType.GyeonggiFrozen => "경기냉동",
                 NotificationType.FrapwonFrozen => "프랩원냉동",
                 NotificationType.SeoulGongsan => "서울공산",
@@ -370,6 +371,7 @@ namespace LogisticManager.Services
                 
                 // [4-8], [4-10], [4-12], [4-14], [4-16], [4-18], [4-20]: 운송장 타입
                 NotificationType.SeoulFrozen => KakaoWorkMessageType.Shipment,
+                NotificationType.SeoulFrozen2 => KakaoWorkMessageType.Shipment,
                 NotificationType.GyeonggiFrozen => KakaoWorkMessageType.Shipment,
                 NotificationType.FrapwonFrozen => KakaoWorkMessageType.Shipment,
                 NotificationType.SeoulGongsan => KakaoWorkMessageType.Shipment,

@@ -47,6 +47,27 @@ namespace LogisticManager.Services
         }
 
         /// <summary>
+        /// Dropbox에 파일을 업로드하는 비동기 메서드 (파일명 지정 가능)
+        /// </summary>
+        /// <param name="filePath">업로드할 로컬 파일 경로</param>
+        /// <param name="dropboxPath">Dropbox 폴더 경로</param>
+        /// <param name="fileName">Dropbox에 저장할 파일명 (확장자 포함)</param>
+        /// <returns>생성된 공유 링크 URL</returns>
+        public async Task<string> UploadFileToDropboxAsync(string filePath, string dropboxPath, string fileName)
+        {
+            try
+            {
+                // DropboxService Singleton 인스턴스 사용
+                var dropboxService = DropboxService.Instance;
+                return await dropboxService.UploadFileAsync(filePath, dropboxPath, fileName);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Dropbox 업로드 중 오류 발생: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
         /// Kakao Work로 메시지를 전송하는 비동기 메서드
         /// </summary>
         /// <param name="chatroomId">채팅방 ID</param>

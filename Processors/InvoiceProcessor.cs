@@ -365,6 +365,88 @@ namespace LogisticManager.Processors
                 // UI 업데이트를 위한 짧은 지연
                 await Task.Delay(50);
 
+
+
+
+
+
+
+                // [1단계] 엑셀 파일을 DropboxFolderPath30에 지정된 경로로 '원본주문서'라는 파일명으로 복사(업로드)하는 처리
+                try
+                {
+                    finalProgress?.Report("🚀 전 처리 작업중 입니다...");
+
+                    string? dropboxFolderPath30 = System.Configuration.ConfigurationManager.AppSettings["DropboxFolderPath30"];
+
+                    if (string.IsNullOrEmpty(dropboxFolderPath30))
+                    {
+                        // 로그 파일에 에러 기록
+                        LogManagerService.LogError("[InvoiceProcessor] DropboxFolderPath30 설정값이 비어있습니다. App.config를 확인하세요.");
+                        finalProgress?.Report("❌ Dropbox 업로드 경로 설정이 잘못되었습니다. 로그(app.log)를 확인하세요.");
+                        return false;
+                    }
+
+                    // 엑셀 확장자 추출 (예: .xlsx, .xls)
+                    string excelExtension = Path.GetExtension(filePath);
+                    if (string.IsNullOrEmpty(excelExtension))
+                    {
+                        LogManagerService.LogError("[InvoiceProcessor] 엑셀 파일 확장자를 확인할 수 없습니다.");
+                        finalProgress?.Report("❌ 엑셀 파일 확장자를 확인할 수 없습니다. 로그(app.log)를 확인하세요.");
+                        return false;
+                    }
+
+                    // 업로드할 파일명: '원본주문서' + 확장자
+                    string uploadFileName = "원본주문서" + excelExtension;
+
+                    // DropboxService를 통해 파일 업로드 (파일명 지정)
+                    string? uploadResult = null;
+                    try
+                    {
+                        // ApiService의 새로운 오버로드를 통해 파일명 지정 업로드
+                        uploadResult = await _apiService.UploadFileToDropboxAsync(filePath, dropboxFolderPath30, uploadFileName);
+
+                        if (!string.IsNullOrEmpty(uploadResult))
+                        {
+                            // 성공 로그 기록
+                            LogManagerService.LogInfo($"[InvoiceProcessor] 원본 엑셀 파일이 Dropbox에 성공적으로 업로드됨: {dropboxFolderPath30}/{uploadFileName}");
+                            //finalProgress?.Report($"✅ 엑셀 파일이 Dropbox에 '원본주문서'로 업로드되었습니다: {dropboxFolderPath30}/{uploadFileName}");
+                            finalProgress?.Report($"✅ 전 처리 작업이 완료 되었습니다.");
+                        }
+                        else
+                        {
+                            // 실패 로그 기록
+                            LogManagerService.LogError($"[InvoiceProcessor] 원본 엑셀 파일 Dropbox 업로드 실패: {dropboxFolderPath30}/{uploadFileName}");
+                            //finalProgress?.Report("❌ 엑셀 파일 Dropbox 업로드에 실패했습니다. 로그(app.log)를 확인하세요.");
+                            finalProgress?.Report("❌ 전 처리 작업이 실패 했습니다.");
+                            return false;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // 예외 발생 시 로그 기록 및 사용자 안내
+                        LogManagerService.LogError($"[InvoiceProcessor] 원본 엑셀 파일 Dropbox 업로드 중 예외 발생: {ex.Message}");
+                        finalProgress?.Report("❌ 전 처리 작업이 실패 했습니다.");
+                        return false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // 예외 발생 시 로그 기록 및 사용자 안내
+                    LogManagerService.LogError($"[InvoiceProcessor] 원본 엑셀 파일 Dropbox 업로드 처리 중 예외 발생: {ex.Message}");
+                    finalProgress?.Report("❌ 전 처리 작업이 실패 했습니다.");
+                    return false;
+                }
+
+
+
+
+
+
+
+
+
+
+
                 // - 지정한 엑셀 파일에서 "order_table" 시트의 데이터를 DataTable로 읽어옵니다.
                 var originalData = _fileService.ReadExcelToDataTable(filePath, "order_table");
 
@@ -882,13 +964,13 @@ namespace LogisticManager.Processors
                 #region [4-12] 프랩원냉동최종
                 #endregion
                 //=======================================================================
-                finalProgress?.Report("💾 [4-12] 프랩원 냉동 최종파일 생성 및 업로드 처리");
+                finalProgress?.Report("💾 [4-12] 프랩원냉동/서울냉장 최종파일 생성 및 업로드 처리");
                 _stepReporter?.ReportStepProgress(11); // 4-12 단계 (0부터 시작하므로 11)
                 LogManagerService.LogInfo("🔍 ProcessFrapwonFrozenFinalFile 메서드 호출 시작...");
                 LogManagerService.LogInfo($"🔍 ProcessFrapwonFrozenFinalFile 호출 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
                 finalProgressReporter?.Report(48); // 4-12단계 완료 (48%)
                 LogManagerService.LogInfo("🔍 ProcessFrapwonFrozenFinalFile 메서드 실행 중...");
-                finalProgress?.Report("✅ [4-12] 프랩원냉동 최종파일 생성 및 업로드 처리 완료");
+                finalProgress?.Report("✅ [4-12] 프랩원냉동/서울냉장 최종파일 생성 및 업로드 처리 완료");
                 _stepReporter?.ReportStepCompleted(11); // 4-12 단계 완료
                 finalProgress?.Report("");
 
@@ -902,7 +984,7 @@ namespace LogisticManager.Processors
                     if (maxStep <= 12)
                     {
                         finalProgress?.Report($"🛑 [제한] 4-12단계까지만 처리 완료 (maxStep: {maxStep})");
-                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 프랩원냉동 처리 및 최종파일 생성까지 완료되었습니다.");
+                        finalProgress?.Report("🎉 서울냉동, 경기냉동, 프랩원냉동/서울냉장 처리 및 최종파일 생성까지 완료되었습니다.");
                         return true;
                     }
                 }
@@ -910,7 +992,7 @@ namespace LogisticManager.Processors
                 {
                     LogManagerService.LogError($"❌ ProcessFrapwonFrozenFinalFile 실행 중 오류 발생: {ex.Message}");
                     LogManagerService.LogError($"❌ ProcessFrapwonFrozenFinalFile 오류 상세: {ex.StackTrace}");
-                    finalProgress?.Report($"❌ [프랩원냉동 최종파일 생성 오류] {ex.Message}");
+                    finalProgress?.Report($"❌ [프랩원냉동/서울냉장 최종파일 생성 오류] {ex.Message}");
 
                     throw;
                 }
@@ -6018,7 +6100,14 @@ namespace LogisticManager.Processors
 			const string DROPBOX_FOLDER_PATH_KEY = "DropboxFolderPath15";
             const string KAKAO_WORK_CHATROOM_ID = "KakaoWork.ChatroomId.FrapwonFrozen";
 
-			// 로그 서비스 초기화 (LogManagerService로 통일)
+			const string TABLE_NAME2 = "송장출력_서울냉장_최종";
+			const string SHEET_NAME2 = "Sheet1";
+			const string DROPBOX_FOLDER_PATH_KEY2 = "DropboxFolderPath16";
+            const string KAKAO_WORK_CHATROOM_ID2 = "KakaoWork.ChatroomId.SeoulFrozen";
+
+			// ==============================================================================
+            // 프랩원냉동 최종 파일 처리
+			// ==============================================================================
 			try
 			{
 				LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 프랩원냉동 최종 파일 처리 시작...");
@@ -6032,32 +6121,6 @@ namespace LogisticManager.Processors
 				LogManagerService.LogInfo($"[{METHOD_NAME}] 대상 테이블: {TABLE_NAME}");
 
 				// 2단계: 데이터베이스에서 경기냉동 최종 데이터 조회 (직접 쿼리 사용)
-				// 주소, 수취인명, 전화번호1 기준으로 중복 제거하는 쿼리
-                // 간단한 쿼리
-                //var data = await _databaseCommonService.GetDataFromQuery("SELECT * FROM 테이블명");
-
-                // 매개변수가 있는 쿼리
-                //var data = await _databaseCommonService.GetDataFromQuery(
-                //    "SELECT * FROM 테이블명 WHERE 컬럼 = @값",
-                //    new Dictionary<string, object> { { "@값", "실제값" } }
-                //);
-
-                // 복잡한 쿼리 (JOIN, GROUP BY 등)
-                //var data = await _databaseCommonService.GetDataFromQuery(
-                //    "SELECT t1.*, t2.컬럼 FROM 테이블1 t1 JOIN 테이블2 t2 ON t1.id = t2.id"
-                //);
-				//var sqlQuery = $"SELECT DISTINCT `주소`, `수취인명`, `전화번호1`, * FROM `{TABLE_NAME}`";
-                //var sqlQuery = $@"SELECT msg1,msg2,msg3,msg4,msg5,msg6,수취인명,전화번호1,전화번호2,
-                //우편번호,주소,송장명,수량,배송메세지,주문번호,쇼핑몰,품목코드,택배비용,박스크기,출력개수,별표1,별표2,품목개수
-                //                   FROM (SELECT *,
-                //                            ROW_NUMBER() OVER (
-                //                                PARTITION BY 주소, 수취인명, 전화번호1 
-                //                                ORDER BY 주소, 수취인명, 전화번호1 ASC
-                //                            ) AS rn
-                //                          FROM {TABLE_NAME}
-                //                    ) AS ranked_rows
-                //                    WHERE rn = 1";
-
                 var sqlQuery = $@"SELECT *
                                   FROM {TABLE_NAME}";
 
@@ -6234,7 +6297,7 @@ namespace LogisticManager.Processors
 				}
 
 				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ 프랩원냉동 최종 파일 처리 완료");
-				return true;
+				// 프랩원냉동 처리 완료 후 서울냉장 처리를 계속 진행
 			}
 			catch (Exception ex)
 			{
@@ -6246,6 +6309,189 @@ namespace LogisticManager.Processors
 				LogManagerService.LogInfo(stackTraceMessage);
 
 				// 내부 예외가 있는 경우 추가 로그
+				if (ex.InnerException != null)
+				{
+					var innerErrorMessage = $"📋 [{METHOD_NAME}] 내부 예외:\n   오류 내용: {ex.InnerException.Message}";
+					LogManagerService.LogInfo(innerErrorMessage);
+				}
+
+				// 프랩원냉동 처리 실패해도 서울냉장 처리는 계속 진행
+			}
+
+            // ==============================================================================
+            // 서울냉장 최종 파일 처리
+			// ==============================================================================
+			try
+			{
+				LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 서울냉장 최종 파일 처리 시작...");
+				LogManagerService.LogInfo($"🔍 [{METHOD_NAME}] 현재 시간: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+				LogPathManager.PrintLogPathInfo();
+				LogPathManager.ValidateLogFileLocations();
+
+				// 1단계: 테이블명 확인
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 대상 테이블: {TABLE_NAME2}");
+
+				// 2단계: 데이터베이스에서 서울냉장 최종 데이터 조회
+                var sqlQuery = $@"SELECT *
+                                  FROM {TABLE_NAME2}";
+
+				var seoulFrozen2Data = await _databaseCommonService.GetDataFromQuery(sqlQuery);
+
+				if (seoulFrozen2Data == null || seoulFrozen2Data.Rows.Count == 0)
+				{
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 서울냉장 최종 데이터가 없습니다.");
+				}
+
+				LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 데이터 조회 완료: {seoulFrozen2Data?.Rows.Count ?? 0:N0}건");
+
+				// 3단계: Excel 파일 생성 (헤더 없음)
+				var excelFileName = _fileCommonService.GenerateExcelFileName("서울냉장", null);
+				var excelFilePath = Path.Combine(Path.GetTempPath(), excelFileName);
+
+				LogManagerService.LogInfo($"[{METHOD_NAME}] Excel 파일 생성 시작: {excelFileName}");
+
+				// null 체크 후 Excel 파일 생성
+				if (seoulFrozen2Data == null)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ 서울냉장 데이터가 null입니다.");
+					return false;
+				}
+
+				var excelCreated = _fileService.SaveDataTableToExcelWithoutHeader(seoulFrozen2Data, excelFilePath, SHEET_NAME2);
+				if (!excelCreated)
+				{
+					LogManagerService.LogError($"[{METHOD_NAME}] ❌ Excel 파일 생성 실패: {excelFilePath}");
+					return false;
+				}
+
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Excel 파일 생성 완료: {excelFilePath}");
+
+				// 4단계: Dropbox에 파일 업로드
+				var dropboxFolderPath = ConfigurationManager.AppSettings[DROPBOX_FOLDER_PATH_KEY2];
+				if (string.IsNullOrEmpty(dropboxFolderPath))
+				{
+					LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {DROPBOX_FOLDER_PATH_KEY2} 미설정 상태입니다.");
+					return false;
+				}
+
+				LogManagerService.LogInfo($"🔗 [{METHOD_NAME}] Dropbox 업로드 시작: {dropboxFolderPath}");
+
+				var dropboxFilePath = await _fileCommonService.UploadFileToDropbox(excelFilePath, dropboxFolderPath);
+				if (string.IsNullOrEmpty(dropboxFilePath))
+				{
+					LogManagerService.LogError($"❌ [{METHOD_NAME}] Dropbox 업로드 실패");
+					return false;
+				}
+
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 업로드 완료: {dropboxFilePath}");
+
+				// 파일 목록에 업로드된 파일 정보 추가
+				if (_fileListCallback != null)
+				{
+					try
+					{
+						var uploadedFileInfo = new FileInfo(excelFilePath);
+						var uploadedFileName = Path.GetFileName(excelFilePath);
+						var uploadedFileSize = uploadedFileInfo.Length;
+						var uploadedTime = DateTime.Now;
+
+						_fileListCallback(uploadedFileName, uploadedFileSize, uploadedTime, dropboxFilePath);
+						LogManagerService.LogInfo($"📋 [{METHOD_NAME}] 파일 목록에 추가됨: {uploadedFileName} ({uploadedFileSize:N0} bytes)");
+					}
+					catch (Exception ex)
+					{
+						LogManagerService.LogWarning($"⚠️ [{METHOD_NAME}] 파일 목록 추가 중 오류: {ex.Message}");
+					}
+				}
+
+				// 5단계: Dropbox 공유 링크 생성
+				LogManagerService.LogInfo($"[{METHOD_NAME}] Dropbox 공유 링크 생성 시작");
+
+				var sharedLink = await _fileCommonService.CreateDropboxSharedLink(dropboxFilePath);
+				if (string.IsNullOrEmpty(sharedLink))
+				{
+					LogManagerService.LogError($"❌ [{METHOD_NAME}] Dropbox 공유 링크 생성 실패");
+					return false;
+				}
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ Dropbox 공유 링크 생성 완료: {sharedLink}");
+
+				// 6단계: KakaoWork 채팅방에 알림 전송
+				if (!IsKakaoWorkEnabled())
+				{
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ KakaoCheck 설정이 'Y'가 아닙니다. 카카오워크 알림 전송을 건너뜁니다.");
+				}
+				else
+				{
+					// 송장 개수 계산
+                    var invoiceCount = 0;
+                    if (seoulFrozen2Data != null && seoulFrozen2Data.Rows.Count > 0)
+                    {
+                        invoiceCount = seoulFrozen2Data.AsEnumerable()
+                            .GroupBy(row => new
+                            {
+                                Address = row.Field<string>("주소"),
+                                Recipient = row.Field<string>("수취인명"),
+                                Phone = row.Field<string>("전화번호1")
+                            })
+                            .Count();
+                    }                    
+					LogManagerService.LogInfo($"[{METHOD_NAME}] 📊 송장 개수: {invoiceCount:N0}건");
+					
+					var kakaoWorkService = KakaoWorkService.Instance;
+					var batch = GetCurrentBatch();
+					
+					// 채팅방 ID 설정
+					var chatroomId = ConfigurationManager.AppSettings[KAKAO_WORK_CHATROOM_ID2];
+					if (string.IsNullOrEmpty(chatroomId))
+					{
+						LogManagerService.LogWarning($"[{METHOD_NAME}] ⚠️ {KAKAO_WORK_CHATROOM_ID2} 미설정 상태입니다.");
+						return false;
+					}
+					
+					try
+					{
+						// KakaoWork 알림 전송
+						await kakaoWorkService.SendInvoiceNotificationAsync(
+							NotificationType.SeoulFrozen2,
+							batch,
+							invoiceCount,
+							sharedLink,
+							chatroomId);
+						
+						LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ KakaoWork 알림 전송 완료 (배치: {batch}, 송장: {invoiceCount}건, 채팅방: {chatroomId})");
+					}
+					catch (Exception ex)
+					{
+						LogManagerService.LogError($"[{METHOD_NAME}] ❌ KakaoWork 알림 전송 실패: {ex.Message}");
+					}
+				}
+
+				// 7단계: 임시 파일 정리
+				try
+				{
+					if (File.Exists(excelFilePath))
+					{
+						File.Delete(excelFilePath);
+						LogManagerService.LogInfo($"[{METHOD_NAME}] 🗑️ 임시 파일 정리 완료: {excelFilePath}");
+					}
+				}
+				catch (Exception ex)
+				{
+					LogManagerService.LogInfo($"[{METHOD_NAME}] ⚠️ 임시 파일 정리 실패: {ex.Message}");
+				}
+
+				LogManagerService.LogInfo($"[{METHOD_NAME}] ✅ 서울냉장 최종 파일 처리 완료");
+				return true;
+			}
+			catch (Exception ex)
+			{
+				var errorMessage = $"❌ [{METHOD_NAME}] 서울냉장 처리 중 오류 발생:\n   오류 내용: {ex.Message}";
+				var stackTraceMessage = $"📋 [{METHOD_NAME}] 스택 트레이스:\n   {ex.StackTrace}";
+
+				LogManagerService.LogInfo(errorMessage);
+				LogManagerService.LogInfo(stackTraceMessage);
+
 				if (ex.InnerException != null)
 				{
 					var innerErrorMessage = $"📋 [{METHOD_NAME}] 내부 예외:\n   오류 내용: {ex.InnerException.Message}";

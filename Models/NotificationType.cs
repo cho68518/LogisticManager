@@ -22,6 +22,11 @@ namespace LogisticManager.Models
         SeoulFrozen,
         
         /// <summary>
+        /// 서울냉장 알림
+        /// </summary>
+        SeoulFrozen2,
+        
+        /// <summary>
         /// 경기냉동 알림
         /// </summary>
         GyeonggiFrozen,

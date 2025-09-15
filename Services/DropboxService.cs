@@ -303,6 +303,167 @@ namespace LogisticManager.Services
         }
 
         /// <summary>
+        /// 로컬 파일을 Dropbox에 업로드하고 공유 링크를 생성 (파일명 지정 가능)
+        /// </summary>
+        /// <param name="localFilePath">업로드할 로컬 파일 경로</param>
+        /// <param name="dropboxFolderPath">Dropbox 폴더 경로 (예: /LogisticManager/)</param>
+        /// <param name="fileName">Dropbox에 저장할 파일명 (확장자 포함)</param>
+        /// <returns>생성된 공유 링크 URL</returns>
+        public async Task<string> UploadFileAsync(string localFilePath, string dropboxFolderPath, string fileName)
+        {
+            try
+            {
+                Console.WriteLine($"파일 업로드 시작: {localFilePath} -> {dropboxFolderPath}/{fileName}");
+
+                // Dropbox 인증 정보 확인
+                if (string.IsNullOrEmpty(_appKey) || string.IsNullOrEmpty(_appSecret) || string.IsNullOrEmpty(_refreshToken))
+                {
+                    throw new InvalidOperationException("Dropbox 인증 정보가 설정되지 않았습니다. App.config에서 Dropbox.AppKey, Dropbox.AppSecret, Dropbox.RefreshToken을 확인해주세요.");
+                }
+
+                // 파일 존재 여부 확인
+                if (!File.Exists(localFilePath))
+                {
+                    throw new FileNotFoundException($"업로드할 파일을 찾을 수 없습니다: {localFilePath}");
+                }
+
+                // 유효한 클라이언트 확보
+                var client = await GetClientAsync();
+
+                // 지정된 파일명으로 Dropbox 경로 생성
+                var dropboxPath = Path.Combine(dropboxFolderPath, fileName).Replace('\\', '/');
+
+                Console.WriteLine($"Dropbox 업로드 경로: {dropboxPath}");
+
+                // 파일 업로드
+                using (var fileStream = File.OpenRead(localFilePath))
+                {
+                    try
+                    {
+                        // 먼저 파일이 존재하는지 확인
+                        try
+                        {
+                            var existingFile = await client.Files.GetMetadataAsync(dropboxPath);
+                            Console.WriteLine($"파일이 이미 존재합니다: {existingFile.Name}. 덮어쓰기 모드로 업로드합니다.");
+                        }
+                        catch (Dropbox.Api.ApiException<Dropbox.Api.Files.GetMetadataError>)
+                        {
+                            Console.WriteLine($"새로운 파일을 업로드합니다: {fileName}");
+                        }
+
+                        var uploadResult = await client.Files.UploadAsync(
+                            dropboxPath,
+                            Dropbox.Api.Files.WriteMode.Overwrite.Instance,
+                            body: fileStream
+                        );
+
+                        Console.WriteLine($"파일 업로드 완료: {uploadResult.Name}");
+                    }
+                    catch (Dropbox.Api.ApiException<Dropbox.Api.Files.UploadError> ex)
+                    {
+                        if (ex.ErrorResponse.IsPath)
+                        {
+                            // 경로 관련 오류인 경우에도 덮어쓰기 시도
+                            Console.WriteLine($"경로 오류 발생, 덮어쓰기로 재시도합니다: {ex.Message}");
+                            
+                            // 파일 스트림을 다시 열어서 재시도
+                            using (var retryStream = File.OpenRead(localFilePath))
+                            {
+                                var retryResult = await client.Files.UploadAsync(
+                                    dropboxPath,
+                                    Dropbox.Api.Files.WriteMode.Overwrite.Instance,
+                                    body: retryStream
+                                );
+                                Console.WriteLine($"재시도 성공: {retryResult.Name}");
+                            }
+                        }
+                        else
+                        {
+                            throw; // 다른 오류는 그대로 던지기
+                        }
+                    }
+                }
+
+                // 공유 링크 생성
+                string sharedUrl;
+                try
+                {
+                    var sharedLink = await client.Sharing.CreateSharedLinkWithSettingsAsync(dropboxPath);
+                    sharedUrl = sharedLink.Url;
+                    Console.WriteLine($"새로운 공유 링크 생성 완료");
+                }
+                catch (Dropbox.Api.ApiException<Dropbox.Api.Sharing.CreateSharedLinkWithSettingsError> ex)
+                {
+                    // 이미 공유 링크가 존재하는 경우
+                    if (ex.ErrorResponse.IsSharedLinkAlreadyExists)
+                    {
+                        Console.WriteLine($"이미 공유 링크가 존재합니다. 기존 링크를 가져옵니다.");
+                        
+                        try
+                        {
+                            // 기존 공유 링크 목록에서 해당 파일의 링크 찾기
+                            var sharedLinks = await client.Sharing.ListSharedLinksAsync(dropboxPath, directOnly: true);
+                            var existingLink = sharedLinks.Links.FirstOrDefault(link => link.PathLower == dropboxPath.ToLower());
+                            
+                            if (existingLink != null)
+                            {
+                                sharedUrl = existingLink.Url;
+                                Console.WriteLine($"기존 공유 링크를 가져왔습니다.");
+                            }
+                            else
+                            {
+                                // 공유 링크 목록에서 찾지 못한 경우, 다시 생성 시도
+                                Console.WriteLine($"기존 링크를 찾을 수 없어 다시 생성 시도합니다.");
+                                var retryLink = await client.Sharing.CreateSharedLinkWithSettingsAsync(dropboxPath);
+                                sharedUrl = retryLink.Url;
+                                Console.WriteLine($"재시도로 공유 링크 생성 완료");
+                            }
+                        }
+                        catch (Exception listEx)
+                        {
+                            Console.WriteLine($"공유 링크 목록 조회 실패: {listEx.Message}. 다시 생성 시도합니다.");
+                            var retryLink = await client.Sharing.CreateSharedLinkWithSettingsAsync(dropboxPath);
+                            sharedUrl = retryLink.Url;
+                            Console.WriteLine($"재시도로 공유 링크 생성 완료");
+                        }
+                    }
+                    else
+                    {
+                        throw; // 다른 오류는 그대로 던지기
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"공유 링크 생성 중 오류 발생: {ex.Message}. 재시도합니다.");
+                    
+                    // 일반적인 오류의 경우에도 재시도
+                    try
+                    {
+                        var retryLink = await client.Sharing.CreateSharedLinkWithSettingsAsync(dropboxPath);
+                        sharedUrl = retryLink.Url;
+                        Console.WriteLine($"재시도로 공유 링크 생성 완료");
+                    }
+                    catch (Exception retryEx)
+                    {
+                        throw new InvalidOperationException($"공유 링크 생성 실패: {ex.Message}. 재시도도 실패: {retryEx.Message}");
+                    }
+                }
+
+                // Dropbox 공유 링크를 다운로드 링크로 변환 (dl=1 파라미터 추가)
+                var downloadUrl = sharedUrl.Replace("www.dropbox.com", "dl.dropboxusercontent.com");
+
+                Console.WriteLine($"공유 링크 생성 완료: {downloadUrl}");
+
+                return downloadUrl;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"파일 업로드 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
         /// Dropbox에 파일을 업로드하는 메서드 (공유 링크 생성 없음)
         /// </summary>
         /// <param name="localFilePath">로컬 파일 경로</param>
